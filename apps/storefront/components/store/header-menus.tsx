@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, LayoutGrid, Menu, MonitorSmartphone, ShieldCheck, Sparkles, Store, X, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { CategoryIcon, GroupIcon } from "./category-icon";
+import type { AccountDoors } from "./account-menus";
 
 const catalogueHref = (group: StoreNavigationGroup) => (group.categories.length === 1 ? `/catalogs/${group.categories[0].category}` : `/catalogs/${group.key}`);
 
@@ -153,7 +154,11 @@ export function DesktopNav({ groups, links }: { groups: StoreNavigationGroup[]; 
  * Phones and tablets: the menu in a drawer, rendered into <body>: the sticky header's backdrop blur makes the header
  * the containing block of fixed elements inside it, which clipped the drawer to the header's height.
  */
-export function MobileMenu({ groups, signedIn = false, reseller = true, links }: { groups: StoreNavigationGroup[]; signedIn?: boolean; reseller?: boolean; links?: string[] }) {
+/**
+ * `doors`: BitoCard's own sites, where signing in and registering each choose customer or reseller; null on a
+ * reseller's store, which signs only its own customers in.
+ */
+export function MobileMenu({ groups, signedIn = false, doors = null, links }: { groups: StoreNavigationGroup[]; signedIn?: boolean; doors?: AccountDoors | null; links?: string[] }) {
   const shown = linksShown(links);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -229,19 +234,41 @@ export function MobileMenu({ groups, signedIn = false, reseller = true, links }:
                   ))}
                 </nav>
                 <div className="grid shrink-0 gap-2.5 border-t border-slate-100 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                  <Link
-                    href={signedIn ? "/account" : "/signin"}
-                    onClick={() => setOpen(false)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-navy-900"
-                  >
-                    {signedIn ? "Account" : "Sign in"}
-                  </Link>
-                  {reseller ? (
-                    <Link href="/resellers" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white">
-                      <Store className="size-5" aria-hidden="true" />
-                      Start Reselling
+                  {doors && !signedIn ? (
+                    <>
+                      <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Sign in</p>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <Link href={doors.customerSignIn} onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-3 font-semibold text-navy-900">
+                          Customer
+                        </Link>
+                        <Link href={doors.resellerSignIn} onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 font-semibold text-navy-900">
+                          <Store className="size-4" aria-hidden="true" />
+                          Reseller
+                        </Link>
+                      </div>
+                      <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Register</p>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <Link href={doors.customerSignUp} onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center rounded-xl bg-brand-500 px-3 font-semibold text-white">
+                          Customer
+                        </Link>
+                        <Link href={doors.resellerSignUp} onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-3 font-semibold text-white">
+                          <Store className="size-4" aria-hidden="true" />
+                          Reseller
+                        </Link>
+                      </div>
+                      <Link href={doors.resellerInfo} onClick={() => setOpen(false)} className="flex min-h-10 items-center justify-center text-sm font-semibold text-brand-600">
+                        How reselling works
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      href={signedIn ? "/account" : "/signin"}
+                      onClick={() => setOpen(false)}
+                      className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-navy-900"
+                    >
+                      {signedIn ? "Account" : "Sign in"}
                     </Link>
-                  ) : null}
+                  )}
                 </div>
               </div>
             </div>,

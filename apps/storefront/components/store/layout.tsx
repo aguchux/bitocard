@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LifeBuoy, Search, Store } from "lucide-react";
+import { LifeBuoy, Search } from "lucide-react";
 import type { StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { Brand } from "@bitocard/ui/brand";
 import { legalDocuments } from "@bitocard/ui/legal";
@@ -10,6 +10,7 @@ import { CurrencyMenu } from "./currency-menu";
 import { MarketChooser } from "./market-chooser";
 import { quickLinksFor } from "@/lib/quick-links";
 import { DesktopNav, MobileMenu } from "./header-menus";
+import { AccountMenus, type AccountDoors } from "./account-menus";
 import { FooterCategories } from "./footer-categories";
 
 /** A reseller's store name, with its logo when it has one. */
@@ -28,8 +29,9 @@ export function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "
 }
 
 /**
- * The store header: wordmark, the category menus, then the shopper's country, currency, sign in and the reseller call
- * to action. A market's own country store (`ng.bitocard.com`…) wears bitocard.com's own wordmark and every business
+ * The store header: wordmark, the category menus, then the shopper's country, currency, and signing in. On BitoCard's
+ * own sites, signed out, Sign in and Register each choose customer (this site) or reseller (Seller HQ); a reseller's
+ * store only signs its own customers in. A market's own country store (`ng.bitocard.com`…) wears bitocard.com's own wordmark and every business
  * link, exactly as root does: it is BitoCard's own retail arm there, localised, never rebranded. Only a reseller's
  * store shows its own name and logo, and drops the market, currency and reseller call to action.
  */
@@ -52,6 +54,9 @@ export function StoreHeader({
   const reseller = Boolean(store) && !store!.house;
   const baseLinks = quickLinksFor(groups, store?.design?.template);
   const links = !reseller ? [...baseLinks, "/spin"] : baseLinks;
+  const doors: AccountDoors | null = reseller
+    ? null
+    : { customerSignIn: "/signin", customerSignUp: "/signup", resellerSignIn: appUrl("shq", "/signin"), resellerSignUp: appUrl("shq", "/signup"), resellerInfo: "/resellers" };
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
@@ -77,22 +82,17 @@ export function StoreHeader({
               </div>
             </>
           ) : null}
-          <Link
-            href={signedIn ? "/account" : "/signin"}
-            className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-slate-300 lg:inline-flex"
-          >
-            {signedIn ? "Account" : "Sign in"}
-          </Link>
-          {!reseller ? (
+          {doors && !signedIn ? (
+            <AccountMenus doors={doors} />
+          ) : (
             <Link
-              href="/resellers"
-              className="hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex"
+              href={signedIn ? "/account" : "/signin"}
+              className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-slate-300 lg:inline-flex"
             >
-              <Store className="size-5" aria-hidden="true" />
-              Start Reselling
+              {signedIn ? "Account" : "Sign in"}
             </Link>
-          ) : null}
-          <MobileMenu groups={groups} signedIn={signedIn} reseller={reseller} links={links} />
+          )}
+          <MobileMenu groups={groups} signedIn={signedIn} doors={doors} links={links} />
         </div>
       </div>
     </header>

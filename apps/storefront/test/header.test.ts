@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import type { StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { StoreHeader } from "@/components/store/layout";
+import { doorChoices } from "@/components/store/account-menus";
 import type { HostedStore } from "@/lib/store";
 
 // The header: root bitocard.com's own wordmark and business links; a market's own country store (house) wears the
@@ -24,11 +25,31 @@ const store = (house: boolean) =>
 const render = (hosted: HostedStore | null) => renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: null, signedIn: false, store: hosted }));
 
 describe("store header", () => {
-  test("bitocard.com shows its own wordmark and the reseller call to action", () => {
+  test("bitocard.com shows its own wordmark, and Sign in and Register each choose customer or reseller", () => {
     const html = render(null);
     expect(html).toContain("Bitocard home");
     expect(html).not.toContain("Ada Digital");
-    expect(html).toContain("Start Reselling");
+    expect(html).not.toContain("Start Reselling");
+    expect(html).toMatch(/aria-haspopup="menu"[^>]*>.*?Sign in/);
+    expect(html).toMatch(/aria-haspopup="menu"[^>]*>.*?Register/);
+  });
+
+  test("signing in and registering lead customers to this site and resellers to Seller HQ", () => {
+    const choices = doorChoices({ customerSignIn: "/signin", customerSignUp: "/signup", resellerSignIn: "https://shq.bitocard.com/signin", resellerSignUp: "https://shq.bitocard.com/signup", resellerInfo: "/resellers" });
+    expect(choices.signIn.map(choice => [choice.title, choice.href])).toEqual([
+      ["Sign in as a customer", "/signin"],
+      ["Sign in as a reseller", "https://shq.bitocard.com/signin"],
+    ]);
+    expect(choices.register.map(choice => [choice.title, choice.href])).toEqual([
+      ["Register as a customer", "/signup"],
+      ["Register as a reseller", "https://shq.bitocard.com/signup"],
+    ]);
+  });
+
+  test("signed in, bitocard.com shows the account instead", () => {
+    const html = renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: null, signedIn: true, store: null }));
+    expect(html).toContain(">Account<");
+    expect(html).not.toContain("Register");
   });
 
   test("a reseller's store shows its own name and logo, never BitoCard's wordmark or the reseller call to action", () => {
@@ -37,6 +58,8 @@ describe("store header", () => {
     expect(html).toContain("ada-logo.png");
     expect(html).not.toContain("Bitocard home");
     expect(html).not.toContain("Start Reselling");
+    expect(html).not.toContain("Register");
+    expect(html).toContain('href="/signin"');
     expect(html).not.toContain("Shop globally");
   });
 
