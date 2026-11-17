@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Module, Param, ParseUUIDPipe, Patch, Post, Query, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -13,6 +14,7 @@ import type { LedgerMode } from '../generated/prisma/client.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { ApiError } from '../common/errors/api-error.js';
+import { SupplierWebhooksService } from '../orders/supplier-webhooks.js';
 import { ProductOnly } from '../products/product.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { GiftCardSalesService } from './gift-card-sales.service.js';
@@ -123,7 +125,10 @@ export class ResellerGiftCardSalesController {
   }
 }
 
-/** Prestmit's trade notifications: signature-checked, then the trade is read back from Prestmit. */
+/**
+ * Prestmit's trade notifications: signature-checked, then the trade is read back from Prestmit. Sell trades are
+ * customers' gift card sales; buy trades are supplier orders, stored and checked like any supplier's notification.
+ */
 @ApiExcludeController()
 @Public()
 @SkipIdempotency()
@@ -133,6 +138,7 @@ export class PrestmitWebhookController {
   constructor(
     private readonly sales: GiftCardSalesService,
     private readonly integrations: IntegrationsService,
+    private readonly modules: ModuleRef,
   ) {}
 
   @Post()
@@ -146,6 +152,10 @@ export class PrestmitWebhookController {
       payload = JSON.parse(req.rawBody!.toString('utf8'));
     } catch {
       return { received: true };
+    }
+    const event = (payload as { event?: unknown } | null)?.event;
+    if (typeof event === 'string' && event.startsWith('giftcard-trade.buy.')) {
+      return this.modules.get(SupplierWebhooksService, { strict: false }).receivePrestmitBuy(req.rawBody!, payload);
     }
     return this.sales.notified(payload);
   }

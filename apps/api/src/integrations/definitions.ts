@@ -143,6 +143,7 @@ const integrationKeyList = [
   'PRESTMIT_API_URL',
   'PRESTMIT_SELL_MARGIN_PERCENT',
   'PRESTMIT_RESELLER_SPREAD_CAP_PERCENT',
+  'PRESTMIT_ACCOUNT_PIN',
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_API_URL',
   'ANTHROPIC_PRICES',
@@ -485,7 +486,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     id: 'prestmit',
     name: 'Prestmit',
     description:
-      'Customers sell their gift cards through BitoCard: Prestmit buys them, paying BitoCard’s Prestmit wallet in naira, and BitoCard credits the customer’s wallet once Prestmit approves, less BitoCard’s margin. Without the API key and secret nobody can sell live. The Sandbox switch syncs the cards Prestmit buys from its sandbox for BitoCard’s sandbox only (sales there are simulated).',
+      'Gift cards both ways: customers sell theirs to Prestmit (paid into BitoCard’s Prestmit wallet in naira, credited to them less BitoCard’s margin once approved), and Prestmit is a gift card supplier, its cards bought from the prefunded Naira wallet. Neither runs live without the key and secret. Sandbox: Prestmit’s sandbox cards for BitoCard’s sandbox only.',
     webhookPath: '/v1/webhooks/prestmit',
     fields: [
       secret('PRESTMIT_API_KEY', 'API key', { help: 'Prestmit console > Developers > API keys (console.prestmit.io/developers; the sandbox’s at sandbox.prestmit.io/developers). API access is asked for from sales@prestmit.com.' }),
@@ -493,6 +494,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       secret('PRESTMIT_WEBHOOK_SECRET', 'Webhook secret', { required: false, help: 'Developers > Webhooks: the signing secret of the webhook pointing at the address above. Without it trades are still checked on schedule.' }),
       field('PRESTMIT_SELL_MARGIN_PERCENT', 'Margin (%)', { required: true, help: 'What BitoCard keeps of what Prestmit pays for each card, from 0 to 50, for example 5. A card may have its own (PATCH /v1/admin/gift-card-sales/offers/:id). Customers see their rate after it. Nobody can sell until it is set.' }),
       field('PRESTMIT_RESELLER_SPREAD_CAP_PERCENT', 'Resellers’ cut cap (%)', { required: false, help: 'On resellers’ stores (the reseller_gift_card_buyback switch), the most a reseller keeps of BitoCard’s rate when their customers sell a card, from 0 to 50; their cut is their gift card markup up to this. Unset: 10.' }),
+      secret('PRESTMIT_ACCOUNT_PIN', 'Account PIN', { required: false, help: 'Prestmit console > Settings > Security: the account PIN, sent with every gift card bought from Prestmit (currentAccountPIN), which Prestmit says will become required. Withdrawal 2FA must be off on the account: an API purchase cannot wait for a code.' }),
       field('PRESTMIT_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Prestmit’s sandbox (dev-api.prestmit.io) for Test connection and the cards shown in BitoCard’s sandbox, where sales are simulated. Off: live (api.prestmit.io).' }),
       field('PRESTMIT_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
     ],

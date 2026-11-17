@@ -116,6 +116,17 @@ export class SupplierWebhooksService {
     return this.store('africas_talking', rawBody, africasTalkingNotice(rawBody));
   }
 
+  /**
+   * Prestmit's buy notifications (`giftcard-trade.buy.approved|rejected`), already signature-checked by its webhook
+   * (shared with the sell side). The body only names the trade: our reference (`uniqueIdentifier`) or Prestmit's.
+   */
+  async receivePrestmitBuy(rawBody: Buffer, payload: unknown) {
+    const body = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+    const data = (body.data && typeof body.data === 'object' ? body.data : {}) as Record<string, unknown>;
+    const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+    return this.store('prestmit', rawBody, { eventType: text(body.event), reference: text(data.uniqueIdentifier), supplierTransactionId: text(data.reference) });
+  }
+
   /** Reloadly, to a reseller's own connection: signed with the webhook secret they saved on it. */
   async receiveOwnReloadly(connectionId: string, rawBody: Buffer | undefined, signature: string | undefined, timestamp: string | undefined) {
     const connection = await this.connections.forNotification(connectionId, 'reloadly');

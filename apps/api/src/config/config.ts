@@ -259,6 +259,8 @@ export const configSchema = z.object({
   PRESTMIT_API_KEY: z.string().optional(),
   PRESTMIT_API_SECRET: z.string().optional(),
   PRESTMIT_WEBHOOK_SECRET: z.string().optional(),
+  /** Sent as `currentAccountPIN` with gift cards bought from Prestmit. */
+  PRESTMIT_ACCOUNT_PIN: z.string().regex(/^[0-9]{4,8}$/, 'the account PIN, 4 to 8 digits').optional(),
   PRESTMIT_SANDBOX: flag.prefault('off'),
   /** Leave at the default to follow PRESTMIT_SANDBOX; any other value overrides it. */
   PRESTMIT_API_URL: z.string().url().default('https://api.prestmit.io/partners/v1'),

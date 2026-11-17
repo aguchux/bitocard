@@ -14,9 +14,9 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { brandRegistry, registryBrand } from '../storefront/brand-registry.js';
+import { registryBrand } from '../storefront/brand-registry.js';
 import { templateSells } from '../stores/templates.js';
-import { Prestmit, type PrestmitCard, type PrestmitTrade } from './prestmit.js';
+import { matchBrand, Prestmit, type PrestmitCard, type PrestmitTrade } from './prestmit.js';
 
 /**
  * Customers sell their gift cards through BitoCard to Prestmit (decided 15 November 2026): Prestmit pays BitoCard's
@@ -45,22 +45,7 @@ const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONF
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such sale.');
 
-/** Letters and digits only, lower case: how names are compared. */
-const key = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-/** The registry entry a provider's card is sold under, from its category's or its own name. */
-export function matchBrand(category: string, name: string): string | null {
-  for (const text of [category, name]) {
-    const wanted = key(text);
-    if (!wanted) continue;
-    const exact = brandRegistry.find(entry => [entry.name, entry.slug, ...entry.slugs, ...entry.aliases].some(word => key(word) === wanted));
-    if (exact) return exact.slug;
-  }
-  // "Amazon (USA) E-code": the longest registry name the card's name starts with.
-  const named = key(name);
-  const starts = brandRegistry.filter(entry => key(entry.name).length >= 3 && named.startsWith(key(entry.name))).sort((a, b) => key(b.name).length - key(a.name).length);
-  return starts[0]?.slug ?? null;
-}
+export { matchBrand } from './prestmit.js';
 
 /** A margin percentage (up to 2 decimals) in basis points; null when unset. */
 export function marginBpsOf(percent: string | undefined) {

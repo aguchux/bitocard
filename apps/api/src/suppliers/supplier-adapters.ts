@@ -9,6 +9,7 @@ import { ReloadlyAdapter } from './reloadly.adapter.js';
 import { StockAdapter } from './stock.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
 import { PawapayAdapter } from './pawapay.adapter.js';
+import { PrestmitAdapter } from './prestmit.adapter.js';
 import { RemitaAdapter } from './remita.adapter.js';
 import { ZenditAdapter } from './zendit.adapter.js';
 import { VpnresellersAdapter } from './vpnresellers.adapter.js';
@@ -56,6 +57,12 @@ export class SupplierAdapters {
           dataPlans: config.AFRICAS_TALKING_DATA_PLANS,
         }),
         new RemitaAdapter({ secretKey: live('remita') ? config.REMITA_SECRET_KEY : undefined, baseUrl: config.REMITA_API_URL, contactPhone: config.REMITA_CONTACT_PHONE }),
+        new PrestmitAdapter({
+          apiKey: live('prestmit') ? config.PRESTMIT_API_KEY : undefined,
+          apiSecret: live('prestmit') ? config.PRESTMIT_API_SECRET : undefined,
+          accountPin: config.PRESTMIT_ACCOUNT_PIN,
+          baseUrl: config.PRESTMIT_API_URL,
+        }),
         new VpnresellersAdapter((() => {
           const credentials = integrations.supplier('vpnresellers');
           return {
