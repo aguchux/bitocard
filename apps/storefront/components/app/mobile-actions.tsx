@@ -12,7 +12,7 @@ const tiles: Tile[] = [
 
 /**
  * The Mobile catalogue's four actions (2 × 2 on phones, four across on desktops): topping up airtime or data, and the
- * airtime exchange's selling and buying, shown as Soon (never a link) until it is open (`exchangeOpen`) on bitocard.com.
+ * airtime exchange's selling and buying, shown as Soon (never a link) until it is open (`exchangeOpen`) on the store (bitocard.com, or a reseller’s store that trades airtime).
  */
 export function MobileActions({ exchangeOpen }: { exchangeOpen: boolean }) {
   return (

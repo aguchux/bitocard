@@ -122,7 +122,7 @@ function PoolTab({ networks, mode, loading }: { networks: AdminAirtimeNetwork[] 
               );
             },
           },
-          { key: "limits", header: "Limits", hideOnMobile: true, cell: row => <span className="text-xs text-muted">{`${naira(row.min_amount)} to ${naira(row.max_amount)} a trade · ${naira(row.seller_daily)} a seller a day (${naira(row.new_seller_daily)} for new sellers, until ${row.established_after} sales) · ${row.credit_hold_hours}h hold`}</span> },
+          { key: "limits", header: "Limits", hideOnMobile: true, cell: row => <span className="text-xs text-muted">{`${naira(row.min_amount)} to ${naira(row.max_amount)} a trade · ${naira(row.seller_daily)} a seller a day (${naira(row.new_seller_daily)} for new sellers, until ${row.established_after} sales) · ${row.credit_hold_hours}h hold · resellers up to ${percent(row.reseller_cap_bps)}`}</span> },
           {
             key: "edit",
             header: "",
@@ -153,14 +153,16 @@ function NetworkDialog({ network, onClose }: { network: AdminAirtimeNetwork; onC
   const [newDaily, setNewDaily] = useState(moneyInputValue(network.new_seller_daily, currency));
   const [established, setEstablished] = useState(String(network.established_after));
   const [hold, setHold] = useState(String(network.credit_hold_hours));
+  const [cap, setCap] = useState(String(network.reseller_cap_bps / 100));
   const [steps, setSteps] = useState(network.transfer_steps);
   const [enabled, setEnabled] = useState(network.enabled);
   const sellBps = Math.round(Number(sell) * 100);
   const buyBps = Math.round(Number(buy) * 100);
   const amounts = [toMinor(min, currency), toMinor(max, currency), toMinor(daily, currency), toMinor(newDaily, currency)];
   const establishedCount = Number(established);
+  const capBps = Math.round(Number(cap) * 100);
   const valid =
-    sellBps > 0 && buyBps <= 10_000 && sellBps < buyBps && amounts.every(value => value !== null) && amounts[3]! <= amounts[2]! && Number.isInteger(Number(hold)) && Number.isInteger(establishedCount) && establishedCount >= 0 && establishedCount <= 100;
+    sellBps > 0 && buyBps <= 10_000 && sellBps < buyBps && amounts.every(value => value !== null) && amounts[3]! <= amounts[2]! && Number.isInteger(Number(hold)) && Number.isInteger(establishedCount) && establishedCount >= 0 && establishedCount <= 100 && cap.trim() !== "" && capBps >= 0 && capBps <= 5000;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!valid) return;
@@ -175,6 +177,7 @@ function NetworkDialog({ network, onClose }: { network: AdminAirtimeNetwork; onC
       new_seller_daily: amounts[3]!,
       established_after: establishedCount,
       credit_hold_hours: Number(hold),
+      reseller_cap_bps: capBps,
       transfer_steps: steps.trim(),
       enabled,
     })
@@ -225,6 +228,9 @@ function NetworkDialog({ network, onClose }: { network: AdminAirtimeNetwork; onC
           </Field>
           <Field label="Hold before sellers are paid (hours)" htmlFor={`${id}-hold`}>
             <Input id={`${id}-hold`} inputMode="numeric" value={hold} onChange={event => setHold(event.target.value)} />
+          </Field>
+          <Field label="Resellers' cut cap (%)" htmlFor={`${id}-cap`} hint="On resellers' stores, sellers get these rates less the reseller's airtime markup and buyers pay them plus it, never more than this. 0 to 50.">
+            <Input id={`${id}-cap`} inputMode="decimal" value={cap} onChange={event => setCap(event.target.value)} />
           </Field>
         </div>
         <Field label="How sellers send it" htmlFor={`${id}-steps`} hint="{number}, {amount} and {pin} are filled in when shown.">

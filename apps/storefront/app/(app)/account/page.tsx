@@ -14,7 +14,6 @@ import { currentCustomer, customerApi } from "@/lib/customer";
 import { sellingOpenIn } from "@/lib/gift-card-sales";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
-import { currentStore } from "@/lib/store";
 import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
@@ -44,7 +43,7 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
   ]);
   const sellOpen = await sellingOpenIn((await currentCustomer())?.country);
   // The airtime exchange is bitocard.com's own, never a reseller's store.
-  const exchangeOpen = !(await currentStore()).store && Boolean((await airtimePool())?.open);
+  const exchangeOpen = Boolean((await airtimePool())?.open);
   const topUpOpen = Boolean(navigation.groups.find(group => group.key === "mobile")?.on_sale);
   const rewards = spins.ok ? spins.data : null;
   const figures = summary.ok ? summary.data : null;

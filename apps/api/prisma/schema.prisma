@@ -5556,6 +5556,8 @@ model AirtimeNetwork {
   transferSteps    String                 @map("transfer_steps")
   enabled          Boolean                @default(true)
   position         Int                    @default(0)
+  /// The most a reseller's store may take of BitoCard's rate on this network (their airtime markup, capped).
+  resellerCapBps   Int                    @default(500) @map("reseller_cap_bps")
   updatedAt        DateTime               @default(now()) @updatedAt @map("updated_at")
   lines            AirtimeCollectorLine[]
   pools            AirtimePool[]
@@ -5623,6 +5625,10 @@ model AirtimeSale {
   currency         String               @db.VarChar(10)
   rateBps          Int                  @map("rate_bps")
   payoutMinor      BigInt               @map("payout_minor")
+  /// A reseller's store: the reseller, their cut of BitoCard's payout and what it came to (null on BitoCard's own).
+  resellerId           String?          @map("reseller_id") @db.Uuid
+  resellerSpreadBps    Int              @default(0) @map("reseller_spread_bps")
+  resellerEarningMinor BigInt?          @map("reseller_earning_minor")
   /// awaiting_transfer, sent, received (credit waiting for the hold), credited; or expired, cancelled, not_received, reversed.
   status           String               @default("awaiting_transfer")
   expiresAt        DateTime             @map("expires_at")
@@ -5645,6 +5651,7 @@ model AirtimeSale {
   @@index([status, expiresAt])
   @@index([status, creditAt])
   @@index([mode, network, receivedAt])
+  @@index([resellerId, createdAt])
   @@map("airtime_sales")
 }
 
@@ -5663,6 +5670,10 @@ model AirtimePurchase {
   currency    String                @db.VarChar(10)
   rateBps     Int                   @map("rate_bps")
   priceMinor  BigInt                @map("price_minor")
+  /// A reseller's store: the reseller, their cut on top of BitoCard's price and what it came to (null on BitoCard's own).
+  resellerId           String?        @map("reseller_id") @db.Uuid
+  resellerSpreadBps    Int            @default(0) @map("reseller_spread_bps")
+  resellerEarningMinor BigInt?        @map("reseller_earning_minor")
   /// What the airtime cost BitoCard (the pool's average), once sent.
   costMinor   BigInt?               @map("cost_minor")
   lineId      String?               @map("line_id") @db.Uuid
@@ -5682,5 +5693,6 @@ model AirtimePurchase {
   @@index([customerId, createdAt])
   @@index([status, expiresAt])
   @@index([mode, network, deliveredAt])
+  @@index([resellerId, createdAt])
   @@map("airtime_purchases")
 }

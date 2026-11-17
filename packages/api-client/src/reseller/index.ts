@@ -15,6 +15,7 @@ export * from './fees';
 export * from './invoices';
 export * from './vpn';
 export * from './buy-back';
+export * from './airtime-exchange';
 export * from './disputes';
 export * from './support';
 export * from '../support-bots';

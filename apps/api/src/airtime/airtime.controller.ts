@@ -2,7 +2,8 @@ import { Body, Controller, Get, Header, HttpCode, HttpStatus, Module, Param, Par
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, StepUp } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, resellerOf, Roles, SessionOnly, StepUp } from '../auth/caller.js';
+import { Mode } from '../ledger/mode.js';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
@@ -16,6 +17,9 @@ const maxMinor = 100_000_000;
 class PoolQueryDto {
   @IsOptional() @Matches(/^[A-Za-z]{2}$/, { message: 'country must be a 2-letter country code' })
   country?: string;
+  /** A reseller's store (its subdomain): its market's pool at its customers' rates. */
+  @IsOptional() @Matches(/^[a-z0-9-]{2,63}$/, { message: 'store must be a store subdomain' })
+  store?: string;
 }
 
 class SellDto {
@@ -53,11 +57,11 @@ export class AirtimePoolController {
   @Get()
   @Header('Cache-Control', 'public, max-age=15')
   pool(@Query() query: PoolQueryDto) {
-    return this.airtime.pool(query.country);
+    return this.airtime.pool(query.country, query.store);
   }
 }
 
-/** A customer's airtime sales and purchases (bitocard.com sessions only). */
+/** A customer's airtime sales and purchases (bitocard.com's, or a reseller's store where it trades airtime). */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
@@ -145,6 +149,8 @@ class NetworkUpdateDto {
   @IsOptional() @IsInt() @Min(0) @Max(720) credit_hold_hours?: number;
   @IsOptional() @IsString() @MinLength(10) @MaxLength(400) transfer_steps?: string;
   @IsOptional() @IsBoolean() enabled?: boolean;
+  /** The most a reseller's store may take of BitoCard's rate on this network, in basis points (0 to 5000). */
+  @IsOptional() @IsInt() @Min(0) @Max(5000) reseller_cap_bps?: number;
 }
 
 class LineDto {
@@ -179,6 +185,21 @@ class ClaimDto {
 
 class DeliverDto {
   @IsOptional() @IsUUID() line_id?: string;
+}
+
+/** The airtime exchange on a reseller's stores: whether it is open, their cut per network and their customers' trades (SHQ sessions only). */
+@ApiExcludeController()
+@SessionOnly()
+@Roles('admin', 'finance', 'support')
+@Controller('airtime')
+@ProductOnly('bitocard')
+export class ResellerAirtimeController {
+  constructor(private readonly airtime: AirtimeExchangeService) {}
+
+  @Get('exchange')
+  exchange(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+    return this.airtime.resellerExchange(resellerOf(caller), mode);
+  }
 }
 
 /** Admins: rates, collector lines, and checking, sending and refunding trades. */
@@ -286,7 +307,7 @@ export class AdminAirtimeController {
 
 @Module({
   imports: [CheckoutModule, SettingsModule],
-  controllers: [AirtimePoolController, CustomerAirtimeController, AdminAirtimeController],
+  controllers: [AirtimePoolController, CustomerAirtimeController, ResellerAirtimeController, AdminAirtimeController],
   providers: [AirtimeExchangeService],
   exports: [AirtimeExchangeService],
 })

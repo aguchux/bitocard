@@ -14,7 +14,6 @@ import { currentCustomer } from "@/lib/customer";
 import { sellingOpenIn } from "@/lib/gift-card-sales";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
-import { currentStore } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Catalog" };
 
@@ -76,7 +75,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const sellOpen = giftCards ? await sellingOpenIn((await currentCustomer())?.country) : false;
   const selling = sellOpen && sell === "1";
   // Mobile: the airtime exchange's tiles open once it is open, on bitocard.com only.
-  const exchangeOpen = group === "mobile" && !(await currentStore()).store ? Boolean((await airtimePool())?.open) : false;
+  const exchangeOpen = group === "mobile" ? Boolean((await airtimePool())?.open) : false;
 
   return (
     <div className="space-y-6 sm:space-y-8">

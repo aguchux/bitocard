@@ -67,6 +67,11 @@ export const switchDefinitions = {
     description:
       "Customers of resellers' stores sell their gift cards there too (with gift card selling on in the market): they get BitoCard's rate less the reseller's cut (their gift card markup, capped), which goes to the reseller's earnings once the card is accepted. Off until buy back is cleared.",
   },
+  reseller_airtime_exchange: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "Customers of resellers' stores sell and buy unused airtime there too (with the airtime exchange on in the market): at BitoCard's rates less the reseller's cut when selling and plus it when buying (their airtime markup, capped per network), the cut going to the reseller's earnings. Off until cleared.",
+  },
   airtime_exchange: {
     scopes: ['global', 'country'],
     description:

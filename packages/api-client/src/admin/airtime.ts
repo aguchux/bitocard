@@ -18,6 +18,8 @@ export type AdminAirtimeNetwork = {
   new_seller_daily: number;
   established_after: number;
   credit_hold_hours: number;
+  /** The most a reseller's store may take of these rates (their airtime markup, capped), in basis points. */
+  reseller_cap_bps: number;
   transfer_steps: string;
   pools: Array<{ mode: 'live' | 'test'; available: number; reserved: number; cost: number; bought_total: number; sold_total: number }>;
 };
@@ -46,7 +48,7 @@ export type AdminAirtimeSellerStanding = { strikes: number; strike_limit: number
 export type AdminAirtimeSale = StoreAirtimeSale & { customer: Who; seller: AdminAirtimeSellerStanding; line: { id: string; number: string } };
 export type AdminAirtimePurchase = StoreAirtimePurchase & { cost: number | null; customer: Who; line: { id: string; number: string } | null };
 
-export type AdminAirtimeNetworkInput = Partial<Pick<AdminAirtimeNetwork, 'sell_rate_bps' | 'buy_rate_bps' | 'min_amount' | 'max_amount' | 'seller_daily' | 'new_seller_daily' | 'established_after' | 'credit_hold_hours' | 'transfer_steps' | 'enabled'>>;
+export type AdminAirtimeNetworkInput = Partial<Pick<AdminAirtimeNetwork, 'sell_rate_bps' | 'buy_rate_bps' | 'min_amount' | 'max_amount' | 'seller_daily' | 'new_seller_daily' | 'established_after' | 'credit_hold_hours' | 'reseller_cap_bps' | 'transfer_steps' | 'enabled'>>;
 
 /** Operations and finance: the airtime exchange's rates, collector lines, sales to check and purchases to send. */
 export const adminAirtimeApi = bitocardApi.injectEndpoints({

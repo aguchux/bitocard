@@ -6,11 +6,12 @@ import { StoreSellers } from '../checkout/store-sellers.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma, type AirtimeCollectorLine, type AirtimeNetwork, type AirtimePurchase, type AirtimeSale, type LedgerMode } from '../generated/prisma/client.js';
+import { Prisma, type AirtimeCollectorLine, type AirtimeNetwork, type AirtimePurchase, type AirtimeSale, type LedgerMode, type Reseller, type Store } from '../generated/prisma/client.js';
 import { LedgerService, type PreparedEntry } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { templateSells } from '../stores/templates.js';
 
 /**
  * The airtime exchange (docs/BITOCARD_AIRTIME_EXCHANGE_PLAN.md, built 15 November 2026 at the owner's request): BitoCard
@@ -27,8 +28,12 @@ import { SettingsService } from '../settings/settings.service.js';
  *
  * The books: received airtime is `airtime_inventory` (at what BitoCard pays, one account per network) against
  * `airtime_payable` (owed to the seller until credited); a delivery takes the pool's average cost out of inventory and
- * the rest of the price is `platform_revenue`. Behind the `airtime_exchange` switch (country), off by default; root
- * bitocard.com only.
+ * the rest of the price is `platform_revenue`. Behind the `airtime_exchange` switch (country), off by default.
+ *
+ * Resellers' stores (17 November 2026, the owner's request) trade from the same pool where `reseller_airtime_exchange`
+ * is on for them: their customers get BitoCard's payout less the reseller's cut when selling, and pay BitoCard's price
+ * plus it when buying. The cut is their airtime markup (else their general markup), capped per network
+ * (`reseller_cap_bps`); it reaches the reseller's earnings (after the payout hold) once the trade settles.
  */
 
 /** Every trade is settled within this: sellers send in it, staff send buyers theirs in it, else it ends. */
@@ -52,6 +57,23 @@ export const purchaseNumber = (n: number) => `AP-${String(n).padStart(6, '0')}`;
 /** A rate (basis points of face value) applied to an amount: rounded down for what sellers get, up for what buyers pay. */
 export const sellerGets = (amount: bigint, bps: number) => (amount * BigInt(bps)) / 10_000n;
 export const buyerPays = (amount: bigint, bps: number) => (amount * BigInt(bps) + 9_999n) / 10_000n;
+/** A reseller's cut off what BitoCard pays a seller (rounded in the seller's favour), and on top of what a buyer pays BitoCard. */
+export const lessCut = (minor: bigint, cutBps: number) => minor - (minor * BigInt(cutBps)) / 10_000n;
+export const plusCut = (minor: bigint, cutBps: number) => minor + (minor * BigInt(cutBps) + 9_999n) / 10_000n;
+/** The rate a store's customer sees, in basis points of face value, after the reseller's cut. */
+export const sellRateAfterCut = (rateBps: number, cutBps: number) => rateBps - Math.ceil((rateBps * cutBps) / 10_000);
+export const buyRateAfterCut = (rateBps: number, cutBps: number) => rateBps + Math.ceil((rateBps * cutBps) / 10_000);
+
+/** Who a customer trades through: BitoCard's own store (no cut), or a reseller's store with their cut, in its mode. */
+type Trader = { resellerId: string | null; cutBps: number; mode: LedgerMode };
+
+/** Whether a reseller's store sells airtime (a single-product store only when its product is airtime). */
+function storeSellsAirtime(store: { template: string; focus: string | null }) {
+  return store.focus ? store.focus.startsWith('airtime:') && templateSells(store, { key: store.focus, category: 'airtime' }) : templateSells(store, { key: '', category: 'airtime' });
+}
+
+/** What BitoCard pays out for a sale's airtime: the seller's payout and the reseller's cut. */
+const saleCost = (sale: Pick<AirtimeSale, 'payoutMinor' | 'resellerEarningMinor'>) => sale.payoutMinor + (sale.resellerEarningMinor ?? 0n);
 
 /** The network's transfer steps with the line's number and the amount filled in (the PIN stays the seller's). */
 export function transferSteps(steps: string, number: string, amountMinor: bigint) {
@@ -103,9 +125,15 @@ export class AirtimeExchangeService {
    * The pool everyone sees (public): per network what is available to buy now, what BitoCard bought and sold in all
    * and in the last 24 hours, and its rates. Never the collector lines or their limits.
    */
-  async pool(countryCode = 'NG') {
-    const country = countryCode.toUpperCase();
-    const [mode, networks, open] = await Promise.all([this.mode(), this.networks(country), this.settings.isOnForCountry('airtime_exchange', country)]);
+  async pool(countryCode = 'NG', storeKey?: string) {
+    // A reseller's store shows its own market's pool at its customers' rates (their cut applied), in the store's mode.
+    const store = storeKey && storeKey !== 'bitocard' ? await this.stores.resolve(storeKey) : null;
+    const reseller = store && !this.stores.isHouse(store) ? store : null;
+    const country = reseller?.reseller.country ?? countryCode.toUpperCase();
+    const [networks, open] = await Promise.all([this.networks(country), this.settings.isOnForCountry('airtime_exchange', country)]);
+    const storeOpen = reseller ? (await this.resellerClosed(reseller)) === null : true;
+    const mode = reseller ? this.stores.mode(reseller) : await this.mode();
+    const markup = reseller ? await this.resellerMarkup(reseller.reseller.id) : 0;
     const since = new Date(Date.now() - dayMs);
     const [pools, lines, bought, sold] = await Promise.all([
       this.prisma.airtimePool.findMany({ where: { mode, country } }),
@@ -120,9 +148,9 @@ export class AirtimeExchangeService {
         object: 'airtime_network' as const,
         network: network.network,
         name: network.name,
-        open: open && network.enabled && lines.some(line => line.network === network.network),
-        sell_rate_bps: network.sellRateBps,
-        buy_rate_bps: network.buyRateBps,
+        open: open && storeOpen && network.enabled && lines.some(line => line.network === network.network),
+        sell_rate_bps: sellRateAfterCut(network.sellRateBps, Math.min(markup, network.resellerCapBps)),
+        buy_rate_bps: buyRateAfterCut(network.buyRateBps, Math.min(markup, network.resellerCapBps)),
         min_amount: num(network.minAmountMinor),
         max_amount: num(network.maxAmountMinor),
         available: num(available),
@@ -139,7 +167,7 @@ export class AirtimeExchangeService {
       country,
       currency: networks[0]?.currency ?? null,
       mode,
-      open,
+      open: open && storeOpen,
       networks: rows,
       totals: { available: sum('available'), bought_total: sum('bought_total'), sold_total: sum('sold_total'), bought_24h: sum('bought_24h'), sold_24h: sum('sold_24h') },
       updated_at: pools.length ? updated.toISOString() : null,
@@ -148,13 +176,41 @@ export class AirtimeExchangeService {
 
   // Customers.
 
-  /** bitocard.com's own customers, email confirmed, where the exchange is open for the network's country. */
-  private async gate(customer: CustomerWithStore, network: AirtimeNetwork) {
-    if (!this.stores.isRoot(customer.store)) throw conflict('airtime_unavailable', 'The airtime exchange is only on bitocard.com.');
+  /** The reseller's airtime markup (else their general markup), before any network's cap. */
+  private async resellerMarkup(resellerId: string) {
+    const rows = await this.prisma.resellerMarkup.findMany({ where: { resellerId, productId: null, OR: [{ category: 'airtime' }, { category: null }] } });
+    const markup = rows.find(row => row.category === 'airtime')?.markupBps ?? rows.find(row => row.category === null)?.markupBps ?? 0;
+    return Math.max(markup, 0);
+  }
+
+  /** The reseller's cut on a network: their airtime markup, held to the network's cap. */
+  async resellerCut(resellerId: string, network: Pick<AirtimeNetwork, 'resellerCapBps'>) {
+    return Math.min(await this.resellerMarkup(resellerId), network.resellerCapBps);
+  }
+
+  /**
+   * Why a reseller's store does not trade airtime, or null when it does: published, not suspended, its template sells
+   * airtime, `reseller_airtime_exchange` on for the reseller, and, live, the reseller verified.
+   */
+  private async resellerClosed(store: Store & { reseller: Reseller }) {
+    if (store.status !== 'published' || store.reseller.status === 'suspended' || !storeSellsAirtime(store)) return 'store_unavailable';
+    if (!(await this.settings.isOn('reseller_airtime_exchange', store.reseller.id))) return 'not_enabled';
+    if (this.stores.mode(store) === 'live' && store.reseller.status !== 'active') return 'not_verified';
+    return null;
+  }
+
+  /**
+   * Customers with a confirmed email, where the exchange is open for the network's country: bitocard.com's own, or a
+   * reseller's store that trades airtime (in its reseller's country, its own mode, with the reseller's cut).
+   */
+  private async gate(customer: CustomerWithStore, network: AirtimeNetwork): Promise<Trader> {
     if (!customer.emailVerifiedAt) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
     if (!(await this.settings.isOnForCountry('airtime_exchange', network.country))) throw conflict('airtime_unavailable', 'The airtime exchange is not open yet.');
     if (!network.enabled) throw conflict('network_closed', `${network.name} airtime is not being traded right now.`, 'network');
-    return this.mode();
+    if (this.stores.isHouse(customer.store)) return { resellerId: null, cutBps: 0, mode: await this.mode() };
+    const store = await this.prisma.store.findUniqueOrThrow({ where: { id: customer.storeId }, include: { reseller: true } });
+    if ((await this.resellerClosed(store)) !== null || store.reseller.country !== network.country) throw conflict('airtime_unavailable', 'This store does not trade airtime.');
+    return { resellerId: store.reseller.id, cutBps: await this.resellerCut(store.reseller.id, network), mode: this.stores.mode(store) };
   }
 
   private checkAmount(network: AirtimeNetwork, amount: bigint) {
@@ -171,13 +227,16 @@ export class AirtimeExchangeService {
   async sell(customer: CustomerWithStore, input: { network: string; amount: number; from_phone?: string; preview?: boolean }) {
     const country = customer.country ?? 'NG';
     const network = await this.network(country, input.network.toLowerCase());
-    const mode = await this.gate(customer, network);
+    const trader = await this.gate(customer, network);
+    const { mode } = trader;
     const amount = BigInt(input.amount);
     this.checkAmount(network, amount);
     if (customer.country !== network.country) throw conflict('country_mismatch', `Only customers in ${network.country} can sell ${network.name} airtime.`);
     const fromPhone = await this.confirmedNumber(customer, input.from_phone, 'from_phone', 'You can sell only from one of your confirmed numbers. Add and confirm it on your profile first.');
-    const payout = sellerGets(amount, network.sellRateBps);
-    const quote = { network: network.network, amount: num(amount), currency: network.currency, rate_bps: network.sellRateBps, payout: num(payout), from_phone: fromPhone };
+    const bitocardPays = sellerGets(amount, network.sellRateBps);
+    const payout = lessCut(bitocardPays, trader.cutBps);
+    const rateBps = sellRateAfterCut(network.sellRateBps, trader.cutBps);
+    const quote = { network: network.network, amount: num(amount), currency: network.currency, rate_bps: rateBps, payout: num(payout), from_phone: fromPhone };
     if (input.preview) return { object: 'airtime_sale_quote' as const, ...quote };
 
     const open = await this.prisma.airtimeSale.count({ where: { customerId: customer.id, status: { in: ['awaiting_transfer', 'sent'] } } });
@@ -212,8 +271,11 @@ export class AirtimeExchangeService {
           fromPhone,
           amountMinor: amount,
           currency: network.currency,
-          rateBps: network.sellRateBps,
+          rateBps,
           payoutMinor: payout,
+          resellerId: trader.resellerId,
+          resellerSpreadBps: trader.cutBps,
+          resellerEarningMinor: trader.resellerId ? bitocardPays - payout : null,
           expiresAt: new Date(Date.now() + tradeWindowMs),
         },
         include: { line: true },
@@ -430,15 +492,18 @@ export class AirtimeExchangeService {
    * pool and the price locked from the buyer's wallet in one transaction, then staff send it within the hour.
    */
   async buy(customer: CustomerWithStore, input: { network: string; amount: number; phone: string; preview?: boolean; expected_price?: number }) {
-    const network = await this.network('NG', input.network.toLowerCase());
-    const mode = await this.gate(customer, network);
+    const network = await this.network(customer.country ?? 'NG', input.network.toLowerCase());
+    const trader = await this.gate(customer, network);
+    const { mode } = trader;
     const amount = BigInt(input.amount);
     this.checkAmount(network, amount);
     const phone = await this.confirmedNumber(customer, input.phone, 'phone', 'Airtime is sent only to one of your confirmed numbers. Add and confirm it on your profile first.');
-    const price = buyerPays(amount, network.buyRateBps);
+    const bitocardPrice = buyerPays(amount, network.buyRateBps);
+    const price = plusCut(bitocardPrice, trader.cutBps);
+    const rateBps = buyRateAfterCut(network.buyRateBps, trader.cutBps);
     const pool = await this.prisma.airtimePool.findUnique({ where: { mode_country_network: { mode, country: network.country, network: network.network } } });
     const free = pool ? pool.availableMinor - pool.reservedMinor : 0n;
-    const quote = { network: network.network, amount: num(amount), currency: network.currency, rate_bps: network.buyRateBps, price: num(price), phone, available: num(free) };
+    const quote = { network: network.network, amount: num(amount), currency: network.currency, rate_bps: rateBps, price: num(price), phone, available: num(free) };
     if (input.preview) return { object: 'airtime_purchase_quote' as const, ...quote };
     if (input.expected_price !== undefined && BigInt(input.expected_price) !== price) throw conflict('price_changed', 'The price changed. Check it and try again.', 'expected_price');
     const open = await this.prisma.airtimePurchase.count({ where: { customerId: customer.id, status: { in: ['paid', 'delivering'] } } });
@@ -473,8 +538,11 @@ export class AirtimeExchangeService {
             phone,
             amountMinor: amount,
             currency: network.currency,
-            rateBps: network.buyRateBps,
+            rateBps,
             priceMinor: price,
+            resellerId: trader.resellerId,
+            resellerSpreadBps: trader.cutBps,
+            resellerEarningMinor: trader.resellerId ? price - bitocardPrice : null,
             expiresAt: new Date(Date.now() + tradeWindowMs),
           },
         });
@@ -544,8 +612,8 @@ export class AirtimeExchangeService {
       description: `${network.name} airtime received (${saleNumber(sale.number)})`,
       metadata: { airtime_sale_id: id },
       lines: [
-        { account: this.inventory(network), debit: sale.payoutMinor },
-        { account: { kind: 'airtime_payable', currency: sale.currency }, credit: sale.payoutMinor },
+        { account: this.inventory(network), debit: saleCost(sale) },
+        { account: { kind: 'airtime_payable', currency: sale.currency }, credit: saleCost(sale) },
       ],
     });
     const now = new Date();
@@ -557,8 +625,8 @@ export class AirtimeExchangeService {
       if (!claimed.count) return null;
       await tx.airtimePool.upsert({
         where: { mode_country_network: { mode: sale.mode, country: sale.country, network: sale.network } },
-        create: { mode: sale.mode, country: sale.country, network: sale.network, availableMinor: sale.amountMinor, costMinor: sale.payoutMinor, boughtMinor: sale.amountMinor },
-        update: { availableMinor: { increment: sale.amountMinor }, costMinor: { increment: sale.payoutMinor }, boughtMinor: { increment: sale.amountMinor } },
+        create: { mode: sale.mode, country: sale.country, network: sale.network, availableMinor: sale.amountMinor, costMinor: saleCost(sale), boughtMinor: sale.amountMinor },
+        update: { availableMinor: { increment: sale.amountMinor }, costMinor: { increment: saleCost(sale) }, boughtMinor: { increment: sale.amountMinor } },
       });
       if (sale.mode === 'live') {
         await this.rollDay(tx, sale);
@@ -605,21 +673,25 @@ export class AirtimeExchangeService {
   async credit(id: string) {
     const sale = await this.prisma.airtimeSale.findUnique({ where: { id } });
     if (!sale || sale.status !== 'received') return null;
+    const earning = sale.resellerId ? (sale.resellerEarningMinor ?? 0n) : 0n;
     const entry = await this.ledger.prepare({
       mode: sale.mode,
       type: 'airtime_sale',
       reference: `airtime_sale:${id}:credited`,
+      resellerId: sale.resellerId,
       description: `Airtime sold (${saleNumber(sale.number)})`,
       metadata: { airtime_sale_id: id },
       lines: [
-        { account: { kind: 'airtime_payable', currency: sale.currency }, debit: sale.payoutMinor },
+        { account: { kind: 'airtime_payable', currency: sale.currency }, debit: saleCost(sale) },
         { account: { kind: 'customer_wallet', currency: sale.currency, customerId: sale.customerId }, credit: sale.payoutMinor },
+        ...(earning > 0n ? [{ account: { kind: 'reseller_earnings_held' as const, currency: sale.currency, resellerId: sale.resellerId! }, credit: earning }] : []),
       ],
     });
     const done = await this.prisma.$transaction(async tx => {
       const claimed = await tx.airtimeSale.updateMany({ where: { id, status: 'received' }, data: { status: 'credited', creditedAt: new Date() } });
       if (!claimed.count) return null;
       await this.ledger.write(tx, entry);
+      if (earning > 0n) await this.earningsLot(tx, sale.resellerId!, sale.mode, sale.currency, earning, `airtime_sale:${id}`);
       return tx.airtimeSale.findUniqueOrThrow({ where: { id } });
     });
     if (!done) return null;
@@ -649,18 +721,18 @@ export class AirtimeExchangeService {
       description: `${network.name} airtime reversed (${saleNumber(sale.number)})`,
       metadata: { airtime_sale_id: id, reason },
       lines: [
-        { account: { kind: 'airtime_payable', currency: sale.currency }, debit: sale.payoutMinor },
-        { account: this.inventory(network), credit: sale.payoutMinor },
+        { account: { kind: 'airtime_payable', currency: sale.currency }, debit: saleCost(sale) },
+        { account: this.inventory(network), credit: saleCost(sale) },
       ],
     });
     await this.prisma.$transaction(async tx => {
       const claimed = await tx.airtimeSale.updateMany({ where: { id, status: 'received' }, data: { status: 'reversed', decidedBy: adminId, note: reason, struckAt: new Date() } });
       if (!claimed.count) throw conflict('sale_not_reversible', 'This sale was already decided.');
       const left = await tx.$executeRaw`
-        UPDATE airtime_pools SET available_minor = available_minor - ${sale.amountMinor}, cost_minor = cost_minor - ${sale.payoutMinor},
+        UPDATE airtime_pools SET available_minor = available_minor - ${sale.amountMinor}, cost_minor = cost_minor - ${saleCost(sale)},
           bought_minor = bought_minor - ${sale.amountMinor}, updated_at = NOW()
         WHERE mode = ${sale.mode}::"LedgerMode" AND country = ${sale.country} AND network = ${sale.network}
-          AND available_minor - ${sale.amountMinor} >= reserved_minor AND cost_minor >= ${sale.payoutMinor}`;
+          AND available_minor - ${sale.amountMinor} >= reserved_minor AND cost_minor >= ${saleCost(sale)}`;
       if (!left) throw conflict('pool_reserved', 'This airtime is already promised to buyers. Refund or send their purchases first.');
       if (sale.mode === 'live') await tx.airtimeCollectorLine.update({ where: { id: sale.lineId }, data: { balanceMinor: { decrement: sale.amountMinor } } });
       await this.ledger.write(tx, entry);
@@ -708,10 +780,12 @@ export class AirtimeExchangeService {
     const network = await this.network(purchase.country, purchase.network);
     const line = lineId ?? purchase.lineId;
     if (purchase.mode === 'live' && !line) throw invalid('line_required', 'Say which line the airtime was sent from.', 'line_id');
-    const [locked, inventory, revenue] = await Promise.all([
+    const earning = purchase.resellerId ? (purchase.resellerEarningMinor ?? 0n) : 0n;
+    const [locked, inventory, revenue, earnings] = await Promise.all([
       this.ledger.accountId(purchase.mode, { kind: 'customer_wallet_locked', currency: purchase.currency, customerId: purchase.customerId }),
       this.ledger.accountId(purchase.mode, this.inventory(network)),
       this.ledger.accountId(purchase.mode, { kind: 'platform_revenue', currency: purchase.currency }),
+      earning > 0n ? this.ledger.accountId(purchase.mode, { kind: 'reseller_earnings_held', currency: purchase.currency, resellerId: purchase.resellerId! }) : Promise.resolve(null),
     ]);
     const done = await this.prisma.$transaction(async tx => {
       const pools = await tx.$queryRaw<Array<{ available_minor: bigint; cost_minor: bigint }>>`
@@ -734,20 +808,24 @@ export class AirtimeExchangeService {
         await this.rollDay(tx, purchase);
         await tx.airtimeCollectorLine.update({ where: { id: line }, data: { sentTodayMinor: { increment: purchase.amountMinor }, balanceMinor: { decrement: purchase.amountMinor } } });
       }
-      const margin = purchase.priceMinor - cost;
+      // The reseller's cut on top of BitoCard's price goes to their earnings; BitoCard keeps the rest over the cost.
+      const margin = purchase.priceMinor - earning - cost;
       const entry: PreparedEntry = {
         mode: purchase.mode,
         type: 'airtime_delivered',
         reference: `airtime_purchase:${id}:delivered`,
+        resellerId: purchase.resellerId,
         description: `${network.name} airtime sent (${purchaseNumber(purchase.number)})`,
         metadata: { airtime_purchase_id: id, cost: String(cost) },
         postings: [
           { accountId: locked, kind: 'customer_wallet_locked', amount: purchase.priceMinor },
           ...(cost > 0n ? [{ accountId: inventory, kind: 'airtime_inventory' as const, amount: -cost }] : []),
           ...(margin !== 0n ? [{ accountId: revenue, kind: 'platform_revenue' as const, amount: -margin }] : []),
+          ...(earnings ? [{ accountId: earnings, kind: 'reseller_earnings_held' as const, amount: -earning }] : []),
         ],
       };
       await this.ledger.write(tx, entry);
+      if (earnings) await this.earningsLot(tx, purchase.resellerId!, purchase.mode, purchase.currency, earning, `airtime_purchase:${id}`);
       return tx.airtimePurchase.findUniqueOrThrow({ where: { id } });
     });
     if (!done) throw conflict('purchase_closed', 'This purchase was already decided.');
@@ -851,6 +929,63 @@ export class AirtimeExchangeService {
     return { expired: expired.count, refunded, credited, overdue: overdue.length + stalled.length };
   }
 
+  /** A reseller's cut waits out their market's payout hold, as a sale's profit does. */
+  private async earningsLot(tx: Tx, resellerId: string, mode: LedgerMode, currency: string, amount: bigint, reference: string) {
+    const reseller = await tx.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { countryRef: true } });
+    await tx.earningsLot.create({ data: { resellerId, mode, currency, amountMinor: amount, reference, releaseAt: new Date(Date.now() + (reseller.countryRef?.payoutHoldDays ?? 0) * dayMs) } });
+  }
+
+  // Resellers.
+
+  /**
+   * The airtime exchange on the reseller's stores: whether it is open for them (`reason`: `not_enabled`,
+   * `country_unsupported`, `exchange_closed`), each network's rates for their customers with their cut and its cap, and
+   * their customers' latest trades with what the reseller earned. Never BitoCard's lines.
+   */
+  async resellerExchange(resellerId: string, mode: LedgerMode) {
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    const country = reseller.country;
+    const [enabled, networks, open, markup, sales, purchases] = await Promise.all([
+      this.settings.isOn('reseller_airtime_exchange', resellerId),
+      country ? this.networks(country) : Promise.resolve([] as AirtimeNetwork[]),
+      country ? this.settings.isOnForCountry('airtime_exchange', country) : Promise.resolve(false),
+      this.resellerMarkup(resellerId),
+      this.prisma.airtimeSale.findMany({ where: { resellerId, mode }, orderBy: { createdAt: 'desc' }, take: 100, include: { customer: { select: { id: true, name: true, email: true } } } }),
+      this.prisma.airtimePurchase.findMany({ where: { resellerId, mode }, orderBy: { createdAt: 'desc' }, take: 100, include: { customer: { select: { id: true, name: true, email: true } } } }),
+    ]);
+    const reason = !enabled ? 'not_enabled' : !networks.length ? 'country_unsupported' : !open ? 'exchange_closed' : null;
+    const earned = (row: { status: string; resellerEarningMinor: bigint | null }, settled: string) => (row.status === settled ? num(row.resellerEarningMinor) : null);
+    return {
+      object: 'airtime_exchange' as const,
+      mode,
+      available: reason === null,
+      reason,
+      currency: networks[0]?.currency ?? null,
+      /** Your airtime markup (else your general markup), before each network's cap. */
+      markup_bps: markup,
+      networks: networks.map(network => {
+        const cut = Math.min(markup, network.resellerCapBps);
+        return {
+          network: network.network,
+          name: network.name,
+          enabled: network.enabled,
+          cut_bps: cut,
+          cap_bps: network.resellerCapBps,
+          sell_rate_bps: sellRateAfterCut(network.sellRateBps, cut),
+          buy_rate_bps: buyRateAfterCut(network.buyRateBps, cut),
+        };
+      }),
+      sales: sales.map(sale => {
+        // Never BitoCard's line or how to send to it: the reseller sees the trade, not the collector.
+        const shown: Partial<ReturnType<AirtimeExchangeService['presentSale']>> = this.presentSale(sale);
+        delete shown.collector_number;
+        delete shown.transfer_steps;
+        return { ...shown, customer: sale.customer, cut_bps: sale.resellerSpreadBps, earned: earned(sale, 'credited') };
+      }),
+      purchases: purchases.map(purchase => ({ ...this.presentPurchase(purchase), customer: purchase.customer, cut_bps: purchase.resellerSpreadBps, earned: earned(purchase, 'delivered') })),
+    };
+  }
+
   // Admins.
 
   async adminOverview() {
@@ -881,6 +1016,7 @@ export class AirtimeExchangeService {
         new_seller_daily: num(network.newSellerDailyMinor),
         established_after: network.establishedAfter,
         credit_hold_hours: network.creditHoldHours,
+        reseller_cap_bps: network.resellerCapBps,
         transfer_steps: network.transferSteps,
         pools: pools
           .filter(pool => pool.country === network.country && pool.network === network.network)
@@ -908,7 +1044,7 @@ export class AirtimeExchangeService {
     };
   }
 
-  async updateNetwork(adminId: string, country: string, networkKey: string, input: { sell_rate_bps?: number; buy_rate_bps?: number; min_amount?: number; max_amount?: number; seller_daily?: number; new_seller_daily?: number; established_after?: number; credit_hold_hours?: number; transfer_steps?: string; enabled?: boolean }) {
+  async updateNetwork(adminId: string, country: string, networkKey: string, input: { sell_rate_bps?: number; buy_rate_bps?: number; min_amount?: number; max_amount?: number; seller_daily?: number; new_seller_daily?: number; established_after?: number; credit_hold_hours?: number; transfer_steps?: string; enabled?: boolean; reseller_cap_bps?: number }) {
     const before = await this.network(country.toUpperCase(), networkKey);
     const sell = input.sell_rate_bps ?? before.sellRateBps;
     const buy = input.buy_rate_bps ?? before.buyRateBps;
@@ -933,9 +1069,10 @@ export class AirtimeExchangeService {
         ...(input.credit_hold_hours !== undefined ? { creditHoldHours: input.credit_hold_hours } : {}),
         ...(input.transfer_steps !== undefined ? { transferSteps: input.transfer_steps } : {}),
         ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+        ...(input.reseller_cap_bps !== undefined ? { resellerCapBps: input.reseller_cap_bps } : {}),
       },
     });
-    const plain = (n: AirtimeNetwork) => ({ sell_rate_bps: n.sellRateBps, buy_rate_bps: n.buyRateBps, min: String(n.minAmountMinor), max: String(n.maxAmountMinor), seller_daily: String(n.sellerDailyMinor), new_seller_daily: String(n.newSellerDailyMinor), established_after: n.establishedAfter, hold: n.creditHoldHours, enabled: n.enabled });
+    const plain = (n: AirtimeNetwork) => ({ sell_rate_bps: n.sellRateBps, buy_rate_bps: n.buyRateBps, min: String(n.minAmountMinor), max: String(n.maxAmountMinor), seller_daily: String(n.sellerDailyMinor), new_seller_daily: String(n.newSellerDailyMinor), established_after: n.establishedAfter, hold: n.creditHoldHours, enabled: n.enabled, reseller_cap_bps: n.resellerCapBps });
     await this.audit.record({ actorId: adminId, action: 'airtime.network_changed', targetType: 'airtime_network', targetId: `${after.country}:${after.network}`, before: plain(before), after: plain(after) });
     return this.adminOverview();
   }
