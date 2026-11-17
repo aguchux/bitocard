@@ -244,6 +244,28 @@ describe('checkout on resellers’ hosted stores', () => {
     assert.equal((await fetch(`${server.base}/v1/store/products?store=nosuchstore1`)).status, 404);
   });
 
+  test('a gift card’s rate on the store: BitoCard’s on bitocard.com, plus the reseller’s markup on theirs; never costs or suppliers', async () => {
+    const { subdomain } = await resellerStore([listed], { markup: 1000 });
+    const key = encodeURIComponent(listed.key);
+    const mine = await fetch(`${server.base}/v1/store/products/${key}/rate?store=${subdomain}&country=NG`);
+    assert.equal(mine.status, 200);
+    assert.equal(mine.headers.get('cache-control'), 'public, max-age=60');
+    const theirs = await mine.json();
+    const bitocard = await fetch(`${server.base}/v1/store/products/${key}/rate?country=NG`).then(res => res.json());
+    assert.equal(bitocard.currency, 'NGN');
+    assert.equal(bitocard.face_currency, 'USD');
+    assert.ok(bitocard.rate > 1500, 'BitoCard’s markup is on what the card costs');
+    assert.equal(theirs.values.length, 1);
+    assert.equal(theirs.values[0].face_value, 2500);
+    assert.ok(Math.abs(theirs.rate - bitocard.rate * 1.1) < 1, 'the reseller’s 10% is on BitoCard’s rate');
+    assert.ok(Math.abs(theirs.values[0].price - theirs.rate * 25) <= 100, 'each value is the rate times its face value');
+    assert.deepEqual(Object.keys(theirs.values[0]).sort(), ['face_value', 'price']);
+    assert.ok(!/stock|supplier|cost|wholesale/i.test(JSON.stringify(theirs)), 'nothing about costs or suppliers');
+    const unlistedRate = await fetch(`${server.base}/v1/store/products/${encodeURIComponent(unlisted.key)}/rate?store=${subdomain}&country=NG`).then(res => res.json());
+    assert.equal(unlistedRate.rate, null, 'not on this store');
+    assert.equal((await fetch(`${server.base}/v1/store/products/nosuch/rate?country=NG`).then(res => res.json())).rate, null);
+  });
+
   test('accounts belong to one store: a session from one store is refused at another', async () => {
     const { subdomain } = await resellerStore([listed]);
     const shopper = await customer(subdomain);

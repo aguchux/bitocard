@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { formatFace, type StorePaymentMethods, type StoreProductDetail } from "@bitocard/api-client/storefront";
+import { RateCard } from "@/components/store/rate-card";
 import { BuyForm } from "@/components/store/buy-form";
 import { BuySell } from "@/components/store/buy-sell";
 import { SellForm } from "@/components/store/sell-form";
 import { sellOptionsFor } from "@/lib/gift-card-sales";
+import { rateFor } from "@/lib/rate";
 import { walletFor } from "@/lib/wallet";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
@@ -54,9 +56,10 @@ export async function ProductDetail({ product, inApp = false, sell = false }: { 
   // country (worldwide products ask).
   const fixed = store?.country ?? customer?.country ?? null;
   const country = fixed ?? (market && market !== "global" ? market : product.global ? null : product.country);
-  const [methods, wallet] = await Promise.all([
+  const [methods, wallet, rate] = await Promise.all([
     country ? storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }) : null,
     customer && country ? walletFor() : null,
+    rateFor(product, country),
   ]);
   // Gift cards the store buys back, in the customer's own country (or the market they shop in).
   const sellOptions = product.category === "gift_cards" ? await sellOptionsFor(product.key, customer?.country ?? (market && market !== "global" ? market : null)) : null;
@@ -73,6 +76,7 @@ export async function ProductDetail({ product, inApp = false, sell = false }: { 
       signedIn={Boolean(customer)}
       back={`${base}/${encodeURIComponent(product.key)}`}
       sandbox={sandbox}
+      rate={rate}
     />
   );
 
@@ -136,6 +140,8 @@ export async function ProductDetail({ product, inApp = false, sell = false }: { 
             {product.brand.company ? ` · ${product.brand.company}` : ""}
           </p>
           {product.description ? <p className="mt-4 text-lg text-slate-700">{product.description}</p> : null}
+
+          {rate ? <RateCard rate={rate} /> : null}
 
           {/* Signed in, the buy form lists the values itself. */}
           {customer ? null : (

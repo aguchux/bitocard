@@ -257,6 +257,27 @@ export function localFace(value: number, product: Pick<StoreProduct, 'face_curre
   return { amount: Math.ceil((value * Number(price.rate)) / unit - 1e-9) * unit, currency: price.currency };
 }
 
+/**
+ * A gift card's rate on the store (`/v1/store/products/:key/rate?country=`): what its customers pay per one unit of the
+ * card's currency (`rate`, in minor units of `currency`, with fractions), and for each of its values, before any tax
+ * added at checkout. `rate` is null where the card is not sold by rate here.
+ */
+export type StoreRate =
+  | { object: 'store_rate'; rate: null }
+  | { object: 'store_rate'; rate: number; currency: string; face_currency: string; values: Array<{ face_value: number; price: number }> };
+export type StoreRateShown = Extract<StoreRate, { rate: number }>;
+
+/** "₦1,724.32 per $1": a rate for one unit of the card's currency. */
+export function formatRate(rate: StoreRateShown) {
+  return `${formatCurrency(Math.round(rate.rate), rate.currency)} per ${formatFace(10 ** currencyDigits(rate.face_currency), rate.face_currency)}`;
+}
+
+/** What a value of the card costs at the rate, or null when the rate lists no price for it. */
+export function ratePrice(rate: StoreRateShown | null | undefined, value: number) {
+  const row = rate?.values.find(item => item.face_value === value);
+  return row ? { amount: row.price, currency: rate!.currency } : null;
+}
+
 /** "$10", "₦1,000" or "GH₵5.50": a face value with its currency's sign (whole amounts without ".00"). */
 export function formatFace(minor: number, currency: string) {
   return formatCurrency(minor, currency, { trim: true });

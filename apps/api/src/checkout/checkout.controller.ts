@@ -419,6 +419,13 @@ export class CheckoutController {
     return this.checkout.methodsFor(await this.stores.resolve(store), query.country);
   }
 
+  /** A gift card's rate on the store: what its customers pay per unit of the card's currency, and for each value. */
+  @Get('products/:key/rate')
+  @Header('Cache-Control', 'public, max-age=60')
+  async rate(@StoreKey() store: string | null, @Param('key') key: string, @Query() query: CountryQueryDto) {
+    return this.checkout.rateFor(await this.stores.resolve(store), key, query.country);
+  }
+
   @UseGuards(CustomerGuard)
   @Post('checkouts')
   start(@CurrentCustomer() caller: CustomerCaller, @Body() body: StartCheckoutDto) {

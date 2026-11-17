@@ -674,6 +674,28 @@ export class PricingService {
     };
   }
 
+  /**
+   * A gift card's rate as the seller's customers pay it (per unit of the card's currency, before any tax added at
+   * checkout) and each of its values at that rate. Only the customer's price: never BitoCard's, costs or suppliers.
+   * Null when the card cannot be sold by this seller (not rated, or no supplier can price it).
+   */
+  async customerRate(resellerId: string, mode: LedgerMode, product: ProductWithOffers, options: { ownSources?: boolean } = {}) {
+    if (!isRated(product)) return null;
+    const ctx = await this.context(resellerId, mode);
+    if (options.ownSources === false) ctx.own.clear();
+    if (this.unavailableReason(ctx, product)) return null;
+    const values: Array<{ face_value: number; price: number }> = [];
+    let first: { face: bigint; price: bigint } | null = null;
+    for (const value of rateValues(product)) {
+      const at = await this.choose(ctx, product, value).catch(() => null);
+      if (!at) continue;
+      first ??= { face: value, price: at.price };
+      values.push({ face_value: minor(value), price: minor(at.price) });
+    }
+    if (!first) return null;
+    return { object: 'store_rate' as const, currency: ctx.currency, face_currency: product.faceCurrency, rate: perUnit(first.price, first.face), values };
+  }
+
   // -- BitoCard pricing rules (admin) ----------------------------------------------------------------------------
 
   async listRules() {

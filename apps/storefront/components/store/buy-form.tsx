@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useId, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { Lock, Wallet } from "lucide-react";
-import { formatFace, localFace, walletName, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
+import { formatFace, localFace, ratePrice, walletName, type StoreCountry, type StoreRateShown, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
 import { type FormState, startCheckout } from "@/lib/account-actions";
 import { type PaymentChoice, paymentMethodsFor } from "@/lib/payment-methods";
 import { prefillFrom } from "@/lib/quick-buy";
@@ -22,9 +22,12 @@ const walletOption: StorePaymentMethod = { object: "payment_method", id: "wallet
 /** The wallet page (the country wallet, or `wallet` USD), coming back here. */
 const topUpHref = (back: string, wallet?: string) => `/account/wallet?${new URLSearchParams({ ...(wallet ? { wallet } : {}), back }).toString()}`;
 
-/** A value in the customer's own currency first (their prices), with the card's own value beneath. */
-function FaceValue({ value, product }: { value: number; product: StoreProductDetail }) {
-  const local = localFace(value, product);
+/**
+ * A value in the customer's own currency first (their prices), with the card's own value beneath. A gift card sold by
+ * rate shows what it costs at the store's rate; anything else its value converted.
+ */
+function FaceValue({ value, product, rate }: { value: number; product: StoreProductDetail; rate?: StoreRateShown | null }) {
+  const local = ratePrice(rate, value) ?? localFace(value, product);
   if (!local) return <>{formatFace(value, product.face_currency)}</>;
   return (
     <span className="flex flex-col items-center leading-tight">
@@ -60,6 +63,7 @@ export function BuyForm({
   signedIn,
   back,
   sandbox,
+  rate = null,
 }: {
   product: StoreProductDetail;
   countries: StoreCountry[];
@@ -74,6 +78,8 @@ export function BuyForm({
   signedIn: boolean;
   back: string;
   sandbox: boolean;
+  /** A gift card's rate for the page's own country (`country`): its values are shown at it while that country is chosen. */
+  rate?: StoreRateShown | null;
 }) {
   const id = useId();
   const [state, action, pending] = useActionState<FormState, FormData>(startCheckout, {});
@@ -141,7 +147,7 @@ export function BuyForm({
             {values.map((value, index) => (
               <label key={value} className={optionClass}>
                 <input type="radio" name="face_value_minor" value={value} defaultChecked={index === 0} className="sr-only" />
-                <FaceValue value={value} product={product} />
+                <FaceValue value={value} product={product} rate={market === country ? rate : null} />
               </label>
             ))}
           </div>

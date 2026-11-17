@@ -1,6 +1,8 @@
 import { InvoicesService } from '../billing/invoices.service.js';
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { offersInclude } from '../catalogue/catalogue.service.js';
+import { PricingService } from '../catalogue/pricing.service.js';
 import { emailedCategories, QuotesService } from '../catalogue/quotes.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
@@ -101,6 +103,7 @@ export class CheckoutService implements OnModuleInit {
     private readonly customerWallets: CustomerWalletsService,
     private readonly fx: FxService,
     private readonly house: HouseService,
+    private readonly pricing: PricingService,
   ) {}
 
   onModuleInit() {
@@ -189,6 +192,26 @@ export class CheckoutService implements OnModuleInit {
     const country = seller?.country ? await this.prisma.country.findUnique({ where: { code: seller.country } }) : null;
     const shown = options.filter(option => option.gateway !== 'sandbox');
     return { object: 'list' as const, mode, wallet_required: false, data: country ? await Promise.all(shown.map(option => this.stores.describe(option, country))) : [] };
+  }
+
+  /**
+   * A gift card's rate on the store (no sign-in needed, for its page): what the store's customers pay per unit of the
+   * card's currency and for each of its values, sold by whoever checkout would sell it through (`country` is the
+   * shopper's market on bitocard.com). `rate` is null where the card is not sold by rate or cannot be priced here.
+   */
+  async rateFor(store: HouseAwareStore, key: string, countryCode: string) {
+    const none = { object: 'store_rate' as const, rate: null };
+    const mode = this.stores.mode(store);
+    const home = await this.sellerOrNull(store, countryCode);
+    const product = await this.prisma.product.findUnique({ where: { key }, include: offersInclude });
+    if (!home || !product) return none;
+    const seller = await this.stores.sellerForProduct(store, product, home);
+    const listed = this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } });
+    if (!listed || (!this.stores.isHouse(store) && !templateSells(store, product))) return none;
+    // As at checkout: the reseller's own supplier only when their own gateway would collect the payment.
+    const walletsOn = await this.customerWallets.enabled(seller, mode);
+    const own = !walletsOn && Boolean((await this.stores.paymentOptions(store, seller, mode))[0]?.own);
+    return (await this.pricing.customerRate(seller.id, mode, product, { ownSources: own })) ?? none;
   }
 
   private async sellerOrNull(store: HouseAwareStore, countryCode: string) {
