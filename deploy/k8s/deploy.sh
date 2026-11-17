@@ -12,8 +12,11 @@ here="$(cd "$(dirname "$0")" && pwd)"
 missing=$(cd "$here" && for example in shared/env/*.example bitocard/env/*.example udozo/env/*.example; do
   target="${example%.example}"; [ -s "$target" ] || echo "$target"; done)
 [ -z "$missing" ] || { echo "Missing (run deploy/k8s/init-env.sh, then fill them in):" >&2; echo "$missing" >&2; exit 1; }
-blank=$(cd "$here" && grep -lE '^[^#]*=$' shared/env/*.env bitocard/env/*.env udozo/env/*.env 2>/dev/null || true)
+blank=$(cd "$here" && grep -lE '^[A-Za-z_][A-Za-z0-9_]*=$' shared/env/*.env bitocard/env/*.env udozo/env/*.env 2>/dev/null || true)
 [ -z "$blank" ] || { echo "Still blank:" >&2; echo "$blank" >&2; exit 1; }
+# A placeholder left from an .example (`<…>`) counts as not filled in.
+placeholder=$(cd "$here" && grep -lE '^[A-Za-z_][A-Za-z0-9_]*=.*<[^>]+>|"auth": *"<' shared/env/*.env shared/env/*.dockerconfigjson bitocard/env/*.env udozo/env/*.env 2>/dev/null || true)
+[ -z "$placeholder" ] || { echo "Still a placeholder:" >&2; echo "$placeholder" >&2; exit 1; }
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 cp -R "$here/." "$work/"

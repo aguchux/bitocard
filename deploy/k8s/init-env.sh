@@ -14,4 +14,4 @@ for example in shared/env/*.example bitocard/env/*.example udozo/env/*.example; 
   fi
 done
 # Anything still blank is listed, so nothing is applied half set up.
-grep -l '=$' shared/env/*.env bitocard/env/*.env udozo/env/*.env 2>/dev/null | sed 's/^/to fill in: /' || true
+grep -lE '^[A-Za-z_][A-Za-z0-9_]*=$' shared/env/*.env bitocard/env/*.env udozo/env/*.env 2>/dev/null | sed 's/^/to fill in: /' || true
