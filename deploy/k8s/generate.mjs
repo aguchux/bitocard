@@ -1,0 +1,513 @@
+// Writes the Kubernetes manifests of BitoCard and Udozo from one list, so every app is set up the same way: each
+// product in its own directory (deploy/k8s/bitocard, deploy/k8s/udozo: its API, scheduler, frontends, Redis, routes,
+// certificate and kustomization), and what both use in deploy/k8s/shared. Run after changing an app, a host or a size,
+// then commit what it wrote:
+//   node deploy/k8s/generate.mjs
+// Secrets and settings are never here: they are kustomize generators over each directory's env/*.env (never
+// committed; each has a committed *.env.example). See deploy/k8s/README.md.
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+
+const registry = 'ghcr.io/aguchux';
+export const namespace = 'bitocard';
+
+/**
+ * Every Next.js app: its image, the hosts it answers, its product, the address it is known by (SITE_URL) and whether
+ * it signs requests with its API's store server secret. `wildcard` serves resellers' store subdomains; `build` adds
+ * build-time values.
+ */
+export const frontends = [
+  { name: 'storefront', image: 'bitocard-storefront', dir: 'apps/storefront', pkg: '@bitocard/storefront', product: 'bitocard', hosts: ['bitocard.com', 'www.bitocard.com'], wildcard: '*.bitocard.com', site: 'https://bitocard.com', storeSecret: true },
+  { name: 'shq', image: 'bitocard-shq', dir: 'apps/shq', pkg: '@bitocard/shq', product: 'bitocard', hosts: ['shq.bitocard.com'], site: 'https://shq.bitocard.com' },
+  { name: 'admin', image: 'bitocard-admin', dir: 'apps/admin', pkg: '@bitocard/admin', product: 'bitocard', hosts: ['admin.bitocard.com'], site: 'https://admin.bitocard.com' },
+  { name: 'legals', image: 'bitocard-legals', dir: 'apps/legals', pkg: '@bitocard/legals', product: 'bitocard', hosts: ['legals.bitocard.com'], site: 'https://legals.bitocard.com' },
+  { name: 'docs', image: 'bitocard-docs', dir: 'apps/docs', pkg: '@bitocard/docs', product: 'bitocard', hosts: ['docs.bitocard.com'], site: 'https://docs.bitocard.com' },
+  { name: 'verify', image: 'bitocard-verify', dir: 'apps/verify', pkg: '@bitocard/verify', product: 'bitocard', hosts: ['verify.bitocard.com'], site: 'https://verify.bitocard.com' },
+  { name: 'udozo', image: 'udozo-web', dir: 'apps/udozo', pkg: '@udozo/web', product: 'udozo', hosts: ['udozo.com', 'www.udozo.com'], wildcard: '*.udozo.com', site: 'https://udozo.com', storeSecret: true, catchAll: true },
+  { name: 'udozo-shq', dir: 'apps/udozo-shq', pkg: '@udozo/shq', product: 'udozo', hosts: ['shq.udozo.com'], site: 'https://shq.udozo.com' },
+  { name: 'udozo-admin', dir: 'apps/udozo-admin', pkg: '@udozo/admin', product: 'udozo', hosts: ['admin.udozo.com'], site: 'https://admin.udozo.com' },
+  { name: 'udozo-connect', dir: 'apps/udozo-connect', pkg: '@udozo/connect', product: 'udozo', hosts: ['connect.udozo.com'], site: 'https://connect.udozo.com', storeSecret: true },
+  { name: 'udozo-pos', dir: 'apps/udozo-pos', pkg: '@udozo/pos', product: 'udozo', hosts: ['pos.udozo.com'], site: 'https://pos.udozo.com', storeSecret: true },
+  { name: 'udozo-verify', dir: 'apps/verify', pkg: '@bitocard/verify', product: 'udozo', hosts: ['verify.udozo.com'], site: 'https://verify.udozo.com', build: { NEXT_PUBLIC_VERIFY_BRAND: 'udozo' } },
+];
+
+/** Both APIs: their image, port and host. Each product has its own Redis (`redis-<product>`). */
+export const apis = [
+  { name: 'bitocard-api', dir: 'apps/api', product: 'bitocard', port: 3001, host: 'api.bitocard.com', dockerfile: 'apps/api/Dockerfile' },
+  { name: 'udozo-api', dir: 'apps/udozo-api', product: 'udozo', port: 3010, host: 'api.udozo.com', dockerfile: 'apps/udozo-api/Dockerfile' },
+];
+
+export const products = [
+  { key: 'bitocard', label: 'BitoCard', domain: 'bitocard.com' },
+  { key: 'udozo', label: 'Udozo', domain: 'udozo.com' },
+];
+
+/** The addresses a product's frontends are built with (their server-side defaults are Vercel's only). */
+export const buildAddresses = {
+  bitocard: { API_URL: 'https://api.bitocard.com', STOREFRONT_URL: 'https://bitocard.com', LEGALS_URL: 'https://legals.bitocard.com', SHQ_URL: 'https://shq.bitocard.com' },
+  udozo: { API_URL: 'https://api.udozo.com', UDOZO_URL: 'https://udozo.com', CONNECT_URL: 'https://connect.udozo.com', POS_URL: 'https://pos.udozo.com' },
+};
+
+/** Each app's image: frontends carry their product in the name (`bitocard-storefront`, `udozo-web`). */
+export const imageOf = app => `${registry}/${app.image ?? app.name}`;
+
+const header = what => `# ${what}\n# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.\n`;
+
+/** Locked-down containers: never root, no extra privileges, no Linux capabilities. */
+const security = (indent, uid = 1000) =>
+  [`securityContext:`, `  allowPrivilegeEscalation: false`, `  runAsNonRoot: true`, `  runAsUser: ${uid}`, `  capabilities:`, `    drop: [ALL]`].map((line, n) => (n ? ' '.repeat(indent) : '') + line).join('\n');
+
+const metadata = (name, product, extra = '') => `metadata:
+  name: ${name}
+  labels:
+    app.kubernetes.io/name: ${name}
+    app.kubernetes.io/part-of: ${product}${extra}`;
+
+function frontend(app) {
+  const secretEnv = app.storeSecret
+    ? `
+            - name: STORE_SERVER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ${app.product}-web-secrets
+                  key: STORE_SERVER_SECRET`
+    : '';
+  return `---
+apiVersion: apps/v1
+kind: Deployment
+${metadata(app.name, app.product)}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${app.name}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${app.name}
+        app.kubernetes.io/part-of: ${app.product}
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ${imageOf(app)}:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: ${app.product}-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "${app.site}" }${secretEnv}
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          ${security(10)}
+---
+apiVersion: v1
+kind: Service
+${metadata(app.name, app.product)}
+spec:
+  selector:
+    app.kubernetes.io/name: ${app.name}
+  ports:
+    - { name: http, port: 80, targetPort: http }
+`;
+}
+
+function api(app) {
+  const env = `envFrom:
+            - configMapRef:
+                name: ${app.name}-config
+            - secretRef:
+                name: ${app.name}-secrets
+          env:
+            - name: UPSTASH_REDIS_REST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: redis-${app.product}-secrets
+                  key: REDIS_TOKEN`;
+  return `---
+apiVersion: apps/v1
+kind: Deployment
+${metadata(app.name, app.product)}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${app.name}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${app.name}
+        app.kubernetes.io/part-of: ${app.product}
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      # Before the new image serves: the settings checked (the database answers, ENCRYPTION_KEY opens the stored
+      # secrets, Redis accepts its token), then the migrations (Prisma's lock keeps a second pod from running them too).
+      initContainers:
+        - name: migrate
+          image: ${imageOf(app)}:latest
+          command: ["sh", "-c", "node scripts/check-env.mjs && node scripts/migrate-deploy.mjs"]
+          ${env}
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 512Mi }
+          ${security(10)}
+      containers:
+        - name: api
+          image: ${imageOf(app)}:latest
+          ports:
+            - { name: http, containerPort: ${app.port} }
+          ${env}
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 4
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 768Mi }
+          ${security(10)}
+      # Long requests (catalogue syncs, reports) finish before the pod goes.
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: v1
+kind: Service
+${metadata(app.name, app.product)}
+spec:
+  selector:
+    app.kubernetes.io/name: ${app.name}
+  ports:
+    - { name: http, port: 80, targetPort: http }
+    - { name: direct, port: ${app.port}, targetPort: http }
+---
+# The scheduled jobs: each minute (UTC), every due job is called as GET /v1/cron/<job> on the API's own Service,
+# never through the internet, with its CRON_SECRET. One replica only; a job still running is never started again.
+apiVersion: apps/v1
+kind: Deployment
+${metadata(`${app.name}-scheduler`, app.product)}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${app.name}-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${app.name}-scheduler
+        app.kubernetes.io/part-of: ${app.product}
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: scheduler
+          image: ${imageOf(app)}:latest
+          command: ["node", "scripts/scheduler.mjs"]
+          env:
+            - { name: API_INTERNAL_URL, value: "http://${app.name}:${app.port}" }
+            - { name: APP_PRODUCT, value: "${app.product}" }
+            - name: CRON_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ${app.name}-secrets
+                  key: CRON_SECRET
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { memory: 128Mi }
+          ${security(10)}
+`;
+}
+
+/**
+ * The product's Redis, in place of Upstash: Redis itself (password set, append-only file on a DigitalOcean volume
+ * kept if the claim is deleted) and, beside it, serverless-redis-http speaking Upstash's REST protocol, so the API
+ * keeps its client and only the address changes.
+ */
+function redis(product) {
+  const name = `redis-${product.key}`;
+  return `${header(`${product.label}'s Redis (never shared with the other product). Postgres stays the record of everything: Redis holds
+# caches, rate limits and short locks, so keys without an expiry are never evicted (volatile-lru).`)}---
+apiVersion: apps/v1
+kind: StatefulSet
+${metadata(name, product.key)}
+spec:
+  serviceName: ${name}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${name}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${name}
+        app.kubernetes.io/part-of: ${product.key}
+        app.kubernetes.io/component: redis
+    spec:
+      securityContext:
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: redis
+          image: redis:8.2-alpine
+          args: ["--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-lru", "--protected-mode", "no"]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: ${name}-secrets, key: REDIS_PASSWORD }
+          ports:
+            - { name: redis, containerPort: 6379 }
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli -a \\"$REDIS_PASSWORD\\" --no-auth-warning ping | grep -q PONG"]
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: redis }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          ${security(10, 999)}
+        - name: rest
+          image: hiett/serverless-redis-http:0.0.10
+          env:
+            - { name: SRH_MODE, value: env }
+            - name: SRH_TOKEN
+              valueFrom:
+                secretKeyRef: { name: ${name}-secrets, key: REDIS_TOKEN }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: ${name}-secrets, key: REDIS_PASSWORD }
+            - { name: SRH_CONNECTION_STRING, value: "redis://:$(REDIS_PASSWORD)@127.0.0.1:6379" }
+          ports:
+            - { name: rest, containerPort: 80 }
+          readinessProbe:
+            tcpSocket: { port: rest }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 25m, memory: 96Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: do-block-storage-retain
+        resources:
+          requests: { storage: 5Gi }
+---
+apiVersion: v1
+kind: Service
+${metadata(name, product.key)}
+spec:
+  selector:
+    app.kubernetes.io/name: ${name}
+  ports:
+    - { name: rest, port: 80, targetPort: rest }
+    - { name: redis, port: 6379, targetPort: redis }
+---
+# Only the product's own API reaches its Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ${name}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ${name}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ${product.key}-api
+`;
+}
+
+/** Host routing: exact hosts first, the wildcard (resellers' stores) below them, then Udozo's own-domain stores. */
+function ingresses(product) {
+  const rule = (host, service) => `    - host: "${host}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ${service}
+                port: { name: http }`;
+  const ingress = (name, rules, priority) => `---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${name}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"${priority ? `\n    traefik.ingress.kubernetes.io/router.priority: "${priority}"` : ''}
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: ${product.key}-tls
+      hosts: ["${product.domain}", "*.${product.domain}"]
+  rules:
+${rules.join('\n')}
+`;
+  const own = frontends.filter(app => app.product === product.key);
+  const exact = [...apis.filter(app => app.product === product.key).map(app => rule(app.host, app.name)), ...own.flatMap(app => app.hosts.map(host => rule(host, app.name)))];
+  const store = own.find(app => app.wildcard);
+  let out = header(`${product.label}'s routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml).`);
+  out += ingress(`${product.key}-sites`, exact, 0);
+  // Resellers' store subdomains: below every exact host, so shq.<domain> never reaches the store.
+  out += ingress(`${product.key}-stores`, [rule(store.wildcard, store.name)], 2);
+  const catchAll = own.find(app => app.catchAll);
+  if (catchAll) {
+    // Live stores on their own domains: any other host reaches the store app, which names the store from the host.
+    // Their certificates are Cloudflare for SaaS's at the edge (deploy/k8s/README.md).
+    out += `---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${product.key}-custom-domains
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+    traefik.ingress.kubernetes.io/router.priority: "1"
+spec:
+  ingressClassName: traefik
+  defaultBackend:
+    service:
+      name: ${catchAll.name}
+      port: { name: http }
+`;
+  }
+  return out;
+}
+
+function certificate(product) {
+  return `${header(`${product.label}'s certificate: the apex and its wildcard (resellers' store subdomains included), from the shared
+# Let's Encrypt issuer (deploy/k8s/shared/issuer.yaml), renewed by cert-manager.`)}---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${product.key}
+spec:
+  secretName: ${product.key}-tls
+  issuerRef: { name: letsencrypt, kind: Issuer }
+  dnsNames: ["${product.domain}", "*.${product.domain}"]
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+`;
+}
+
+function kustomization(product) {
+  const own = [...apis, ...frontends].filter(app => app.product === product.key);
+  const images = [...new Set(own.map(imageOf))].map(image => `  - { name: ${image}, newTag: latest }`).join('\n');
+  return `${header(`${product.label} on Kubernetes: its API and scheduler, frontends, Redis, routes and certificate, in the namespace
+# \`${namespace}\`. Applied with the rest by \`kubectl apply -k deploy/k8s\`, or alone by \`kubectl apply -k deploy/k8s/${product.key}\`
+# (after deploy/k8s/shared once).
+#
+# Settings and secrets come from env/*.env, never committed: copy each from its *.env.example (deploy/k8s/init-env.sh).
+# A generated ConfigMap or Secret is named with a hash of its contents, so a changed value rolls the pods using it.`)}apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ${namespace}
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ${product.key}
+
+resources:
+  - api.yaml
+  - frontends.yaml
+  - redis.yaml
+  - ingress.yaml
+  - certificate.yaml
+
+configMapGenerator:
+  # The API's settings that are not secret (origins, cookies, rate limits, Redis's address).
+  - name: ${product.key}-api-config
+    envs: [env/api.config.env]
+  # The addresses the frontends' servers call and link to.
+  - name: ${product.key}-web-config
+    envs: [env/web.config.env]
+
+secretGenerator:
+  - name: ${product.key}-api-secrets
+    envs: [env/api.secret.env]
+  - name: ${product.key}-web-secrets
+    envs: [env/web.secret.env]
+  - name: redis-${product.key}-secrets
+    envs: [env/redis.secret.env]
+
+# The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (\`kustomize edit set image\`).
+images:
+${images}
+`;
+}
+
+/**
+ * What CI builds (.github/workflows/k8s-images.yml reads images.json): each image's Dockerfile and build arguments, the
+ * frontends' with their product's addresses and their own SITE_URL.
+ */
+export function imageBuilds() {
+  return [
+    ...apis.map(app => ({ name: app.name, image: imageOf(app), dockerfile: app.dockerfile, args: '' })),
+    ...frontends.map(app => ({
+      name: app.image ?? app.name,
+      image: imageOf(app),
+      dockerfile: 'deploy/k8s/web.Dockerfile',
+      args: Object.entries({ APP: app.pkg, APP_DIR: app.dir, SITE_URL: app.site, ...buildAddresses[app.product], ...(app.build ?? {}) })
+        .map(([key, value]) => `${key}=${value}`)
+        .join('\n'),
+    })),
+  ];
+}
+
+const write = (path, text) => {
+  mkdirSync(new URL('.', path), { recursive: true });
+  writeFileSync(path, text);
+};
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const here = new URL('.', import.meta.url);
+  for (const product of products) {
+    const dir = new URL(`${product.key}/`, here);
+    write(new URL('api.yaml', dir), header(`${product.label}'s API: its migrations, its Service and its scheduler.`) + apis.filter(app => app.product === product.key).map(api).join(''));
+    write(new URL('frontends.yaml', dir), header(`${product.label}'s Next.js apps: a Deployment and a Service each.`) + frontends.filter(app => app.product === product.key).map(frontend).join(''));
+    write(new URL('redis.yaml', dir), redis(product));
+    write(new URL('ingress.yaml', dir), ingresses(product));
+    write(new URL('certificate.yaml', dir), certificate(product));
+    write(new URL('kustomization.yaml', dir), kustomization(product));
+  }
+  write(new URL('images.json', here), `${JSON.stringify(imageBuilds(), null, 2)}\n`);
+  console.log('Wrote deploy/k8s/bitocard, deploy/k8s/udozo and deploy/k8s/images.json');
+}

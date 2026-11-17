@@ -1,0 +1,413 @@
+# Udozo's Next.js apps: a Deployment and a Service each.
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udozo
+  labels:
+    app.kubernetes.io/name: udozo
+    app.kubernetes.io/part-of: udozo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: udozo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: udozo
+        app.kubernetes.io/part-of: udozo
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/udozo-web:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: udozo-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://udozo.com" }
+            - name: STORE_SERVER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: udozo-web-secrets
+                  key: STORE_SERVER_SECRET
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udozo
+  labels:
+    app.kubernetes.io/name: udozo
+    app.kubernetes.io/part-of: udozo
+spec:
+  selector:
+    app.kubernetes.io/name: udozo
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udozo-shq
+  labels:
+    app.kubernetes.io/name: udozo-shq
+    app.kubernetes.io/part-of: udozo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: udozo-shq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: udozo-shq
+        app.kubernetes.io/part-of: udozo
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/udozo-shq:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: udozo-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://shq.udozo.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udozo-shq
+  labels:
+    app.kubernetes.io/name: udozo-shq
+    app.kubernetes.io/part-of: udozo
+spec:
+  selector:
+    app.kubernetes.io/name: udozo-shq
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udozo-admin
+  labels:
+    app.kubernetes.io/name: udozo-admin
+    app.kubernetes.io/part-of: udozo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: udozo-admin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: udozo-admin
+        app.kubernetes.io/part-of: udozo
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/udozo-admin:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: udozo-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://admin.udozo.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udozo-admin
+  labels:
+    app.kubernetes.io/name: udozo-admin
+    app.kubernetes.io/part-of: udozo
+spec:
+  selector:
+    app.kubernetes.io/name: udozo-admin
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udozo-connect
+  labels:
+    app.kubernetes.io/name: udozo-connect
+    app.kubernetes.io/part-of: udozo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: udozo-connect
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: udozo-connect
+        app.kubernetes.io/part-of: udozo
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/udozo-connect:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: udozo-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://connect.udozo.com" }
+            - name: STORE_SERVER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: udozo-web-secrets
+                  key: STORE_SERVER_SECRET
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udozo-connect
+  labels:
+    app.kubernetes.io/name: udozo-connect
+    app.kubernetes.io/part-of: udozo
+spec:
+  selector:
+    app.kubernetes.io/name: udozo-connect
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udozo-pos
+  labels:
+    app.kubernetes.io/name: udozo-pos
+    app.kubernetes.io/part-of: udozo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: udozo-pos
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: udozo-pos
+        app.kubernetes.io/part-of: udozo
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/udozo-pos:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: udozo-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://pos.udozo.com" }
+            - name: STORE_SERVER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: udozo-web-secrets
+                  key: STORE_SERVER_SECRET
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udozo-pos
+  labels:
+    app.kubernetes.io/name: udozo-pos
+    app.kubernetes.io/part-of: udozo
+spec:
+  selector:
+    app.kubernetes.io/name: udozo-pos
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udozo-verify
+  labels:
+    app.kubernetes.io/name: udozo-verify
+    app.kubernetes.io/part-of: udozo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: udozo-verify
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: udozo-verify
+        app.kubernetes.io/part-of: udozo
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/udozo-verify:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: udozo-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://verify.udozo.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udozo-verify
+  labels:
+    app.kubernetes.io/name: udozo-verify
+    app.kubernetes.io/part-of: udozo
+spec:
+  selector:
+    app.kubernetes.io/name: udozo-verify
+  ports:
+    - { name: http, port: 80, targetPort: http }

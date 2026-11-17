@@ -1,0 +1,403 @@
+# BitoCard's Next.js apps: a Deployment and a Service each.
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storefront
+  labels:
+    app.kubernetes.io/name: storefront
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storefront
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: storefront
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/bitocard-storefront:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://bitocard.com" }
+            - name: STORE_SERVER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bitocard-web-secrets
+                  key: STORE_SERVER_SECRET
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storefront
+  labels:
+    app.kubernetes.io/name: storefront
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: storefront
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shq
+  labels:
+    app.kubernetes.io/name: shq
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shq
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/bitocard-shq:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://shq.bitocard.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shq
+  labels:
+    app.kubernetes.io/name: shq
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: shq
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+  labels:
+    app.kubernetes.io/name: admin
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: admin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: admin
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/bitocard-admin:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://admin.bitocard.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  labels:
+    app.kubernetes.io/name: admin
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: admin
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legals
+  labels:
+    app.kubernetes.io/name: legals
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: legals
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: legals
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/bitocard-legals:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://legals.bitocard.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legals
+  labels:
+    app.kubernetes.io/name: legals
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: legals
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docs
+  labels:
+    app.kubernetes.io/name: docs
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: docs
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: docs
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/bitocard-docs:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://docs.bitocard.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docs
+  labels:
+    app.kubernetes.io/name: docs
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: docs
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: verify
+  labels:
+    app.kubernetes.io/name: verify
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: verify
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: verify
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: ghcr.io/aguchux/bitocard-verify:latest
+          ports:
+            - { name: http, containerPort: 3000 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-web-config
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SITE_URL, value: "https://verify.bitocard.com" }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 160Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: verify
+  labels:
+    app.kubernetes.io/name: verify
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: verify
+  ports:
+    - { name: http, port: 80, targetPort: http }

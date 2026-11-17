@@ -1,0 +1,86 @@
+[
+  {
+    "name": "bitocard-api",
+    "image": "ghcr.io/aguchux/bitocard-api",
+    "dockerfile": "apps/api/Dockerfile",
+    "args": ""
+  },
+  {
+    "name": "udozo-api",
+    "image": "ghcr.io/aguchux/udozo-api",
+    "dockerfile": "apps/udozo-api/Dockerfile",
+    "args": ""
+  },
+  {
+    "name": "bitocard-storefront",
+    "image": "ghcr.io/aguchux/bitocard-storefront",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/storefront\nAPP_DIR=apps/storefront\nSITE_URL=https://bitocard.com\nAPI_URL=https://api.bitocard.com\nSTOREFRONT_URL=https://bitocard.com\nLEGALS_URL=https://legals.bitocard.com\nSHQ_URL=https://shq.bitocard.com"
+  },
+  {
+    "name": "bitocard-shq",
+    "image": "ghcr.io/aguchux/bitocard-shq",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/shq\nAPP_DIR=apps/shq\nSITE_URL=https://shq.bitocard.com\nAPI_URL=https://api.bitocard.com\nSTOREFRONT_URL=https://bitocard.com\nLEGALS_URL=https://legals.bitocard.com\nSHQ_URL=https://shq.bitocard.com"
+  },
+  {
+    "name": "bitocard-admin",
+    "image": "ghcr.io/aguchux/bitocard-admin",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/admin\nAPP_DIR=apps/admin\nSITE_URL=https://admin.bitocard.com\nAPI_URL=https://api.bitocard.com\nSTOREFRONT_URL=https://bitocard.com\nLEGALS_URL=https://legals.bitocard.com\nSHQ_URL=https://shq.bitocard.com"
+  },
+  {
+    "name": "bitocard-legals",
+    "image": "ghcr.io/aguchux/bitocard-legals",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/legals\nAPP_DIR=apps/legals\nSITE_URL=https://legals.bitocard.com\nAPI_URL=https://api.bitocard.com\nSTOREFRONT_URL=https://bitocard.com\nLEGALS_URL=https://legals.bitocard.com\nSHQ_URL=https://shq.bitocard.com"
+  },
+  {
+    "name": "bitocard-docs",
+    "image": "ghcr.io/aguchux/bitocard-docs",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/docs\nAPP_DIR=apps/docs\nSITE_URL=https://docs.bitocard.com\nAPI_URL=https://api.bitocard.com\nSTOREFRONT_URL=https://bitocard.com\nLEGALS_URL=https://legals.bitocard.com\nSHQ_URL=https://shq.bitocard.com"
+  },
+  {
+    "name": "bitocard-verify",
+    "image": "ghcr.io/aguchux/bitocard-verify",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/verify\nAPP_DIR=apps/verify\nSITE_URL=https://verify.bitocard.com\nAPI_URL=https://api.bitocard.com\nSTOREFRONT_URL=https://bitocard.com\nLEGALS_URL=https://legals.bitocard.com\nSHQ_URL=https://shq.bitocard.com"
+  },
+  {
+    "name": "udozo-web",
+    "image": "ghcr.io/aguchux/udozo-web",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@udozo/web\nAPP_DIR=apps/udozo\nSITE_URL=https://udozo.com\nAPI_URL=https://api.udozo.com\nUDOZO_URL=https://udozo.com\nCONNECT_URL=https://connect.udozo.com\nPOS_URL=https://pos.udozo.com"
+  },
+  {
+    "name": "udozo-shq",
+    "image": "ghcr.io/aguchux/udozo-shq",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@udozo/shq\nAPP_DIR=apps/udozo-shq\nSITE_URL=https://shq.udozo.com\nAPI_URL=https://api.udozo.com\nUDOZO_URL=https://udozo.com\nCONNECT_URL=https://connect.udozo.com\nPOS_URL=https://pos.udozo.com"
+  },
+  {
+    "name": "udozo-admin",
+    "image": "ghcr.io/aguchux/udozo-admin",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@udozo/admin\nAPP_DIR=apps/udozo-admin\nSITE_URL=https://admin.udozo.com\nAPI_URL=https://api.udozo.com\nUDOZO_URL=https://udozo.com\nCONNECT_URL=https://connect.udozo.com\nPOS_URL=https://pos.udozo.com"
+  },
+  {
+    "name": "udozo-connect",
+    "image": "ghcr.io/aguchux/udozo-connect",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@udozo/connect\nAPP_DIR=apps/udozo-connect\nSITE_URL=https://connect.udozo.com\nAPI_URL=https://api.udozo.com\nUDOZO_URL=https://udozo.com\nCONNECT_URL=https://connect.udozo.com\nPOS_URL=https://pos.udozo.com"
+  },
+  {
+    "name": "udozo-pos",
+    "image": "ghcr.io/aguchux/udozo-pos",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@udozo/pos\nAPP_DIR=apps/udozo-pos\nSITE_URL=https://pos.udozo.com\nAPI_URL=https://api.udozo.com\nUDOZO_URL=https://udozo.com\nCONNECT_URL=https://connect.udozo.com\nPOS_URL=https://pos.udozo.com"
+  },
+  {
+    "name": "udozo-verify",
+    "image": "ghcr.io/aguchux/udozo-verify",
+    "dockerfile": "deploy/k8s/web.Dockerfile",
+    "args": "APP=@bitocard/verify\nAPP_DIR=apps/verify\nSITE_URL=https://verify.udozo.com\nAPI_URL=https://api.udozo.com\nUDOZO_URL=https://udozo.com\nCONNECT_URL=https://connect.udozo.com\nPOS_URL=https://pos.udozo.com\nNEXT_PUBLIC_VERIFY_BRAND=udozo"
+  }
+]

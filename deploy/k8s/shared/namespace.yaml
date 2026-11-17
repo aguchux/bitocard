@@ -1,0 +1,8 @@
+# The one namespace every BitoCard and Udozo app, both APIs and both Redis instances live in.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bitocard
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted

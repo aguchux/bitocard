@@ -1,0 +1,44 @@
+# Traefik, the cluster's way in (Helm chart traefik/traefik; install.sh). One DigitalOcean load balancer sends every
+# request, with the PROXY protocol so Traefik sees the real sender, and Traefik routes it by host (deploy/k8s/ingress.yaml).
+#
+# Behind Cloudflare: forwarded headers are believed only from Cloudflare's ranges (the same list as
+# deploy/droplet/Caddyfile; refresh from https://www.cloudflare.com/ips/), so the APIs (TRUST_PROXY=2) take the
+# visitor's address from Cloudflare and never one a client wrote. Anything else that reaches the load balancer has its
+# forwarded headers dropped.
+deployment:
+  replicas: 2
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  name: traefik
+providers:
+  kubernetesIngress:
+    publishedService:
+      enabled: true
+service:
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-name: golojan-traefik
+    service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: tcp
+  spec:
+    externalTrafficPolicy: Cluster
+additionalArguments:
+  - --entryPoints.web.http.redirections.entryPoint.to=websecure
+  - --entryPoints.web.http.redirections.entryPoint.scheme=https
+  - --entryPoints.web.proxyProtocol.trustedIPs=10.0.0.0/8
+  - --entryPoints.websecure.proxyProtocol.trustedIPs=10.0.0.0/8
+  - --entryPoints.web.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+  - --entryPoints.websecure.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+  # Long requests (catalogue syncs, reports, uploads) are not cut short.
+  - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=300s
+  - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=300s
+logs:
+  access:
+    enabled: true
+    format: json
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { memory: 256Mi }

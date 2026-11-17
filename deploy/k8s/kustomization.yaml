@@ -1,0 +1,9 @@
+# BitoCard and Udozo on Kubernetes (DigitalOcean, the golojancluster), all in the namespace `bitocard`, each product in
+# its own directory. Apply everything with `kubectl apply -k deploy/k8s` (after deploy/k8s/bootstrap/install.sh once
+# per cluster), or one part with `kubectl apply -k deploy/k8s/<shared|bitocard|udozo>`. See README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - shared
+  - bitocard
+  - udozo

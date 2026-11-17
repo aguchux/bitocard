@@ -58,3 +58,10 @@ assets/*.zip
 # Bitocard keys
 keys.mjs
 bitocard-keys/
+# Kubernetes settings and secrets (deploy/k8s): only the *.example files are committed.
+deploy/k8s/*/env/*
+!deploy/k8s/*/env/*.example
+# Cluster credentials (kubeconfigs) and Terraform state.
+terraform/
+*.kubeconfig
+*-kubeconfig.yaml

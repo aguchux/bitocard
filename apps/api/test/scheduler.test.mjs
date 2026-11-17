@@ -81,4 +81,15 @@ describe('running jobs', () => {
     assert.deepEqual(await Promise.all(tick(jobs, at('2026-10-24T06:01:00Z'), { baseUrl: 'http://api:3001', secret: 's', timeoutMs: 1000, running, fetchImpl: refused })), ['failed']);
     assert.equal(running.size, 0);
   });
+
+  test("a vercel.json's crons are read as jobs (Udozo's API off Vercel)", async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const file = join(mkdtempSync(join(tmpdir(), 'crons-')), 'vercel.json');
+    writeFileSync(file, JSON.stringify({ crons: [{ path: '/v1/cron/payments', schedule: '*/10 * * * *' }, { path: '/v1/cron/pos', schedule: '25 * * * *' }] }));
+    const jobs = loadJobs(file, 'udozo');
+    assert.deepEqual(jobs.map(job => [job.job, job.schedule]), [['payments', '*/10 * * * *'], ['pos', '25 * * * *']]);
+    assert.equal(matches(jobs[1].parsed, new Date('2026-11-17T10:25:00Z')), true);
+  });
 });

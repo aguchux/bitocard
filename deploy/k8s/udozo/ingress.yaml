@@ -1,0 +1,126 @@
+# Udozo's routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml).
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: udozo-sites
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: udozo-tls
+      hosts: ["udozo.com", "*.udozo.com"]
+  rules:
+    - host: "api.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo-api
+                port: { name: http }
+    - host: "udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo
+                port: { name: http }
+    - host: "www.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo
+                port: { name: http }
+    - host: "shq.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo-shq
+                port: { name: http }
+    - host: "admin.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo-admin
+                port: { name: http }
+    - host: "connect.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo-connect
+                port: { name: http }
+    - host: "pos.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo-pos
+                port: { name: http }
+    - host: "verify.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo-verify
+                port: { name: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: udozo-stores
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "2"
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: udozo-tls
+      hosts: ["udozo.com", "*.udozo.com"]
+  rules:
+    - host: "*.udozo.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: udozo
+                port: { name: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: udozo-custom-domains
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure,web
+    traefik.ingress.kubernetes.io/router.priority: "1"
+spec:
+  ingressClassName: traefik
+  defaultBackend:
+    service:
+      name: udozo
+      port: { name: http }

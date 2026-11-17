@@ -1,0 +1,153 @@
+# BitoCard's API: its migrations, its Service and its scheduler.
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitocard-api
+  labels:
+    app.kubernetes.io/name: bitocard-api
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bitocard-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bitocard-api
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      # Before the new image serves: the settings checked (the database answers, ENCRYPTION_KEY opens the stored
+      # secrets, Redis accepts its token), then the migrations (Prisma's lock keeps a second pod from running them too).
+      initContainers:
+        - name: migrate
+          image: ghcr.io/aguchux/bitocard-api:latest
+          command: ["sh", "-c", "node scripts/check-env.mjs && node scripts/migrate-deploy.mjs"]
+          envFrom:
+            - configMapRef:
+                name: bitocard-api-config
+            - secretRef:
+                name: bitocard-api-secrets
+          env:
+            - name: UPSTASH_REDIS_REST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: redis-bitocard-secrets
+                  key: REDIS_TOKEN
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+      containers:
+        - name: api
+          image: ghcr.io/aguchux/bitocard-api:latest
+          ports:
+            - { name: http, containerPort: 3001 }
+          envFrom:
+            - configMapRef:
+                name: bitocard-api-config
+            - secretRef:
+                name: bitocard-api-secrets
+          env:
+            - name: UPSTASH_REDIS_REST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: redis-bitocard-secrets
+                  key: REDIS_TOKEN
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 4
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 768Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+      # Long requests (catalogue syncs, reports) finish before the pod goes.
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitocard-api
+  labels:
+    app.kubernetes.io/name: bitocard-api
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: bitocard-api
+  ports:
+    - { name: http, port: 80, targetPort: http }
+    - { name: direct, port: 3001, targetPort: http }
+---
+# The scheduled jobs: each minute (UTC), every due job is called as GET /v1/cron/<job> on the API's own Service,
+# never through the internet, with its CRON_SECRET. One replica only; a job still running is never started again.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitocard-api-scheduler
+  labels:
+    app.kubernetes.io/name: bitocard-api-scheduler
+    app.kubernetes.io/part-of: bitocard
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bitocard-api-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bitocard-api-scheduler
+        app.kubernetes.io/part-of: bitocard
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: scheduler
+          image: ghcr.io/aguchux/bitocard-api:latest
+          command: ["node", "scripts/scheduler.mjs"]
+          env:
+            - { name: API_INTERNAL_URL, value: "http://bitocard-api:3001" }
+            - { name: APP_PRODUCT, value: "bitocard" }
+            - name: CRON_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bitocard-api-secrets
+                  key: CRON_SECRET
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]

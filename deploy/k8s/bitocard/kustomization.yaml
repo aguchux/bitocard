@@ -1,0 +1,47 @@
+# BitoCard on Kubernetes: its API and scheduler, frontends, Redis, routes and certificate, in the namespace
+# `bitocard`. Applied with the rest by `kubectl apply -k deploy/k8s`, or alone by `kubectl apply -k deploy/k8s/bitocard`
+# (after deploy/k8s/shared once).
+#
+# Settings and secrets come from env/*.env, never committed: copy each from its *.env.example (deploy/k8s/init-env.sh).
+# A generated ConfigMap or Secret is named with a hash of its contents, so a changed value rolls the pods using it.
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: bitocard
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: bitocard
+
+resources:
+  - api.yaml
+  - frontends.yaml
+  - redis.yaml
+  - ingress.yaml
+  - certificate.yaml
+
+configMapGenerator:
+  # The API's settings that are not secret (origins, cookies, rate limits, Redis's address).
+  - name: bitocard-api-config
+    envs: [env/api.config.env]
+  # The addresses the frontends' servers call and link to.
+  - name: bitocard-web-config
+    envs: [env/web.config.env]
+
+secretGenerator:
+  - name: bitocard-api-secrets
+    envs: [env/api.secret.env]
+  - name: bitocard-web-secrets
+    envs: [env/web.secret.env]
+  - name: redis-bitocard-secrets
+    envs: [env/redis.secret.env]
+
+# The images to run; deploy/k8s/deploy.sh pins each to the commit CI built (`kustomize edit set image`).
+images:
+  - { name: ghcr.io/aguchux/bitocard-api, newTag: latest }
+  - { name: ghcr.io/aguchux/bitocard-storefront, newTag: latest }
+  - { name: ghcr.io/aguchux/bitocard-shq, newTag: latest }
+  - { name: ghcr.io/aguchux/bitocard-admin, newTag: latest }
+  - { name: ghcr.io/aguchux/bitocard-legals, newTag: latest }
+  - { name: ghcr.io/aguchux/bitocard-docs, newTag: latest }
+  - { name: ghcr.io/aguchux/bitocard-verify, newTag: latest }

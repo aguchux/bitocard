@@ -1,0 +1,20 @@
+# Let's Encrypt for both products' certificates (bitocard/certificate.yaml, udozo/certificate.yaml), by the DNS-01
+# challenge on Cloudflare, which runs both zones. The token (env/cloudflare.secret.env) needs Zone > DNS > Edit and
+# Zone > Zone > Read on bitocard.com and udozo.com only.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Set from ACME_EMAIL in env/cluster.config.env (kustomization.yaml's replacements).
+    email: set-by-kustomize@example.com
+    privateKeySecretRef:
+      name: letsencrypt-account
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: CLOUDFLARE_API_TOKEN

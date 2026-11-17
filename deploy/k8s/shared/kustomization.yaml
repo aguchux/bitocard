@@ -1,0 +1,40 @@
+# What BitoCard and Udozo share on the cluster: the namespace, the certificate issuer, the image pull secret and the
+# apps' network policy. Applied with the rest by `kubectl apply -k deploy/k8s`, or alone (first) by
+# `kubectl apply -k deploy/k8s/shared`. Its settings and secrets come from env/*.env, never committed: copy each from
+# its *.env.example (deploy/k8s/init-env.sh).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: bitocard
+
+resources:
+  - namespace.yaml
+  - issuer.yaml
+  - network-policy.yaml
+
+# Named exactly (no hash): cert-manager and every product's pods find them by these names.
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  # Read only by the replacements below.
+  - name: cluster-config
+    envs: [env/cluster.config.env]
+
+secretGenerator:
+  - name: cloudflare-api-token
+    envs: [env/cloudflare.secret.env]
+  # Pulls the private images from GitHub's container registry (a token with read:packages).
+  - name: ghcr
+    type: kubernetes.io/dockerconfigjson
+    files: [.dockerconfigjson=env/ghcr.dockerconfigjson]
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.ACME_EMAIL
+    targets:
+      - select:
+          kind: Issuer
+          name: letsencrypt
+        fieldPaths: [spec.acme.email]

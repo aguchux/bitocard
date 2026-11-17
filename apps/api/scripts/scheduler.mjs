@@ -6,6 +6,7 @@
 //   API_INTERNAL_URL  the API as the scheduler reaches it, never through Cloudflare (default http://api:3001)
 //   CRON_SECRET       the API's own CRON_SECRET
 //   CRON_TIMEOUT_MS   how long one run may take before it is given up on (default 15 minutes; the job carries on)
+//   CRON_JOBS_FILE    the jobs file (default ../cron.json); a vercel.json's `crons` are read too (Udozo's API on Kubernetes)
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -53,8 +54,10 @@ export function matches(parsed, date) {
  * The jobs in cron.json this product's instance runs (`APP_PRODUCT`, BitoCard's by default), each with its parsed
  * schedule: a job naming another `product` belongs to that product's instance (docs/UDOZO_SPINOFF_PLAN.md).
  */
-export function loadJobs(path = new URL('../cron.json', import.meta.url), product = process.env.APP_PRODUCT || 'bitocard') {
-  const { jobs } = JSON.parse(readFileSync(path, 'utf8'));
+export function loadJobs(path = process.env.CRON_JOBS_FILE || new URL('../cron.json', import.meta.url), product = process.env.APP_PRODUCT || 'bitocard') {
+  const file = JSON.parse(readFileSync(path, 'utf8'));
+  // cron.json lists `jobs`; a vercel.json lists `crons` as { path: '/v1/cron/<job>', schedule }.
+  const jobs = file.jobs ?? (file.crons ?? []).map(cron => ({ job: String(cron.path).replace(/^\/v1\/cron\//, ''), schedule: cron.schedule }));
   return jobs.filter(job => !job.product || job.product === product).map(job => ({ ...job, parsed: parseSchedule(job.schedule) }));
 }
 

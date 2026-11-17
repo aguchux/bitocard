@@ -1,0 +1,115 @@
+# BitoCard's Redis (never shared with the other product). Postgres stays the record of everything: Redis holds
+# caches, rate limits and short locks, so keys without an expiry are never evicted (volatile-lru).
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-bitocard
+  labels:
+    app.kubernetes.io/name: redis-bitocard
+    app.kubernetes.io/part-of: bitocard
+spec:
+  serviceName: redis-bitocard
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis-bitocard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis-bitocard
+        app.kubernetes.io/part-of: bitocard
+        app.kubernetes.io/component: redis
+    spec:
+      securityContext:
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: redis
+          image: redis:8.2-alpine
+          args: ["--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-lru", "--protected-mode", "no"]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: redis-bitocard-secrets, key: REDIS_PASSWORD }
+          ports:
+            - { name: redis, containerPort: 6379 }
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli -a \"$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: redis }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 999
+            capabilities:
+              drop: [ALL]
+        - name: rest
+          image: hiett/serverless-redis-http:0.0.10
+          env:
+            - { name: SRH_MODE, value: env }
+            - name: SRH_TOKEN
+              valueFrom:
+                secretKeyRef: { name: redis-bitocard-secrets, key: REDIS_TOKEN }
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: redis-bitocard-secrets, key: REDIS_PASSWORD }
+            - { name: SRH_CONNECTION_STRING, value: "redis://:$(REDIS_PASSWORD)@127.0.0.1:6379" }
+          ports:
+            - { name: rest, containerPort: 80 }
+          readinessProbe:
+            tcpSocket: { port: rest }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 25m, memory: 96Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: do-block-storage-retain
+        resources:
+          requests: { storage: 5Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-bitocard
+  labels:
+    app.kubernetes.io/name: redis-bitocard
+    app.kubernetes.io/part-of: bitocard
+spec:
+  selector:
+    app.kubernetes.io/name: redis-bitocard
+  ports:
+    - { name: rest, port: 80, targetPort: rest }
+    - { name: redis, port: 6379, targetPort: redis }
+---
+# Only the product's own API reaches its Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-bitocard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis-bitocard
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: bitocard-api

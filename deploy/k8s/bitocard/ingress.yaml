@@ -1,0 +1,112 @@
+# BitoCard's routes by host, through Traefik (deploy/k8s/bootstrap/traefik-values.yaml).
+# Written by deploy/k8s/generate.mjs: change that file and run it again, never edit this one by hand.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bitocard-sites
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: bitocard-tls
+      hosts: ["bitocard.com", "*.bitocard.com"]
+  rules:
+    - host: "api.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bitocard-api
+                port: { name: http }
+    - host: "bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: storefront
+                port: { name: http }
+    - host: "www.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: storefront
+                port: { name: http }
+    - host: "shq.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shq
+                port: { name: http }
+    - host: "admin.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port: { name: http }
+    - host: "legals.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: legals
+                port: { name: http }
+    - host: "docs.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: docs
+                port: { name: http }
+    - host: "verify.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: verify
+                port: { name: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bitocard-stores
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "2"
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: bitocard-tls
+      hosts: ["bitocard.com", "*.bitocard.com"]
+  rules:
+    - host: "*.bitocard.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: storefront
+                port: { name: http }
