@@ -2,26 +2,49 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import type { StoreCountry } from "@bitocard/api-client/storefront";
 import { Flag } from "./flag";
 
-const currencies = [
-  { code: "USD", symbol: "$", flag: "us", name: "US dollar" },
-  { code: "GBP", symbol: "£", flag: "gb", name: "British pound" },
-  { code: "EUR", symbol: "€", flag: "eu", name: "Euro" },
-  { code: "NGN", symbol: "₦", flag: "ng", name: "Nigerian naira" },
-  { code: "GHS", symbol: "GH₵", flag: "gh", name: "Ghanaian cedi" },
-  { code: "KES", symbol: "KSh", flag: "ke", name: "Kenyan shilling" },
-] as const;
+type Currency = { code: string; symbol: string; flag: string; name: string };
+
+/** The narrow symbol (₦, GH₵) of a currency, else its code. */
+function symbolOf(code: string) {
+  try {
+    const part = new Intl.NumberFormat("en", { style: "currency", currency: code, currencyDisplay: "narrowSymbol" }).formatToParts(0).find(item => item.type === "currency");
+    return part?.value ?? code;
+  } catch {
+    return code;
+  }
+}
+
+function nameOf(code: string) {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "currency" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** US dollars, then the currencies of the markets in the country picker (BitoCard's switched-on African markets). */
+export function currencyChoices(countries: StoreCountry[]): Currency[] {
+  const choices: Currency[] = [{ code: "USD", symbol: "$", flag: "us", name: "US dollar" }];
+  for (const country of [...countries].sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!country.currency || choices.some(item => item.code === country.currency)) continue;
+    choices.push({ code: country.currency, symbol: symbolOf(country.currency), flag: country.code.toLowerCase(), name: nameOf(country.currency) });
+  }
+  return choices;
+}
 
 /**
- * The currency to pay in. Until checkout (M10b), prices are face values in each product's own currency, and the
- * choice is not remembered (the site sets no cookies or storage until the cookie notice says so).
+ * The currency to pay in: US dollars or one of the markets' currencies. Prices are face values in each product's own
+ * currency, and the choice is not remembered (the site sets no cookies or storage for it until the cookie notice says so).
  */
-export function CurrencyMenu() {
-  const [selected, setSelected] = useState<(typeof currencies)[number]["code"]>("USD");
+export function CurrencyMenu({ countries }: { countries: StoreCountry[] }) {
+  const currencies = currencyChoices(countries);
+  const [selected, setSelected] = useState("USD");
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const current = currencies.find(item => item.code === selected)!;
+  const current = currencies.find(item => item.code === selected) ?? currencies[0];
 
   useEffect(() => {
     if (!open) return;

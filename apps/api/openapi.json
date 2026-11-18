@@ -26643,22 +26643,20 @@
                     {
                       "code": "GH",
                       "name": "Ghana",
+                      "currency": "GHS",
                       "products": 9
                     },
                     {
                       "code": "KE",
                       "name": "Kenya",
+                      "currency": "KES",
                       "products": 0
                     },
                     {
                       "code": "NG",
                       "name": "Nigeria",
+                      "currency": "NGN",
                       "products": 40
-                    },
-                    {
-                      "code": "US",
-                      "name": "United States",
-                      "products": 12
                     }
                   ]
                 }
@@ -28142,22 +28140,20 @@
                     {
                       "code": "GH",
                       "name": "Ghana",
+                      "currency": "GHS",
                       "products": 9
                     },
                     {
                       "code": "KE",
                       "name": "Kenya",
+                      "currency": "KES",
                       "products": 0
                     },
                     {
                       "code": "NG",
                       "name": "Nigeria",
+                      "currency": "NGN",
                       "products": 40
-                    },
-                    {
-                      "code": "US",
-                      "name": "United States",
-                      "products": 12
                     }
                   ]
                 }
@@ -43807,6 +43803,7 @@
         "required": [
           "code",
           "name",
+          "currency",
           "products"
         ],
         "additionalProperties": false,
@@ -43818,6 +43815,10 @@
           "name": {
             "type": "string",
             "description": "Country name."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Its currency (ISO 4217): the currency menu offers these and US dollars."
           },
           "products": {
             "type": "integer",

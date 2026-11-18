@@ -78,7 +78,7 @@ export function StoreHeader({
             <>
               <MarketChooser countries={countries} market={market} locked={marketLocked} />
               <div className="hidden lg:block">
-                <CurrencyMenu />
+                <CurrencyMenu countries={countries} />
               </div>
             </>
           ) : null}

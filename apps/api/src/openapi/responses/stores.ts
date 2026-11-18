@@ -316,6 +316,7 @@ const storeCategoryMatch = objectSchema('Store category match', {
 const storeCountry = objectSchema('Store country', {
   code: str('ISO 3166-1 alpha-2 country code.'),
   name: str('Country name.'),
+  currency: str('Its currency (ISO 4217): the currency menu offers these and US dollars.'),
   products: int('Products on sale there (zero is possible for a market not stocked yet).'),
 });
 const navigationGroup = objectSchema('Store menu group', {
@@ -526,10 +527,9 @@ const payTv = category_('pay_tv', 'bills', 12);
 const bills = category_('bills', 'bills', 4);
 
 const countries = [
-  { code: 'GH', name: 'Ghana', products: 9 },
-  { code: 'KE', name: 'Kenya', products: 0 },
-  { code: 'NG', name: 'Nigeria', products: 40 },
-  { code: 'US', name: 'United States', products: 12 },
+  { code: 'GH', name: 'Ghana', currency: 'GHS', products: 9 },
+  { code: 'KE', name: 'Kenya', currency: 'KES', products: 0 },
+  { code: 'NG', name: 'Nigeria', currency: 'NGN', products: 40 },
 ];
 
 const navigation = [

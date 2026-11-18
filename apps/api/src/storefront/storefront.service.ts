@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { africanCountries } from '../kyc/catalogue.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { worldwideCategories, worldwideCountry } from '../catalogue/pricing.service.js';
@@ -511,29 +512,31 @@ export class StorefrontService {
   }
 
   /**
-   * The countries for the country picker: every market BitoCard has set up (Settings > Markets), with the products on
-   * sale there (none yet is fine), plus any other country with products on sale. Choosing one only changes what
+   * The countries for the country picker: BitoCard's African markets that are switched on (reseller sign-up open, or a
+   * category other than software enabled there: software is on in every market by default), with the products on sale
+   * in each (none yet is fine). Everywhere else shops on Global, in US dollars. Choosing one only changes what
    * bitocard.com shows: there are no country stores to go to (retired, docs/BITOCARD_MULTI_WALLETS_PLAN.md).
    */
   async countries() {
     // A reseller's store sells in its own country only.
     const store = this.scope.getStore()?.store;
     if (store) {
-      const market = await this.prisma.country.findUnique({ where: { code: store.country }, select: { name: true } });
-      return [{ code: store.country, name: market?.name ?? countryName(store.country), products: await this.prisma.product.count({ where: (await this.availability()).where }) }];
+      const market = await this.prisma.country.findUnique({ where: { code: store.country }, select: { name: true, currency: true } });
+      return [{ code: store.country, name: market?.name ?? countryName(store.country), currency: market?.currency ?? 'USD', products: await this.prisma.product.count({ where: (await this.availability()).where }) }];
     }
     // Always the whole store's countries, so a shopper can pick another market.
     const { where } = await this.scope.run({ market: null }, () => this.availability());
     const [grouped, markets] = await Promise.all([
       this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } }),
-      this.prisma.country.findMany({ select: { code: true, name: true } }),
+      this.prisma.country.findMany({
+        where: { OR: [{ resellerSignup: true }, { categories: { some: { enabled: true, category: { not: 'software' } } } }] },
+        select: { code: true, name: true, currency: true },
+      }),
     ]);
     const counts = new Map(grouped.map(row => [row.country, row._count._all]));
-    const codes = new Set([...markets.map(row => row.code), ...counts.keys()]);
-    return [...codes]
-      // Products usable anywhere (`WW`) are not a country to pick: they show in every country.
-      .filter(code => /^[A-Z]{2}$/.test(code) && code !== worldwideCountry)
-      .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0 }))
+    return markets
+      .filter(row => africanCountries.has(row.code))
+      .map(row => ({ code: row.code, name: row.name, currency: row.currency, products: counts.get(row.code) ?? 0 }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 

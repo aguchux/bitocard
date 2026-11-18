@@ -118,7 +118,7 @@ describe('the public catalogue', () => {
     assert.equal((await visitor.get('/v1/store/network-detect?phone=08021234567&country=nigeria')).status, 400);
   });
 
-  test('categories and brands list only what is on sale; the menu lists every group; countries every market', async () => {
+  test('categories and brands list only what is on sale; the menu lists every group; countries the switched-on African markets', async () => {
     const categories = (await visitor.get('/v1/store/categories')).json.data;
     assert.ok(categories.some(item => item.category === 'airtime' && item.label === 'Airtime' && item.group === 'mobile' && item.products >= 2));
     assert.ok(categories.every(item => item.products > 0 && item.on_sale));
@@ -135,8 +135,14 @@ describe('the public catalogue', () => {
     const vpn = navigation.groups.find(group => group.key === 'vpn');
     assert.deepEqual([vpn.label, vpn.on_sale, vpn.categories.map(item => [item.category, item.label, item.on_sale])], ['VPN', false, [['vpn', 'VPN', false]]], 'VPN has its own group, closed until a market is approved');
     assert.ok(navigation.countries.some(item => item.code === 'NG' && item.name === 'Nigeria'));
-    const markets = await prisma.country.findMany();
-    for (const market of markets) assert.ok(navigation.countries.some(item => item.code === market.code && item.name === market.name), `market ${market.code} is in the picker, with or without products`);
+    const { africanCountries } = await import('../dist/kyc/catalogue.js');
+    const markets = await prisma.country.findMany({ include: { categories: true } });
+    for (const market of markets) {
+      const open = market.resellerSignup || market.categories.some(item => item.enabled && item.category !== 'software');
+      const shown = navigation.countries.some(item => item.code === market.code && item.name === market.name);
+      assert.equal(shown, africanCountries.has(market.code) && open, `market ${market.code}: only switched-on African markets are in the picker, with or without products`);
+    }
+    assert.ok(navigation.countries.every(item => africanCountries.has(item.code)), 'nowhere else: everywhere else shops on Global');
     noSuppliers(navigation);
   });
 });

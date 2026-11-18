@@ -73,3 +73,18 @@ describe("store header", () => {
     expect(html).not.toContain("/listings");
   });
 });
+describe("currency menu", () => {
+  test("offers US dollars and the picker's markets' currencies, nothing else", async () => {
+    const { currencyChoices } = await import("@/components/store/currency-menu");
+    const markets: StoreCountry[] = [
+      { code: "NG", name: "Nigeria", currency: "NGN", products: 3 },
+      { code: "GH", name: "Ghana", currency: "GHS", products: 0 },
+      { code: "SN", name: "Senegal", currency: "XOF", products: 0 },
+      { code: "BJ", name: "Benin", currency: "XOF", products: 0 },
+    ];
+    const choices = currencyChoices(markets);
+    expect(choices.map(item => item.code)).toEqual(["USD", "XOF", "GHS", "NGN"]);
+    expect(choices.find(item => item.code === "NGN")?.symbol).toBe("₦");
+    expect(currencyChoices([]).map(item => item.code)).toEqual(["USD"]);
+  });
+});
