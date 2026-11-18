@@ -24,7 +24,7 @@ export function doorChoices(doors: AccountDoors) {
       { href: doors.resellerSignIn, title: "Sign in as a reseller", detail: "Seller HQ: your stores, prices and wallet", kind: "reseller" },
     ],
     register: [
-      { href: doors.customerSignUp, title: "Register as a customer", detail: "Buy gift cards, top-ups, bills and more", kind: "customer" },
+      { href: doors.customerSignUp, title: "Register as a customer", detail: "Buy and sell gift cards, top-ups, bills and more", kind: "customer" },
       { href: doors.resellerSignUp, title: "Register as a reseller", detail: "Open your own store and sell to your customers", kind: "reseller" },
     ],
   } as const;
