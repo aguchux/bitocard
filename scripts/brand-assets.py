@@ -44,7 +44,7 @@ DESKTOP = {"udozo": [ROOT / "apps" / "udozo-pos-windows"]}
 
 # Phone apps of a brand (Expo, docs/UDOZO_MOBILE_APP_PLAN.md): the store icon, Android's adaptive icon layers and the
 # splash picture in assets/images.
-MOBILE = {"udozo": [ROOT / "mobile" / "udozo"]}
+MOBILE = {"bitocard": [ROOT / "mobile" / "bitocard"], "udozo": [ROOT / "mobile" / "udozo"]}
 
 WHITE = np.array([255, 255, 255])
 

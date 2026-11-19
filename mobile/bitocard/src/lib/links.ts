@@ -21,6 +21,8 @@ const routes: [RegExp, (match: RegExpExecArray) => Route | string][] = [
   [/^\/account\/verification$/, () => '/identity'],
   [/^\/account\/notifications$/, () => '/notifications'],
   [/^\/account\/profile(\/.*)?$/, () => '/account'],
+  // A gift card's page on bitocard.com (its key as written or encoded, `gift_cards:US:amazon:usd`).
+  [/^\/p\/(gift_cards(?::|%3A)[^/]+)$/i, m => ({ pathname: '/gift-card/[key]', params: { key: decodeURIComponent(m[1]!) } })],
 ];
 
 /** The app screen for a bitocard.com path, or null. `?chat=1` anywhere opens the chat. */
@@ -43,3 +45,23 @@ export function productRoute(product: { key: string; category: string }): Route 
   return null;
 }
 
+/**
+ * A link the phone hands the app (a bitocard.com universal link or App Link, or a `bitocard://` link) as the app's
+ * screen, else Home. Only pages the app has screens for are claimed (`apps/storefront/lib/app-links.ts`).
+ */
+export function incomingRoute(url: string): string {
+  let path = url;
+  try {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(url)) {
+      const parsed = new URL(url);
+      // bitocard://account/orders/1 puts `account` in the host.
+      path = parsed.protocol === 'bitocard:' ? `/${parsed.host}${parsed.pathname}${parsed.search}` : `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    return '/';
+  }
+  const route = appLink(path);
+  if (!route) return '/';
+  if (typeof route === 'string') return route;
+  return Object.entries(route.params ?? {}).reduce((to, [name, value]) => to.replace(`[${name}]`, encodeURIComponent(value)), route.pathname);
+}

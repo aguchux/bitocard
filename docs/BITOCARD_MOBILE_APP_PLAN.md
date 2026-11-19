@@ -95,7 +95,7 @@ Kept here so nothing left open is forgotten. Strike an item out when it ships.
 From phase 0:
 
 - **Forgot password in the app.** Sign in only says to reset it on bitocard.com. Use `POST /v1/store/account/password/forgot` and `…/password/reset` (code and new password).
-- **App icons and splash.** Phase 0 copied the website's icons. Generate a proper set (adaptive icon foreground, background and monochrome; splash) from `assets/logo.png` with `scripts/brand-assets.py`, as `mobile/udozo` has.
+- ~~**App icons and splash.**~~ Done in phase 5 (`scripts/brand-assets.py`, `MOBILE`).
 - **`BitoCard-App` header.** The app sends it, but BitoCard's API ignores it. Read it if the API should tell app calls apart (sign-up journeys, counts).
 - **Tried on a phone.** Nothing has run on a real device or against the live API yet. Run it in a development build before a store build.
 
@@ -211,4 +211,10 @@ From phase 4:
     - **Spin and win** (`/spin`, from Home's card): the wheel stops on what the server decided (`landingRotation` in `src/lib/spin.ts`), still for reduced motion; rewards moved to a wallet at the amount shown first.
     - **The update gate** (`UpdateGate`): blocks below the minimum version, offers the update below the latest.
     - Tests: `test/links.test.ts`, `test/spin.test.ts`, `test/screens/staying.test.tsx`, `test/screens/delete-account.test.tsx`.
-- Next: phase 5.
+- **Phase 5 built (19 November 2026), everything but the builds:**
+  - **Opening bitocard.com links in the app:** bitocard.com serves `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` (`apps/storefront/lib/app-links.ts`), only on bitocard.com and only once `BITOCARD_IOS_APP_IDS`, `BITOCARD_ANDROID_PACKAGE` and `BITOCARD_ANDROID_CERT_SHA256` are set (404 before, and always on resellers' stores). They claim only pages the app has screens for: orders, wallet and deposits, gift card sales, the airtime exchange, help, the identity check, notifications and gift card pages (`/p/gift_cards…`). The app's `associatedDomains` and Android intent filters (`app.json`) list the same, checked by `apps/storefront/test/app-links.test.ts`; `+native-intent.tsx` turns each link into its screen (`incomingRoute` in `src/lib/links.ts`), anything else Home.
+  - **Icons and splash** from `assets/logo.png` by `scripts/brand-assets.py` (`MOBILE`): the store icon, Android's adaptive layers (white mark on the logo's navy, and the monochrome layer) and the splash mark.
+  - **Legal:** the privacy notice's "When you use BitoCard's app" (the phone's secure store, Face ID checked by the phone, push tokens through Apple and Google, the camera only for selling a gift card, deleting the account in the app), Apple and Google as recipients, and retention (deleting in the app is at once; push tokens until signed out); `legalUpdated` 19 November 2026. bitocard.com's `/delete-account` explains deleting, for Google Play (never on resellers' stores).
+  - **Stores:** listing copy, screenshots, Google's Data safety and Apple's App Privacy answers, review notes and the checklist before the first build are in `docs/BITOCARD_MOBILE_APP_STORES.md`.
+  - **Builds:** not started. They wait for the owner's go, after the checklist in that file.
+- Next: the checklist in `docs/BITOCARD_MOBILE_APP_STORES.md`, then builds on the owner's go.

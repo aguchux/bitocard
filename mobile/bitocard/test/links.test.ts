@@ -40,3 +40,15 @@ test('versions', () => {
   assert.equal(updateState('1.2.0', '1.1.0', '1.2.0'), 'none');
   assert.equal(updateState('dev', '9.0.0'), 'none');
 });
+
+test('links the phone hands the app open their screens, else Home', async () => {
+  const { incomingRoute } = await import('../src/lib/links.ts');
+  assert.equal(incomingRoute('https://bitocard.com/account/orders/chk_9'), '/order/chk_9');
+  assert.equal(incomingRoute('https://bitocard.com/p/gift_cards%3AUS%3Aamazon%3Ausd'), '/gift-card/gift_cards%3AUS%3Aamazon%3Ausd');
+  assert.deepEqual(appLink('/p/gift_cards:US:amazon:usd'), { pathname: '/gift-card/[key]', params: { key: 'gift_cards:US:amazon:usd' } });
+  assert.equal(incomingRoute('bitocard://account/wallet'), '/wallet');
+  assert.equal(incomingRoute('/account/support'), '/help');
+  assert.equal(incomingRoute('https://bitocard.com/p/pay_tv:NG:dstv:padi'), '/');
+  assert.equal(incomingRoute('https://bitocard.com/catalogs'), '/');
+  assert.equal(incomingRoute('not a url ::'), '/');
+});

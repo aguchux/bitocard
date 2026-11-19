@@ -12,15 +12,93 @@
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": [
+        "applinks:bitocard.com",
+        "webcredentials:bitocard.com"
+      ]
     },
     "android": {
       "package": "com.bitocard.app",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/images/android-icon-foreground.png"
+        "backgroundColor": "#002b85",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/orders"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/orders/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/wallet"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/wallet/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/sold/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/airtime"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/airtime/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/support"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/support/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/verification"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/notifications"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/p/gift_cards"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "plugins": [
       "expo-router",
