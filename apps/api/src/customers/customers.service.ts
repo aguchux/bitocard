@@ -93,7 +93,7 @@ export class CustomersService {
   /** The customer signed in with this token, or null (ended, expired or suspended). */
   async resolve(token: string): Promise<{ customer: CustomerWithStore; sessionId: string; mfaVerifiedAt: Date | null; mfaReconfirmedAt: Date | null } | null> {
     const session = await this.prisma.customerSession.findUnique({ where: { tokenHash: sha256(token) }, include: { customer: { include: { store: { include: { reseller: { select: { house: true } } } }, market: true } } } });
-    if (!session || session.revokedAt || session.expiresAt <= new Date() || session.customer.status !== 'active') return null;
+    if (!session || session.revokedAt || session.expiresAt <= new Date() || session.customer.status !== 'active' || session.customer.deletedAt) return null;
     if (Date.now() - session.lastSeenAt.getTime() > touchEveryMs) await this.prisma.customerSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
     return { customer: session.customer, sessionId: session.id, mfaVerifiedAt: session.mfaVerifiedAt, mfaReconfirmedAt: session.mfaReconfirmedAt };
   }
@@ -187,7 +187,7 @@ export class CustomersService {
       if (ok) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many wrong attempts. Try again in 15 minutes, or reset your password.');
       throw signInFailed();
     }
-    if (!customer || !ok || customer.status !== 'active') {
+    if (!customer || !ok || customer.status !== 'active' || customer.deletedAt) {
       if (customer) await this.recordFailedSignIn(customer.id);
       throw signInFailed();
     }

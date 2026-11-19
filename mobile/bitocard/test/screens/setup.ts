@@ -42,3 +42,16 @@ jest.mock('expo-image-manipulator', () => ({
   SaveFormat: { JPEG: 'jpeg' },
   ImageManipulator: { manipulate: () => ({ resize: jest.fn(), renderAsync: async () => ({ saveAsync: async () => ({ uri: 'file:///prepared.jpg' }) }) }) },
 }));
+
+// Push: the phone allows notifications and gives a token unless a test says otherwise.
+jest.mock('expo-notifications', () => ({
+  AndroidImportance: { DEFAULT: 3 },
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async () => null),
+  getPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  requestPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  getDevicePushTokenAsync: jest.fn(async () => ({ type: 'android', data: 'fcm-token-0123456789abcdef' })),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponse: jest.fn(() => null),
+}));

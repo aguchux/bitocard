@@ -290,6 +290,89 @@ export type AirtimePurchase = {
   created_at: string;
 };
 
+/** A notice in the customer's inbox. `link` is a bitocard.com path (`src/lib/links.ts` opens it in the app). */
+export type Notice = {
+  object: 'notification';
+  id: string;
+  type: string;
+  severity: 'info' | 'success' | 'warning' | 'critical';
+  title: string;
+  body: string;
+  link: string | null;
+  mode: 'live' | 'test' | null;
+  read: boolean;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type NoticePage = { object: 'list'; data: Notice[]; has_more: boolean; unread_count: number };
+
+export type NoticePreference = { object: 'notification_preference'; type: string; label: string; severity: string; push: boolean; default: boolean; locked: boolean };
+
+/** Whether push can reach this customer: browsers (VAPID) and, for the app, phones by platform. */
+export type PushSettings = { enabled: boolean; phones?: { android: boolean; ios: boolean } };
+
+/** `GET /v1/app/config`: whether this version must or may be updated, and where. */
+export type AppConfig = {
+  object: 'app_config';
+  platform: 'ios' | 'android';
+  version: string;
+  update: 'none' | 'available' | 'required';
+  min_version: string | null;
+  latest_version: string | null;
+  store_url: string | null;
+  site_url: string;
+  legal: { terms: string; privacy: string };
+};
+
+export type ChatAttachment = { id: string; name: string; content_type: 'image/jpeg' | 'image/png' | 'application/pdf'; size: number; width: number | null; height: number | null };
+export type ChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; author_avatar_url: string | null; body: string; attachments: ChatAttachment[]; created_at: string };
+
+/** The customer's live chat with BitoCard: an assistant (`bot`), waiting for a person, a person answering, or closed. */
+export type SupportChat = { object: 'support_chat'; id: string; status: 'bot' | 'waiting' | 'with_staff' | 'closed'; ticket_reference: string | null; created_at: string; closed_at: string | null; messages: ChatMessage[] };
+
+export type SupportChatCurrent = { object: 'support_chat_current'; chat: SupportChat | null; assistant: { name: string; avatar_url: string | null; greeting: string | null } | null };
+
+export type ChatSince = { object: 'list'; status: SupportChat['status']; data: ChatMessage[] };
+
+export type TicketCategory = 'order' | 'payment' | 'account' | 'product' | 'technical' | 'other';
+
+/** A question to BitoCard: `open` waits for BitoCard, `pending` for the customer. */
+export type SupportTicket = {
+  object: 'support_ticket';
+  id: string;
+  reference: string;
+  status: 'open' | 'pending' | 'resolved';
+  category: TicketCategory;
+  subject: string;
+  checkout_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  messages?: { id: string; author: ChatMessage['author']; author_name: string | null; author_avatar_url: string | null; visibility: 'all'; body: string; created_at: string }[];
+};
+
+export type SpinAllowance = { won_usd: string; spins_used: number; today_left: number; daily_limit: number; next_spin_at: string | null; finished: boolean };
+
+/** `GET /v1/store/spins`: the wheel, whether the customer can spin (and why not), their allowance and latest wins. */
+export type SpinRewards = {
+  object: 'spin_rewards';
+  mode: 'live' | 'test';
+  enabled: boolean;
+  reason: 'not_enabled' | 'email_not_verified' | 'claimed_elsewhere' | null;
+  segments: { index: number; usd: string }[];
+  daily_limit: number;
+  allowance: SpinAllowance | null;
+  recent: { id: string; number: number; usd: string; segment: number; created_at: string }[];
+  rewards: { usd: string; exchange_currencies: string[] };
+};
+
+export type Spin = { object: 'spin'; id: string; number: number; segment: number; usd: string; allowance: SpinAllowance };
+export type SpinExchangePreview = { object: 'spin_exchange_preview'; usd: string; currency: string; amount: number; rate: string };
+export type SpinExchange = { object: 'spin_exchange'; id: string; usd: string; currency: string; amount: number; rate: string; created_at: string };
+
+export type StoreSearch = { object: 'store_search'; query: string; products: StoreProduct[] };
+
 export type VerificationStatus = {
   object: 'customer_verification_status';
   country: string;

@@ -125,6 +125,7 @@ const deviceExample = {
   id: '3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b',
   channel: 'web_push',
   label: 'Chrome on Windows',
+  app_version: null,
   current: true,
   last_pushed_at: '2026-10-06T08:31:12.000Z',
   last_seen_at: '2026-10-06T08:15:00.000Z',
@@ -367,8 +368,9 @@ const schemas = {
     {
       object: constant('device'),
       id: uuid('The device’s ID.'),
-      channel: oneOf('How it receives pushes: `web_push` (a browser’s Web Push subscription).', ['web_push']),
+      channel: oneOf('How it receives pushes: `web_push` (a browser’s Web Push subscription), or `fcm` and `apns` (BitoCard’s app on a store customer’s phone).', ['web_push', 'fcm', 'apns']),
       label: str('How it is shown, for example "Chrome on Windows".'),
+      app_version: nullableStr('The version of BitoCard’s app that registered it, or null for a browser.'),
       current: bool('Whether it was registered from this session (this browser).'),
       last_pushed_at: nullableTime('When it last accepted a push, or null.'),
       last_seen_at: time('When it was last registered or refreshed.'),

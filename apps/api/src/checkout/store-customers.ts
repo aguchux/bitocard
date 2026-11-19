@@ -129,6 +129,8 @@ export class StoreCustomersService {
   async update(storeId: string, id: string, input: { identity_check?: boolean; status?: 'active' | 'disabled' }, actor: Actor) {
     const before = await this.prisma.customer.findFirst({ where: { id, storeId } });
     if (!before) throw notFound();
+    // A customer who deleted their account has none left to reopen.
+    if (before.deletedAt && input.status === 'active') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'account_deleted', 'This customer deleted their account: it cannot be reopened.', 'status');
     const after = await this.prisma.customer.update({ where: { id }, data: { identityCheck: input.identity_check, status: input.status } });
     if (input.status === 'disabled') await this.revokeSessions(id);
     if (actor) {

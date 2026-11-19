@@ -2196,8 +2196,12 @@ model Notification {
 // ---------------------------------------------------------------------------
 
 enum DeviceChannel {
-  /// A browser's Web Push subscription (VAPID, RFC 8030/8291). Native app channels can be added later.
+  /// A browser's Web Push subscription (VAPID, RFC 8030/8291).
   web_push
+  /// BitoCard's app on Android: its Firebase Cloud Messaging token.
+  fcm
+  /// BitoCard's app on an iPhone: its APNs device token.
+  apns
 }
 
 /// One signed-in browser or device that receives push notifications, with its own ID. Belongs to a user (admins,
@@ -2220,6 +2224,8 @@ model Device {
   keysEncrypted String               @map("keys_encrypted")
   /// For people to recognise it, for example "Chrome on Windows".
   label         String
+  /// BitoCard's app on a phone: the version that registered it, three numbers.
+  appVersion    String?              @map("app_version") @db.VarChar(20)
   failures      Int                  @default(0)
   lastPushedAt  DateTime?            @map("last_pushed_at")
   lastSeenAt    DateTime             @default(now()) @map("last_seen_at")
@@ -2529,6 +2535,8 @@ model Customer {
   /// The customer's country, chosen at sign-up (a reseller's store: the reseller's) and then fixed: their wallet,
   /// checkouts and prices are in its currency. Null only for accounts from before it was asked, until they choose.
   country                   String?                   @db.Char(2)
+  /// The customer deleted their account: their personal details are gone and it is closed for good.
+  deletedAt                 DateTime?                 @map("deleted_at")
   createdAt                 DateTime                  @default(now()) @map("created_at")
   updatedAt                 DateTime                  @updatedAt @map("updated_at")
   store                     Store                     @relation(fields: [storeId], references: [id], onDelete: Cascade)

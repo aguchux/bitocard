@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { CatalogueModule } from '../catalogue/catalogue.module.js';
 import { FeesModule } from '../fees/fees.module.js';
 import { FxModule } from '../fx/fx.module.js';
+import { AccountDeletionController, AccountDeletionService } from '../customers/account-deletion.js';
 import { CustomerGuard } from '../customers/customer-session.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { CustomerNotificationsController } from '../notifications/customer-notifications.controller.js';
@@ -23,8 +24,8 @@ import { StoreSellers } from './store-sellers.js';
 /** Store customers (accounts and sign-in) and checkout on hosted stores: bitocard.com and resellers' stores. */
 @Module({
   imports: [AuthModule, CatalogueModule, FeesModule, FxModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule, StoresModule],
-  controllers: [CustomerNotificationsController, CustomerAccountController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController],
-  providers: [CustomersService, HandoffService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
+  controllers: [CustomerNotificationsController, CustomerAccountController, AccountDeletionController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController],
+  providers: [CustomersService, AccountDeletionService, HandoffService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
   exports: [CheckoutService, HouseService, CustomersService, StoreSellers, CustomerWalletsService],
 })
 export class CheckoutModule {}

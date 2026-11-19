@@ -357,7 +357,7 @@ describe('storefront customers', () => {
 
   test('a signed-in customer reads their inbox and is pushed while signed in, whichever of their stores sent it', async () => {
     const shopper = await signedInCustomer();
-    assert.deepEqual((await shopper.get('/v1/store/account/devices/push-settings')).json, { object: 'push_settings', enabled: true, public_key: vapid.publicKey });
+    assert.deepEqual((await shopper.get('/v1/store/account/devices/push-settings')).json, { object: 'push_settings', enabled: true, public_key: vapid.publicKey, phones: { android: false, ios: false } });
     const sub = browserSubscription();
     const added = await shopper.post('/v1/store/account/devices', sub.json, { 'bitocard-client-agent': chrome['user-agent'] });
     assert.equal(added.status, 201, JSON.stringify(added.json));

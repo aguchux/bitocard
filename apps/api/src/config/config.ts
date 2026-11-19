@@ -101,6 +101,22 @@ export const configSchema = z.object({
   WEB_PUSH_PUBLIC_KEY: z.string().optional(),
   WEB_PUSH_PRIVATE_KEY: z.string().optional(),
   WEB_PUSH_SUBJECT: z.string().default('mailto:support@bitocard.com'),
+  // BitoCard's app on phones: Firebase Cloud Messaging (Android) and APNs (iPhone), each off until set.
+  FCM_SERVICE_ACCOUNT: z.string().optional(),
+  FCM_API_URL: z.string().url().default('https://fcm.googleapis.com'),
+  APNS_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
+  APNS_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
+  APNS_PRIVATE_KEY: z.string().optional(),
+  APNS_TOPIC: z.string().regex(/^[A-Za-z0-9.-]+$/, 'A bundle ID, for example com.bitocard.app').optional(),
+  APNS_SANDBOX: flag.default(false),
+  APNS_API_URL: z.string().url().optional(),
+  // The versions BitoCard's app must have (below the lowest it stops) or may update to, and its store pages.
+  APP_IOS_MIN_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_IOS_LATEST_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_IOS_STORE_URL: z.string().url().optional(),
+  APP_ANDROID_MIN_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_ANDROID_LATEST_VERSION: z.string().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/, 'A version is three numbers, for example 1.2.0').optional(),
+  APP_ANDROID_STORE_URL: z.string().url().optional(),
 
   /** BitoCard's public API address: where suppliers send notifications to resellers' own connections. */
   API_PUBLIC_URL: z.string().url().default('https://api.bitocard.com'),

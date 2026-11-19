@@ -6,10 +6,15 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { AppState, Platform, useColorScheme } from 'react-native';
 
+import { PushListener } from '@/components/push-listener';
 import { inter, useTheme } from '@/components/ui';
+import { UpdateGate } from '@/components/update-gate';
 import { AccountProvider } from '@/lib/account';
+import { applyTheme, savedTheme } from '@/lib/preferences';
 
 SplashScreen.preventAutoHideAsync();
+// The theme the customer chose in Settings (else the phone's), before the first screen draws.
+void savedTheme().then(applyTheme);
 
 // React Query follows the phone: data is read again when the app comes back to the front, and anything that failed
 // for want of a connection is retried once it returns.
@@ -36,7 +41,10 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
-        <ThemedApp />
+        <UpdateGate>
+          <ThemedApp />
+        </UpdateGate>
+        <PushListener />
       </AccountProvider>
     </QueryClientProvider>
   );
@@ -79,6 +87,15 @@ function ThemedApp() {
         <Stack.Screen name="airtime/buy" options={{ title: 'Buy airtime' }} />
         <Stack.Screen name="airtime/sale/[id]" options={{ title: 'Airtime sale' }} />
         <Stack.Screen name="airtime/purchase/[id]" options={{ title: 'Airtime purchase' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="search" options={{ title: 'Search' }} />
+        <Stack.Screen name="spin" options={{ title: 'Spin and win' }} />
+        <Stack.Screen name="help/index" options={{ title: 'Help' }} />
+        <Stack.Screen name="help/chat" options={{ title: 'Chat with us' }} />
+        <Stack.Screen name="help/new" options={{ title: 'Ask a question' }} />
+        <Stack.Screen name="help/ticket/[id]" options={{ title: 'Your question' }} />
+        <Stack.Screen name="delete-account" options={{ title: 'Delete your account' }} />
       </Stack>
     </ThemeProvider>
   );

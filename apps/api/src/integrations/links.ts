@@ -15,7 +15,7 @@ import { signerLinks } from '../crypto/custody/signer.js';
 export type IntegrationLink = { label: string; url: string };
 
 /** Integrations without an outside provider account: nothing to sign up for. */
-export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys', 'support_ai']);
+export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys', 'support_ai', 'mobile_app']);
 
 const signUp = (url: string): IntegrationLink => ({ label: 'Sign up', url });
 const keys = (url: string, label = 'Get API keys'): IntegrationLink => ({ label, url });
@@ -34,6 +34,12 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   sms_africas_talking: [signUp('https://account.africastalking.com/auth/register'), keys('https://account.africastalking.com/apps', 'Apps and API keys'), docs('https://developers.africastalking.com/docs/sms/sending')],
   kyc_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/how-to/manage-access/')],
   file_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/')],
+  phone_push: [
+    { label: 'Firebase: service accounts', url: 'https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk' },
+    { label: 'FCM docs', url: 'https://firebase.google.com/docs/cloud-messaging/send/v1-api' },
+    { label: 'Apple: keys', url: 'https://developer.apple.com/account/resources/authkeys/list' },
+    { label: 'APNs docs', url: 'https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns' },
+  ],
   google: [keys('https://console.cloud.google.com/apis/credentials', 'Google Cloud credentials'), docs('https://developers.google.com/identity/protocols/oauth2/web-server')],
   flutterwave: [signUp('https://app.flutterwave.com/register'), keys('https://app.flutterwave.com/dashboard/settings/apis'), docs('https://developer.flutterwave.com/')],
   stripe: [signUp('https://dashboard.stripe.com/register'), keys('https://dashboard.stripe.com/apikeys'), { label: 'Webhooks', url: 'https://dashboard.stripe.com/webhooks' }, docs('https://docs.stripe.com/api/checkout/sessions')],

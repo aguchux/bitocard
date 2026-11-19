@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { StyleSheet, View } from 'react-native';
 
@@ -86,6 +86,7 @@ export default function OrderScreen() {
       {checkout.failure_reason ? <Notice tone="bad">{checkout.failure_reason}</Notice> : null}
       {checkout.status === 'refunded' ? <Notice tone="good">Your money is back where it came from.</Notice> : null}
       {checkout.checkout_url ? <Button label="Open the payment page" onPress={() => void WebBrowser.openBrowserAsync(checkout.checkout_url!).finally(() => void order.refetch())} /> : null}
+      <Button kind="secondary" label="Ask us about this order" onPress={() => router.push({ pathname: '/help/new', params: { checkout: checkout.id } })} />
       {checkout.mode === 'test' && inProgress(checkout.status) ? (
         <Card>
           <T kind="small" muted>

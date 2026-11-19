@@ -1,12 +1,14 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { waitUntil } from '@vercel/functions';
 import webpush from 'web-push';
+import { sha256 } from '../common/crypto.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Device, Notification, NotificationAudience, Platform, Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { notificationTypes, type NotificationType } from './inbox.js';
+import { ApnsSender, apnsReady, FcmSender, fcmReady, type NativeResult } from './native-push.js';
 
 /** After the first try: 1 minute, 5 minutes, 30 minutes; then it is given up (a push is only useful while fresh). */
 export const pushRetryMs = [60_000, 5 * 60_000, 30 * 60_000];
@@ -78,7 +80,15 @@ const platformOf = (device: { user?: { realm: string } | null }): Platform => (d
 const ownerWhere = (owner: PushOwner) => ('userId' in owner ? { userId: owner.userId } : { customerId: owner.customerId });
 const ownerKey = (row: { userId: string | null; customerId: string | null }) => row.userId ?? `customer:${row.customerId}`;
 
-type SendResult = { ok: true } | { ok: false; gone: boolean; retry: boolean; error: string };
+type SendResult = NativeResult;
+
+/** BitoCard's app's channels: Android's FCM token and the iPhone's APNs token. */
+export const phoneChannels = ['fcm', 'apns'] as const;
+export type PhoneChannel = (typeof phoneChannels)[number];
+const phoneTokenPattern: Record<PhoneChannel, RegExp> = {
+  fcm: /^[A-Za-z0-9_:.-]{20,4096}$/,
+  apns: /^[0-9a-fA-F]{64,200}$/,
+};
 
 /**
  * Push notifications to registered devices (Web Push). Every in-app notification is also pushed, once, to each of the
@@ -89,6 +99,8 @@ type SendResult = { ok: true } | { ok: false; gone: boolean; retry: boolean; err
 @Injectable()
 export class PushService {
   private readonly logger = new Logger('Push');
+  private readonly fcm = new FcmSender();
+  private readonly apns = new ApnsSender();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -120,7 +132,49 @@ export class PushService {
     return { object: 'push_settings' as const, enabled: vapid !== null, public_key: vapid?.publicKey ?? null };
   }
 
+  /** Whether a phone channel's sender is set up (Settings > Integrations > Phone push). */
+  private phoneReady(channel: string) {
+    const config = this.integrations.config;
+    return channel === 'fcm' ? fcmReady(config) : channel === 'apns' ? apnsReady(config) : false;
+  }
+
+  /** A store customer: the browser's settings, and which phones BitoCard's app can push to. */
+  customerSettings() {
+    return { ...this.settings('bitocard'), phones: { android: this.phoneReady('fcm'), ios: this.phoneReady('apns') } };
+  }
+
   // -- Devices ---------------------------------------------------------------------------------------------------
+
+  /**
+   * Registers BitoCard's app on a phone for the signed-in customer: its FCM token (Android) or APNs token (iPhone). The
+   * token is kept encrypted, found again by its SHA-256, and moved to whoever signs in on that phone. The app registers
+   * each time it opens; the device stays tied to that session, so signing out stops its pushes.
+   */
+  async registerPhone(caller: PushCaller, input: { kind: PhoneChannel; token: string; appVersion?: string; label?: string | null }) {
+    if (caller.audience !== 'customer' || !caller.storeId || !('customerId' in caller.owner)) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'phones_not_supported', 'Only BitoCard’s app registers phones.');
+    }
+    if (!this.phoneReady(input.kind)) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'push_not_configured', 'Push notifications are not switched on yet.');
+    if (!phoneTokenPattern[input.kind].test(input.token)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'push_token_invalid', 'This push token is not valid.', 'token');
+    const endpoint = `${input.kind}:${sha256(input.token)}`;
+    const data = {
+      audience: caller.audience,
+      userId: null,
+      customerId: caller.owner.customerId,
+      storeId: caller.storeId,
+      sessionId: caller.sessionId,
+      channel: input.kind,
+      keysEncrypted: this.encryption().encrypt(input.token),
+      appVersion: input.appVersion ?? null,
+      label: (input.label?.trim() || (input.kind === 'fcm' ? 'BitoCard app on Android' : 'BitoCard app on iPhone')).slice(0, 80),
+      failures: 0,
+      lastSeenAt: new Date(),
+    };
+    const device = await this.prisma.device.upsert({ where: { endpoint }, create: { endpoint, ...data }, update: data });
+    const extra = await this.prisma.device.findMany({ where: ownerWhere(caller.owner), orderBy: { lastSeenAt: 'desc' }, skip: maxDevicesPerPerson, select: { id: true } });
+    if (extra.length) await this.prisma.device.deleteMany({ where: { id: { in: extra.map(item => item.id) } } });
+    return this.present(device, caller.sessionId);
+  }
 
   /** Registers this browser for the signed-in person (or moves it to them, if someone else used it before). */
   async register(caller: PushCaller, input: { endpoint: string; keys: { p256dh: string; auth: string }; label?: string }, userAgent?: string | null) {
@@ -169,7 +223,7 @@ export class PushService {
       title: 'Push notifications are on',
       body: `${device.label} will get your notifications.`,
       severity: 'info',
-      link: '/notifications',
+      link: device.audience === 'customer' ? '/account/notifications' : '/notifications',
       mode: null,
       account: null,
       icon: await this.iconFor(device.storeId),
@@ -184,6 +238,7 @@ export class PushService {
       id: device.id,
       channel: device.channel,
       label: device.label,
+      app_version: device.appVersion,
       /** Registered from the session making this request (this browser). */
       current: device.sessionId === sessionId,
       last_pushed_at: device.lastPushedAt?.toISOString() ?? null,
@@ -256,7 +311,8 @@ export class PushService {
    */
   async enqueue(notifications: Notification[]) {
     try {
-      if ((!this.vapid('bitocard') && !this.vapid('afrippa')) || notifications.length === 0) return;
+      const phones = this.phoneReady('fcm') || this.phoneReady('apns');
+      if ((!this.vapid('bitocard') && !this.vapid('afrippa') && !phones) || notifications.length === 0) return;
       const userIds = [...new Set(notifications.flatMap(row => (row.userId ? [row.userId] : [])))];
       const customerIds = [...new Set(notifications.flatMap(row => (row.customerId ? [row.customerId] : [])))];
       const owners = { OR: [{ userId: { in: userIds } }, { customerId: { in: customerIds } }] };
@@ -318,7 +374,7 @@ export class PushService {
       await this.prisma.device.deleteMany({ where: { id: device.id } });
       return 'failed';
     }
-    if (!this.vapid(platform)) return finish({ status: 'failed', lastError: 'Push is switched off' });
+    if (device.channel === 'web_push' ? !this.vapid(platform) : !this.phoneReady(device.channel)) return finish({ status: 'failed', lastError: 'Push is switched off' });
 
     const result = await this.send(device, platform, {
       id: notification.id,
@@ -372,7 +428,16 @@ export class PushService {
   }
 
   /** Encrypts and sends one push (RFC 8291 aes128gcm, VAPID). Never throws. */
-  private async send(device: Device, platform: Platform, payload: Record<string, unknown> & { severity: string; body: string }): Promise<SendResult> {
+  private async send(device: Device, platform: Platform, payload: Record<string, unknown> & { id: string; type: string; title: string; severity: string; body: string; link: string | null }): Promise<SendResult> {
+    if (device.channel === 'fcm' || device.channel === 'apns') {
+      try {
+        const token = this.encryption().decrypt(device.keysEncrypted);
+        const notice = { id: payload.id, type: payload.type, title: payload.title, body: payload.body, link: payload.link, severity: payload.severity };
+        return device.channel === 'fcm' ? await this.fcm.notify(this.integrations.config, token, notice) : await this.apns.notify(this.integrations.config, token, notice);
+      } catch (error) {
+        return { ok: false, gone: false, retry: true, error: (error as Error).message.slice(0, 300) };
+      }
+    }
     const vapid = this.vapid(platform);
     if (!vapid) return { ok: false, gone: false, retry: false, error: 'Push is switched off' };
     // Checked again before every send, in case the rules tightened since it was registered.

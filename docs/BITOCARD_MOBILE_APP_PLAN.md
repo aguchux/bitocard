@@ -117,6 +117,15 @@ From phase 3:
 - **Numbers outside Nigeria** are shown as the API sends them (`localNumber` writes only Nigerian ones locally), and amounts are whole units, as Nigeria's exchange takes. Check both when another market opens.
 - **The seller's standing** (strikes, when they expire) is shown only when selling is paused; add it to the exchange page.
 
+From phase 4:
+
+- **Native Google and Apple sign-in** were left out on purpose: bitocard.com's customers have no Google sign-in, and Apple asks for Sign in with Apple only when an app offers another company's sign-in. Add both together (the API's `…/google/native` and `…/apple/native`, as udozo-api has) if Google sign-in comes to bitocard.com.
+- **Real push needs keys.** Android needs Firebase's `google-services.json` in the app (`android.googleServicesFile` in `app.json`) and the service account in Settings > Integrations > Phone push; iPhones need the APNs key there. Until then `registerPush` gets no token and the inbox still works.
+- **Chat and ticket attachments** sent by BitoCard's team show as "(sent a file)": the app cannot open them yet (`GET /v1/store/support/chat/:id/files/:file` with the session).
+- **Settings:** Face ID before every payment is always on; a switch to skip it for small amounts is not built.
+- **Spin and win's wheel** is checked in tests with reduced motion only; watch the turn on a phone.
+- **The update gate** blocks only once admins set the minimum versions (Settings > Integrations > Mobile app); set them and the store links before the first store build.
+
 ## Build progress
 
 - **Phase 0 built (19 November 2026):**
@@ -187,4 +196,19 @@ From phase 3:
     goes to, the price quoted, then Face ID or PIN and that price paid (`expected_price`) with a kept key; a short wallet
     offers Add funds. **The purchase** (`/airtime/purchase/[id]`): followed until sent or refunded.
   - Tests: `test/airtime.test.ts`, `test/screens/airtime.test.tsx`.
-- Next: phase 4.
+- **Phase 4 built (19 November 2026):**
+  - **API** (`apps/api`, migration `20270213000000_mobile_app`: `DeviceChannel` `fcm` and `apns`, `devices.app_version`, `customers.deleted_at`):
+    - phone push (`src/notifications/native-push.ts`, ported from udozo-api: FCM HTTP v1 and APNs over HTTP/2), `POST /v1/store/account/devices/phone { kind: fcm|apns, token, app_version? }`, the token encrypted and found by its hash; Settings > Integrations > **Phone push (FCM and APNs)**;
+    - `GET /v1/app/config?platform=&version=` (`src/app-config/`: `update` none, available or required, the store link, bitocard.com and the legal pages); Settings > Integrations > **Mobile app**;
+    - deleting the account (`src/customers/account-deletion.ts`): `GET /v1/store/account/delete` (`can_delete`, `password_required`, `blockers`: money held, open orders, gift card sales being checked, airtime trades, bank deposits, payouts on their way) and `POST …/delete { confirm: "DELETE", password? }` (personal details removed, sessions ended, devices forgotten; orders and the ledger stay).
+    - Tests: `test/phone-push.test.mjs`, `test/app-config.test.mjs`, `test/account-deletion.test.mjs`.
+  - **App:**
+    - **Notifications** (`/notifications`, the bell on Home with the unread count): newest first, opening one marks it read and goes to its screen (`appLink` in `src/lib/links.ts` turns bitocard.com paths into the app's), Mark all read, and Turn on notifications.
+    - **Push** (`src/lib/push.ts`, `PushListener`): the phone's own token (expo-notifications, never Expo's push service) registered once the email is confirmed; a notice in front refreshes the inbox; a tap opens its screen.
+    - **Help** (`/help`): chat (the assistant's greeting, polled every 3 seconds, Talk to a person, End chat) and questions to BitoCard (`/help/new`, from an order with Ask us about this order; `/help/ticket/[id]` with replies and Close).
+    - **Search** (`/search`, from Home): gift cards open in the app, airtime and data on the Mobile tab, anything else on bitocard.com.
+    - **Settings** (`/settings`): push on or off, which notices are pushed (security ones locked), the theme (phone, light or dark, kept on the phone), mobile numbers, terms and privacy, the version, and **Delete your account** (`/delete-account`: what stands in the way, else the password and DELETE typed; then signed out).
+    - **Spin and win** (`/spin`, from Home's card): the wheel stops on what the server decided (`landingRotation` in `src/lib/spin.ts`), still for reduced motion; rewards moved to a wallet at the amount shown first.
+    - **The update gate** (`UpdateGate`): blocks below the minimum version, offers the update below the latest.
+    - Tests: `test/links.test.ts`, `test/spin.test.ts`, `test/screens/staying.test.tsx`, `test/screens/delete-account.test.tsx`.
+- Next: phase 5.

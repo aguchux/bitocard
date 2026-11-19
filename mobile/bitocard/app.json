@@ -34,6 +34,13 @@
       ],
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#070f4c"
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "BitoCard asks for Face ID before money leaves your wallet."
