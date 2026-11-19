@@ -3,11 +3,12 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { StyleSheet, View } from 'react-native';
 
+import { Codes } from '@/components/codes';
 import { Button, Card, Line, Notice, Page, T, useTheme } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import { inProgress, recipientOf, statusOf, stepsOf } from '@/lib/orders';
-import type { Checkout } from '@/lib/types';
+import type { CheckoutWithCodes } from '@/lib/types';
 
 /** One order: its status and timeline (asked again every 4 seconds while it moves), what was paid and for what. */
 export default function OrderScreen() {
@@ -15,11 +16,11 @@ export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const order = useQuery({
     queryKey: ['orders', id],
-    queryFn: () => api<Checkout>(`/v1/store/checkouts/${id}`),
+    queryFn: () => api<CheckoutWithCodes>(`/v1/store/checkouts/${id}`),
     refetchInterval: query => (query.state.data && inProgress(query.state.data.status) ? 4000 : false),
   });
   const simulate = useMutation({
-    mutationFn: (outcome: 'succeeded' | 'failed') => api<Checkout>(`/v1/store/checkouts/${id}/simulate`, { body: { outcome } }),
+    mutationFn: (outcome: 'succeeded' | 'failed') => api<CheckoutWithCodes>(`/v1/store/checkouts/${id}/simulate`, { body: { outcome } }),
     onSuccess: () => void order.refetch(),
   });
 
@@ -70,6 +71,8 @@ export default function OrderScreen() {
           );
         })}
       </Card>
+
+      {checkout.status === 'completed' && checkout.order?.deliveries?.length ? <Codes deliveries={checkout.order.deliveries} instructions={checkout.order.redeem_instructions} /> : null}
 
       <Card>
         <Line label="Paid" value={formatMoney(checkout.amount, checkout.currency)} />

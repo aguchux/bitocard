@@ -18,7 +18,7 @@ jest.mock('expo-router', () => {
 
 jest.mock('@/lib/api', () => {
   const core = jest.requireActual('@/lib/api-core');
-  return { api: jest.fn(), ApiError: core.ApiError, newIdempotencyKey: () => 'key' };
+  return { api: jest.fn(), apiUpload: jest.fn(), ApiError: core.ApiError, newIdempotencyKey: () => 'key' };
 });
 
 // Icons draw nothing in tests (their package is ES modules only).
@@ -32,3 +32,13 @@ jest.mock('expo-local-authentication', () => ({
 }));
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));
+jest.mock('expo-screen-capture', () => ({ usePreventScreenCapture: jest.fn() }));
+jest.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: false, assets: [{ uri: 'file:///front.jpg', width: 3000, height: 2000 }] })),
+}));
+jest.mock('expo-image-manipulator', () => ({
+  SaveFormat: { JPEG: 'jpeg' },
+  ImageManipulator: { manipulate: () => ({ resize: jest.fn(), renderAsync: async () => ({ saveAsync: async () => ({ uri: 'file:///prepared.jpg' }) }) }) },
+}));

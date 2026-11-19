@@ -65,7 +65,11 @@ export default function Pay() {
       {preview.isError ? (
         <>
           <Notice tone="bad">{preview.error instanceof ApiError ? preview.error.message : 'The price could not be worked out. Check your connection.'}</Notice>
-          <Button kind="secondary" label="Try again" onPress={() => void preview.refetch()} />
+          {preview.error instanceof ApiError && preview.error.code === 'customer_verification_required' ? (
+            <Button label="Check my identity" onPress={() => router.push('/identity')} />
+          ) : (
+            <Button kind="secondary" label="Try again" onPress={() => void preview.refetch()} />
+          )}
         </>
       ) : null}
       {quote && chosen ? (

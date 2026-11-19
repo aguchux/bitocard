@@ -69,6 +69,10 @@ function ThemedApp() {
         <Stack.Screen name="account-number" options={{ title: 'Your account number' }} />
         <Stack.Screen name="bank-deposit/index" options={{ title: 'Bank deposit' }} />
         <Stack.Screen name="bank-deposit/[id]" options={{ title: 'Bank deposit' }} />
+        <Stack.Screen name="gift-card/[key]" options={{ title: 'Gift card' }} />
+        <Stack.Screen name="sell/[key]" options={{ title: 'Sell a gift card' }} />
+        <Stack.Screen name="sale/[id]" options={{ title: 'Your sale' }} />
+        <Stack.Screen name="identity" options={{ title: 'Identity check' }} />
       </Stack>
     </ThemeProvider>
   );

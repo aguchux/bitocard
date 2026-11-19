@@ -165,3 +165,45 @@ export type AccountSummary = {
   orders: { total: number; in_progress: number };
   delivered_this_month: number;
 };
+
+/** A gift card's rate at checkout: per unit of the card's currency (minor units of `currency`), and each value's price. */
+export type StoreRate = { object: 'store_rate'; currency: string; face_currency: string; rate: number; values: { face_value: number; price: number }[] } | { object: 'store_rate'; rate: null };
+
+/** What a delivered order holds: a gift card's code and PIN, a licence key, a token. Shown only on its own order. */
+export type Delivery = { kind: string; code: string | null; pin: string | null; serial: string | null; details: Record<string, unknown> };
+
+export type CheckoutWithCodes = Checkout & {
+  order: (NonNullable<Checkout['order']> & { deliveries?: Delivery[]; redeem_instructions?: string | null }) | null;
+};
+
+export type SellOffer = { id: string; name: string; form: 'physical' | 'ecode' | 'both' | string; minimum: number; maximum: number; currency: string; rate: number; terms: string | null };
+
+export type SellOptions = { object: 'gift_card_sell_options'; available: boolean; reason: string | null; currency: string | null; offers: SellOffer[] };
+
+export type SaleQuote = { object: 'gift_card_sale_quote'; offer_id: string; amount: number; currency: string; payout: number };
+
+export type GiftCardSale = {
+  object: 'gift_card_sale';
+  id: string;
+  number: string;
+  mode: 'live' | 'test';
+  status: 'pending' | 'completed' | 'rejected' | 'failed';
+  card: { name: string; brand: string | null; brand_slug: string | null; country: string | null };
+  form: 'physical' | 'ecode';
+  /** Whole units of the card's value. */
+  amount: number;
+  currency: string;
+  quoted: number;
+  paid: number | null;
+  code_hint: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
+export type VerificationStatus = {
+  object: 'customer_verification_status';
+  country: string;
+  provider: 'bitocard' | 'didit';
+  verified: boolean;
+  latest: { status: string; url: string | null; reason: string | null } | null;
+};

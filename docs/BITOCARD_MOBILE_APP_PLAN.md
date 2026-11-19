@@ -88,6 +88,28 @@ data, and buy and sell gift cards. The approved screens are the design canvas "B
 - **Stores:** listings, screenshots and the data safety forms.
 - **Builds:** EAS builds only on the owner's go.
 
+## Carried forward (not done yet, to pick up)
+
+Kept here so nothing left open is forgotten. Strike an item out when it ships.
+
+From phase 0:
+
+- **Forgot password in the app.** Sign in only says to reset it on bitocard.com. Use `POST /v1/store/account/password/forgot` and `…/password/reset` (code and new password).
+- **App icons and splash.** Phase 0 copied the website's icons. Generate a proper set (adaptive icon foreground, background and monochrome; splash) from `assets/logo.png` with `scripts/brand-assets.py`, as `mobile/udozo` has.
+- **`BitoCard-App` header.** The app sends it, but BitoCard's API ignores it. Read it if the API should tell app calls apart (sign-up journeys, counts).
+- **Tried on a phone.** Nothing has run on a real device or against the live API yet. Run it in a development build before a store build.
+
+From phase 1:
+
+- **Data plans with several fixed values.** A data product with more than one fixed face value is offered at its `from` value only. Show its `denominations` (from `GET /v1/store/products/:key`) as separate plans.
+- **Ghana account numbers.** `POST /v1/store/wallet/reserved-accounts` takes `phone` for Ghana; the app sends only the BVN (Nigeria). Ask for the phone where the market is GH.
+- **Adding and removing wallets** (another currency where `customer_foreign_wallets` is open): `GET /v1/store/wallet/currencies`, `POST /v1/store/wallet/wallets`, `DELETE …/wallets/:currency`. The app only shows the wallets already held.
+- **Transactions per wallet.** `GET /v1/store/wallet/transactions` has no currency filter; the app filters the page it loaded, so a wallet's list can look short. Add `currency` to the API, or keep loading until there are enough rows.
+- **Bank deposit history.** Only open deposits are listed; add the full list (`?show=done` and each status) as bitocard.com's Deposits page has.
+- **Pull to refresh** on Home and the Wallet tab (Orders has it).
+- **Paying by card for an order.** Orders are paid from the wallet only (`method: 'wallet'`). Where a market has wallets switched off (`wallet_required: false`), offer its checkout methods (`GET /v1/store/payment-methods`) and open the gateway's page as Add funds does.
+- **Cancelling an unpaid checkout or top-up** (`POST …/cancel`) from its page.
+
 ## Build progress
 
 - **Phase 0 built (19 November 2026):**
@@ -125,4 +147,22 @@ data, and buy and sell gift cards. The approved screens are the design canvas "B
     how and the name on it, Cancel).
   - Tests: `test/orders.test.ts`, `test/money.test.ts` (typed amounts, kept keys), `test/screens/buying.test.tsx`,
     `test/screens/wallet.test.tsx`.
-- Next: phase 2 (gift cards).
+- **Phase 2 built (19 November 2026):**
+  - **Gift cards tab:** Buy and Sell (`?mode=` from Home's tiles), a search, the cards as a grid with their logo or
+    initials (`BrandTile`); Sell lists the customer's latest five sales.
+  - **A card to buy** (`/gift-card/[key]`): the day's rate (`GET /v1/store/products/:key/rate`), its values as chips
+    with their price (`src/lib/gift-cards.ts`: `valuesOf`, `priceAt` rounding up), 1 to 10 cards, the email the codes
+    go to, then Confirm payment.
+  - **Codes:** a delivered order's codes, PINs and serials are masked until Reveal and Face ID, fingerprint or PIN;
+    screen capture is blocked while they show (`expo-screen-capture`), each with copy (`src/components/codes.tsx`).
+  - **Selling** (`/sell/[key]`): the cards Prestmit buys for that product, the form (e-code or photos), the value
+    within the offer's limits, "See what you get" (the exact quote), then the code or up to 20 photos (camera or
+    library, scaled to 1600 px JPEG, `src/lib/photo.ts`) sent with `expected_payout` and a kept Idempotency-Key
+    (`apiUpload`); a lower rate meanwhile clears the quote; an unchecked identity leads to the check.
+  - **The sale** (`/sale/[id]`): its status, asked again every 10 seconds while being checked; sandbox sales can be
+    decided.
+  - **Identity check** (`/identity`): the names as on the ID, the BVN in Nigeria where the provider asks, consent,
+    then the check in an in-app browser (start, continue or start again); Confirm payment offers it when checkout
+    refuses for it.
+  - Tests: `test/gift-cards.test.ts`, `test/screens/gift-cards.test.tsx`.
+- Next: phase 3.

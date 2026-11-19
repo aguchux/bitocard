@@ -10,7 +10,9 @@
     "ios": {
       "bundleIdentifier": "com.bitocard.app",
       "supportsTablet": false,
-      "config": { "usesNonExemptEncryption": false }
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.bitocard.app",
@@ -24,12 +26,18 @@
       "expo-router",
       [
         "expo-splash-screen",
-        { "backgroundColor": "#070f4c", "image": "./assets/images/splash-icon.png", "imageWidth": 96 }
+        {
+          "backgroundColor": "#070f4c",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
       ],
       "expo-secure-store",
       [
         "expo-local-authentication",
-        { "faceIDPermission": "BitoCard asks for Face ID before money leaves your wallet." }
+        {
+          "faceIDPermission": "BitoCard asks for Face ID before money leaves your wallet."
+        }
       ],
       [
         "expo-font",
@@ -41,13 +49,24 @@
             "node_modules/@expo-google-fonts/inter/800ExtraBold/Inter_800ExtraBold.ttf"
           ]
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BitoCard uses your photos when you sell a gift card: photos of the card for checking.",
+          "cameraPermission": "BitoCard uses the camera when you photograph a gift card you are selling.",
+          "microphonePermission": false
+        }
       ]
     ],
     "extra": {
       "apiUrl": "https://api.bitocard.com",
       "siteUrl": "https://bitocard.com"
     },
-    "experiments": { "typedRoutes": true, "reactCompiler": true },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
     "owner": "golojan"
   }
 }

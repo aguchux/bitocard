@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 
-import { appTag, request, type RequestOptions } from '@/lib/api-core';
+import { appHeader, appTag, networkError, readResponse, request, sessionHeader, type RequestOptions } from '@/lib/api-core';
 import { apiUrl, appVersion } from '@/lib/config';
 import { readSession } from '@/lib/session';
 
@@ -18,4 +18,18 @@ const app = appTag(Platform.OS === 'ios' ? 'ios' : 'android', appVersion);
  */
 export async function api<T>(path: string, options: Omit<RequestOptions, 'session' | 'app'> = {}) {
   return request<T>(fetch, apiUrl, path, { ...options, session: await readSession(), app }, newIdempotencyKey);
+}
+
+/** A multipart send (a gift card's photos): the session and the app's tag as for any call; the answer read the same way. */
+export async function apiUpload<T>(path: string, form: FormData, idempotencyKey?: string) {
+  const session = await readSession();
+  const headers: Record<string, string> = { Accept: 'application/json', [appHeader]: app, 'Idempotency-Key': idempotencyKey ?? newIdempotencyKey() };
+  if (session) headers[sessionHeader] = session;
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}${path}`, { method: 'POST', headers, body: form });
+  } catch {
+    throw networkError();
+  }
+  return readResponse<T>(response);
 }

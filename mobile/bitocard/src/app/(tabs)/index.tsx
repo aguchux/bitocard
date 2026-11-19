@@ -14,8 +14,8 @@ const actions: { label: string; href: Href; Icon: typeof Gift; tint: 'pink' | 'b
   { label: 'Buy airtime', href: { pathname: '/mobile', params: { kind: 'airtime' } }, Icon: Smartphone, tint: 'pink' },
   { label: 'Buy data', href: { pathname: '/mobile', params: { kind: 'data' } }, Icon: Wifi, tint: 'blue' },
   { label: 'Sell airtime', href: '/mobile', Icon: ArrowUpRight, tint: 'amber' },
-  { label: 'Buy gift cards', href: '/gift-cards', Icon: Gift, tint: 'violet' },
-  { label: 'Sell gift cards', href: '/gift-cards', Icon: WalletIcon, tint: 'green' },
+  { label: 'Buy gift cards', href: { pathname: '/gift-cards', params: { mode: 'buy' } }, Icon: Gift, tint: 'violet' },
+  { label: 'Sell gift cards', href: { pathname: '/gift-cards', params: { mode: 'sell' } }, Icon: WalletIcon, tint: 'green' },
   { label: 'Buy unused airtime', href: '/mobile', Icon: RefreshCw, tint: 'sky' },
 ];
 
