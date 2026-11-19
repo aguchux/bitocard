@@ -19,3 +19,17 @@ test('currencies without a minor unit, and ones without a symbol', () => {
   assert.equal(formatMoney(15000, 'XOF'), '15,000 XOF');
   assert.equal(formatMoney(123456, 'ZMW'), '1,234.56 ZMW');
 });
+
+test('typed amounts become minor units; anything else is not an amount', async () => {
+  const { toMinor, keepKey } = await import('../src/lib/money.ts');
+  assert.equal(toMinor('5,000', 'NGN'), 500000);
+  assert.equal(toMinor(' 12.5 ', 'USD'), 1250);
+  assert.equal(toMinor('12.505', 'USD'), null);
+  assert.equal(toMinor('1500', 'XOF'), 1500);
+  assert.equal(toMinor('15.5', 'XOF'), null);
+  assert.equal(toMinor('abc', 'NGN'), null);
+  assert.equal(toMinor('0', 'NGN'), null);
+  assert.equal(keepKey({ status: 0 }), true, 'no answer: the next tap reuses the key');
+  assert.equal(keepKey({ status: 502 }), true);
+  assert.equal(keepKey({ status: 402 }), false, 'refused: a new key next time');
+});

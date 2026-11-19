@@ -100,4 +100,29 @@ data, and buy and sell gift cards. The approved screens are the design canvas "B
     out).
   - Icons are the website's for now; a proper set from `scripts/brand-assets.py` comes with phase 5.
   - Tests: `test/api-core.test.ts`, `test/money.test.ts`, `test/screens/signin.test.tsx`.
-- Next: phase 1.
+- **Phase 1 built (19 November 2026):**
+  - **Mobile tab:**
+    - Airtime or Data; the network from the number (`GET /v1/store/network-detect`, the customer's choice wins);
+    - airtime amounts as chips within the product's range, or typed;
+    - data plans as the network's products (each at its `from` value; a plan with several fixed values is not offered
+      yet).
+  - **Confirm payment** (`/pay`):
+    - the quote first (`preview`), with each wallet's price;
+    - Face ID, fingerprint or PIN (`confirmOnPhone`), then the quote paid from the chosen wallet with a kept
+      Idempotency-Key (`useMoneyKey`);
+    - a wallet too low offers Add funds; an expired quote, a new price.
+  - **Order page** (`/order/[id]`): the status, timeline (`src/lib/orders.ts`) and receipt, asked again every
+    4 seconds while it moves; sandbox orders can be simulated.
+  - **Orders tab:** All, On the way, Delivered, Refunded, paged by `starting_after`.
+  - **Wallet tab:**
+    - a tab per wallet, the balance, Add funds, Move money, Bank deposit;
+    - your account number, or getting one (`/account-number`, the BVN in Nigeria);
+    - transactions, linking to their order.
+  - **Add funds:** the market's methods; the provider's page in an in-app browser, then the top-up followed until it
+    settles; sandbox top-ups can be simulated.
+  - **Move money:** what arrives first, then the move with `expected_amount`.
+  - **Bank deposit:** the open deposits, a new one, and its page (where to pay with copy buttons, "I've paid it" with
+    how and the name on it, Cancel).
+  - Tests: `test/orders.test.ts`, `test/money.test.ts` (typed amounts, kept keys), `test/screens/buying.test.tsx`,
+    `test/screens/wallet.test.tsx`.
+- Next: phase 2 (gift cards).

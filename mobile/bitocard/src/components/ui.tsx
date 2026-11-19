@@ -97,7 +97,58 @@ export function Notice({ tone = 'warn', children }: { tone?: 'warn' | 'bad' | 'g
   );
 }
 
+/** A choice among a few (a network, an amount): selected is navy, or pink-ringed with `ring`. */
+export function Chip({ label, selected, onPress, ring }: { label: string; selected: boolean; onPress: () => void; ring?: boolean }) {
+  const theme = useTheme();
+  const filled = selected && !ring;
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={[styles.chip, { backgroundColor: filled ? theme.navy : theme.card, borderColor: selected ? (ring ? theme.pink : theme.navy) : theme.line, borderWidth: selected && ring ? 2 : 1 }]}>
+      <Text style={[styles.chipText, { color: filled ? '#ffffff' : theme.text }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Two to four tabs in a grey track (Airtime or Data, a wallet each, order filters). */
+export function Segmented<K extends string>({ options, value, onChange, label }: { options: { key: K; label: string }[]; value: K; onChange: (key: K) => void; label: string }) {
+  const theme = useTheme();
+  return (
+    <View accessibilityRole="tablist" accessibilityLabel={label} style={[styles.segmented, { backgroundColor: theme.line }]}>
+      {options.map(option => {
+        const on = option.key === value;
+        return (
+          <Pressable key={option.key} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => onChange(option.key)} style={[styles.segment, on && { backgroundColor: theme.card }]}>
+            <Text style={[styles.chipText, { color: on ? theme.text : theme.textSecondary }]}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** A label and its value on one line (a receipt's lines). */
+export function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 12 }}>
+      <T muted style={{ flex: 1 }}>
+        {label}
+      </T>
+      <T kind={strong ? 'heading' : 'body'} style={{ flexShrink: 1, textAlign: 'right' }}>
+        {value}
+      </T>
+    </View>
+  );
+}
+
 export const styles = StyleSheet.create({
+  chip: { minHeight: 48, paddingHorizontal: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  chipText: { fontFamily: inter.bold, fontSize: 15 },
+  segmented: { flexDirection: 'row', padding: 4, borderRadius: 14, gap: 4 },
+  segment: { flex: 1, minHeight: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   page: { padding: 20, gap: 18, paddingBottom: 40 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
   button: { minHeight: 54, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },

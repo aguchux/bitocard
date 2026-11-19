@@ -62,6 +62,13 @@ function ThemedApp() {
         <Stack.Screen name="signup" options={{ title: 'Create your account' }} />
         <Stack.Screen name="verify" options={{ title: 'Confirm your email', gestureEnabled: false }} />
         <Stack.Screen name="account" options={{ title: 'Your account' }} />
+        <Stack.Screen name="pay" options={{ title: 'Confirm payment', presentation: 'modal' }} />
+        <Stack.Screen name="order/[id]" options={{ title: 'Order' }} />
+        <Stack.Screen name="add-funds" options={{ title: 'Add funds' }} />
+        <Stack.Screen name="move-money" options={{ title: 'Move money' }} />
+        <Stack.Screen name="account-number" options={{ title: 'Your account number' }} />
+        <Stack.Screen name="bank-deposit/index" options={{ title: 'Bank deposit' }} />
+        <Stack.Screen name="bank-deposit/[id]" options={{ title: 'Bank deposit' }} />
       </Stack>
     </ThemeProvider>
   );

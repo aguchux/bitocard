@@ -23,3 +23,23 @@ export function formatMoney(minor: number, currency: string, options: { cents?: 
   const symbol = symbols[code];
   return `${negative ? '−' : ''}${symbol ? `${symbol}${amount}` : `${amount} ${code}`}`;
 }
+
+/** What the customer typed (`5,000`, `12.50`) as minor units of the currency; null when it is not an amount. */
+export function toMinor(text: string, currency: string) {
+  const cleaned = text.replace(/[,\s]/g, '');
+  const digits = digitsOf(currency);
+  const pattern = digits === 0 ? /^\d+$/ : new RegExp(String.raw`^\d+(\.\d{1,${digits}})?$`);
+  if (!pattern.test(cleaned)) return null;
+  const [whole, part = ''] = cleaned.split('.');
+  const minor = Number(whole) * 10 ** digits + Number(part.padEnd(digits, '0') || '0');
+  return Number.isSafeInteger(minor) && minor > 0 ? minor : null;
+}
+
+/**
+ * Whether a money step's Idempotency-Key is kept for the next tap: kept when the outcome is unclear (no answer, the
+ * API failing), so trying again can never pay twice; dropped once the API answered and refused.
+ */
+export function keepKey(error: unknown) {
+  const status = (error as { status?: number } | null)?.status;
+  return typeof status !== 'number' || status === 0 || status >= 500;
+}

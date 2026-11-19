@@ -12,7 +12,8 @@ jest.mock('expo-secure-store', () => {
 
 jest.mock('expo-router', () => {
   const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) };
-  return { router, Redirect: () => null, useLocalSearchParams: jest.fn(() => ({})) };
+  const Stack = Object.assign(() => null, { Screen: () => null });
+  return { router, Stack, Redirect: () => null, useLocalSearchParams: jest.fn(() => ({})) };
 });
 
 jest.mock('@/lib/api', () => {
@@ -22,3 +23,12 @@ jest.mock('@/lib/api', () => {
 
 // Icons draw nothing in tests (their package is ES modules only).
 jest.mock('lucide-react-native', () => new Proxy({ __esModule: true }, { get: (target, name) => (name === '__esModule' ? true : () => null) }));
+
+// Money steps: Face ID or the fingerprint says yes unless a test says otherwise.
+jest.mock('expo-local-authentication', () => ({
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+  getEnrolledLevelAsync: jest.fn(async () => 3),
+  authenticateAsync: jest.fn(async () => ({ success: true })),
+}));
+jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));

@@ -9,10 +9,10 @@ import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import type { AccountSummary, Wallet } from '@/lib/types';
 
-/** What the "I want to" tiles open; each lands on its tab until its own screen is built (phases 1 to 3). */
+/** What the "I want to" tiles open; selling and gift cards land on their tab until their screens are built (phases 2 and 3). */
 const actions: { label: string; href: Href; Icon: typeof Gift; tint: 'pink' | 'blue' | 'amber' | 'violet' | 'green' | 'sky' }[] = [
-  { label: 'Buy airtime', href: '/mobile', Icon: Smartphone, tint: 'pink' },
-  { label: 'Buy data', href: '/mobile', Icon: Wifi, tint: 'blue' },
+  { label: 'Buy airtime', href: { pathname: '/mobile', params: { kind: 'airtime' } }, Icon: Smartphone, tint: 'pink' },
+  { label: 'Buy data', href: { pathname: '/mobile', params: { kind: 'data' } }, Icon: Wifi, tint: 'blue' },
   { label: 'Sell airtime', href: '/mobile', Icon: ArrowUpRight, tint: 'amber' },
   { label: 'Buy gift cards', href: '/gift-cards', Icon: Gift, tint: 'violet' },
   { label: 'Sell gift cards', href: '/gift-cards', Icon: WalletIcon, tint: 'green' },
@@ -71,7 +71,7 @@ export default function Home() {
         <T kind="amount" color="#ffffff">
           {wallet.data ? formatMoney(wallet.data.balance, wallet.data.currency) : wallet.isError ? '—' : '…'}
         </T>
-        <Pressable accessibilityRole="button" onPress={() => router.push('/wallet')} style={[styles.walletButton, { backgroundColor: theme.pink }]}>
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/add-funds', params: wallet.data ? { currency: wallet.data.currency } : {} })} style={[styles.walletButton, { backgroundColor: theme.pink }]}>
           <T kind="label" color="#ffffff" style={{ fontFamily: inter.bold }}>
             Add funds
           </T>
