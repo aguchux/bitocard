@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "BitoCard",
+    "slug": "bitocard",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "bitocard",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.bitocard.app",
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false }
+    },
+    "android": {
+      "package": "com.bitocard.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        { "backgroundColor": "#070f4c", "image": "./assets/images/splash-icon.png", "imageWidth": 96 }
+      ],
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        { "faceIDPermission": "BitoCard asks for Face ID before money leaves your wallet." }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+            "node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf",
+            "node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf",
+            "node_modules/@expo-google-fonts/inter/800ExtraBold/Inter_800ExtraBold.ttf"
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "https://api.bitocard.com",
+      "siteUrl": "https://bitocard.com"
+    },
+    "experiments": { "typedRoutes": true, "reactCompiler": true },
+    "owner": "golojan"
+  }
+}

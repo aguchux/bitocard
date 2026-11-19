@@ -1,0 +1,7 @@
+# What EAS Build never needs: it installs the packages itself.
+node_modules/
+.expo/
+dist/
+web-build/
+test/
+*.log
