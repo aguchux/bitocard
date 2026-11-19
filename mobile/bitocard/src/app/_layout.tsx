@@ -73,6 +73,12 @@ function ThemedApp() {
         <Stack.Screen name="sell/[key]" options={{ title: 'Sell a gift card' }} />
         <Stack.Screen name="sale/[id]" options={{ title: 'Your sale' }} />
         <Stack.Screen name="identity" options={{ title: 'Identity check' }} />
+        <Stack.Screen name="phones" options={{ title: 'Mobile numbers' }} />
+        <Stack.Screen name="airtime/index" options={{ title: 'Airtime exchange' }} />
+        <Stack.Screen name="airtime/sell" options={{ title: 'Sell airtime' }} />
+        <Stack.Screen name="airtime/buy" options={{ title: 'Buy airtime' }} />
+        <Stack.Screen name="airtime/sale/[id]" options={{ title: 'Airtime sale' }} />
+        <Stack.Screen name="airtime/purchase/[id]" options={{ title: 'Airtime purchase' }} />
       </Stack>
     </ThemeProvider>
   );

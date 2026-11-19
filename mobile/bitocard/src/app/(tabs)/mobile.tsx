@@ -166,6 +166,7 @@ export default function MobileTab() {
 
       {error ? <Notice tone="bad">{error}</Notice> : null}
       <Button label="Continue" onPress={proceed} />
+      <Button kind="secondary" label="Sell or buy unused airtime" onPress={() => router.push('/airtime')} />
     </Page>
   );
 }

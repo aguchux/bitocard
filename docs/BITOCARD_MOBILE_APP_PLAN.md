@@ -110,6 +110,13 @@ From phase 1:
 - **Paying by card for an order.** Orders are paid from the wallet only (`method: 'wallet'`). Where a market has wallets switched off (`wallet_required: false`), offer its checkout methods (`GET /v1/store/payment-methods`) and open the gateway's page as Add funds does.
 - **Cancelling an unpaid checkout or top-up** (`POST …/cancel`) from its page.
 
+From phase 3:
+
+- **Dialling the transfer code on iPhones.** iOS refuses `tel:` links holding `*` or `#`, so Dial it may do nothing there; Copy code is beside it. Hide Dial it on iOS once tried on a phone.
+- **All of a customer's trades.** The exchange shows the latest ten; the API lists 50 of each with no paging. Add a full list with paging when there are more.
+- **Numbers outside Nigeria** are shown as the API sends them (`localNumber` writes only Nigerian ones locally), and amounts are whole units, as Nigeria's exchange takes. Check both when another market opens.
+- **The seller's standing** (strikes, when they expire) is shown only when selling is paused; add it to the exchange page.
+
 ## Build progress
 
 - **Phase 0 built (19 November 2026):**
@@ -165,4 +172,19 @@ From phase 1:
     then the check in an in-app browser (start, continue or start again); Confirm payment offers it when checkout
     refuses for it.
   - Tests: `test/gift-cards.test.ts`, `test/screens/gift-cards.test.tsx`.
-- Next: phase 3.
+- **Phase 3 built (19 November 2026):**
+  - **Mobile numbers** (`/phones`, from Account and the exchange): the confirmed numbers, the default first; adding one
+    with its texted code (`POST /v1/store/account/phones`, then `…/verify`), making another the default, removing one.
+  - **The exchange** (`/airtime`, from the Mobile tab): the live pool per network (available, the sell and buy rates,
+    what moved in 24 hours; asked again every 20 seconds), Sell and Buy, and the customer's latest trades.
+  - **Selling** (`/airtime/sell`, Home's Sell airtime): an open network, the confirmed number it comes from (the default
+    first), a whole amount within the network's limits (`src/lib/airtime.ts`), the payout quoted first, the warning
+    that airtime from any other number is lost, then the sale with a kept Idempotency-Key.
+  - **The sale** (`/airtime/sale/[id]`): BitoCard's number with copy, the network's transfer code with Dial it and
+    copy, the time left, "I've sent it" after a confirmation (a sale said sent that never arrives is a strike), Cancel;
+    then checked (asked again every 10 seconds), paid after the hold, or not received and why; sandbox sales decided.
+  - **Buying** (`/airtime/buy`, Home's Buy unused airtime): a network with airtime in the pool, the confirmed number it
+    goes to, the price quoted, then Face ID or PIN and that price paid (`expected_price`) with a kept key; a short wallet
+    offers Add funds. **The purchase** (`/airtime/purchase/[id]`): followed until sent or refunded.
+  - Tests: `test/airtime.test.ts`, `test/screens/airtime.test.tsx`.
+- Next: phase 4.

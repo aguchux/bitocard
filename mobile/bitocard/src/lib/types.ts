@@ -200,6 +200,96 @@ export type GiftCardSale = {
   created_at: string;
 };
 
+/** The customer's confirmed mobile numbers (up to `limit`), the default first; `unconfirmed` is a number still waiting for its code. */
+export type CustomerPhones = { object: 'list'; data: { object: 'customer_phone'; phone: string; default: boolean; verified_at: string }[]; limit: number; default: string | null; unconfirmed: string | null };
+
+export type AirtimeNetwork = {
+  object: 'airtime_network';
+  network: string;
+  name: string;
+  /** Traded now: the exchange open there and a collector line on the network. */
+  open: boolean;
+  /** What sellers get and buyers pay, in basis points of the airtime's value. */
+  sell_rate_bps: number;
+  buy_rate_bps: number;
+  min_amount: number;
+  max_amount: number;
+  available: number;
+  bought_total: number;
+  sold_total: number;
+  bought_24h: number;
+  sold_24h: number;
+};
+
+export type AirtimePool = {
+  object: 'airtime_pool';
+  country: string;
+  currency: string | null;
+  mode: 'live' | 'test';
+  open: boolean;
+  networks: AirtimeNetwork[];
+  totals: { available: number; bought_total: number; sold_total: number; bought_24h: number; sold_24h: number };
+  updated_at: string | null;
+};
+
+export type AirtimeSeller = {
+  object: 'airtime_seller';
+  completed_sales: number;
+  strikes: number;
+  strike_limit: number;
+  paused: boolean;
+  strikes_expire_at: string | null;
+  sold_today: number;
+  networks: { network: string; new_seller: boolean; established_after: number; daily_limit: number; seller_daily: number }[];
+};
+
+export type AirtimeSaleQuote = { object: 'airtime_sale_quote'; network: string; amount: number; currency: string; rate_bps: number; payout: number; from_phone: string };
+
+export type AirtimeSale = {
+  object: 'airtime_sale';
+  id: string;
+  number: string;
+  mode: 'live' | 'test';
+  network: string;
+  amount: number;
+  currency: string;
+  rate_bps: number;
+  payout: number;
+  from_phone: string;
+  status: 'awaiting_transfer' | 'sent' | 'received' | 'credited' | 'expired' | 'cancelled' | 'not_received' | 'reversed';
+  /** Where to send the airtime, and how (the network's transfer code filled in), while the seller still has to. */
+  collector_number: string | null;
+  transfer_steps: string | null;
+  expires_at: string;
+  sent_at: string | null;
+  received_at: string | null;
+  credit_at: string | null;
+  credited_at: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type AirtimePurchaseQuote = { object: 'airtime_purchase_quote'; network: string; amount: number; currency: string; rate_bps: number; price: number; phone: string; available: number };
+
+export type AirtimePurchase = {
+  object: 'airtime_purchase';
+  id: string;
+  number: string;
+  mode: 'live' | 'test';
+  network: string;
+  phone: string;
+  amount: number;
+  currency: string;
+  rate_bps: number;
+  price: number;
+  status: 'paid' | 'delivering' | 'delivered' | 'refunded';
+  expires_at: string;
+  delivered_at: string | null;
+  refunded_at: string | null;
+  note: string | null;
+  created_at: string;
+};
+
 export type VerificationStatus = {
   object: 'customer_verification_status';
   country: string;

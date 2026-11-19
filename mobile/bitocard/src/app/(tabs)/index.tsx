@@ -9,14 +9,14 @@ import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import type { AccountSummary, Wallet } from '@/lib/types';
 
-/** What the "I want to" tiles open; selling and gift cards land on their tab until their screens are built (phases 2 and 3). */
+/** What the "I want to" tiles open. */
 const actions: { label: string; href: Href; Icon: typeof Gift; tint: 'pink' | 'blue' | 'amber' | 'violet' | 'green' | 'sky' }[] = [
   { label: 'Buy airtime', href: { pathname: '/mobile', params: { kind: 'airtime' } }, Icon: Smartphone, tint: 'pink' },
   { label: 'Buy data', href: { pathname: '/mobile', params: { kind: 'data' } }, Icon: Wifi, tint: 'blue' },
-  { label: 'Sell airtime', href: '/mobile', Icon: ArrowUpRight, tint: 'amber' },
+  { label: 'Sell airtime', href: '/airtime/sell', Icon: ArrowUpRight, tint: 'amber' },
   { label: 'Buy gift cards', href: { pathname: '/gift-cards', params: { mode: 'buy' } }, Icon: Gift, tint: 'violet' },
   { label: 'Sell gift cards', href: { pathname: '/gift-cards', params: { mode: 'sell' } }, Icon: WalletIcon, tint: 'green' },
-  { label: 'Buy unused airtime', href: '/mobile', Icon: RefreshCw, tint: 'sky' },
+  { label: 'Buy unused airtime', href: '/airtime/buy', Icon: RefreshCw, tint: 'sky' },
 ];
 
 const tints = { pink: ['#ffe4ef', '#d10f5f'], blue: ['#e5ecff', '#1d4ed8'], amber: ['#fff1dc', '#b45309'], violet: ['#ede7ff', '#6d28d9'], green: ['#dcf5e8', '#047857'], sky: ['#e0f2fe', '#0369a1'] } as const;

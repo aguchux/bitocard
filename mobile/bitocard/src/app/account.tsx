@@ -16,6 +16,7 @@ export default function AccountScreen() {
           Your country is fixed: your wallet and prices are in its currency.
         </T>
       </Card>
+      <Button kind="secondary" label="Mobile numbers" onPress={() => router.push('/phones')} />
       <Button
         kind="secondary"
         label="Sign out"
