@@ -98,6 +98,10 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "plugins": [
@@ -146,7 +150,15 @@
     ],
     "extra": {
       "apiUrl": "https://api.bitocard.com",
-      "siteUrl": "https://bitocard.com"
+      "siteUrl": "https://bitocard.com",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "822ca89c-fb4a-42eb-94ed-847bdd118e49"
+      }
     },
     "experiments": {
       "typedRoutes": true,
