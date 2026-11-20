@@ -47,3 +47,6 @@ google-service-account.json
 google-services.json
 GoogleService-Info.plist
 *firebase-adminsdk*.json
+
+# Rendered store images: make them with node store-listing/render.mjs
+store-listing/out/
