@@ -7,3 +7,5 @@ test/
 *.log
 # The Play service account is only for eas submit, never in a build
 google-service-account.json
+# Firebase Admin keys belong to the API (Settings > Integrations > Phone push), never a build
+*firebase-adminsdk*.json
