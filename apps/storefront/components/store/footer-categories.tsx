@@ -60,7 +60,6 @@ export function FooterCategories({ groups }: { groups: StoreNavigationGroup[] })
                   <GroupIcon group={group} className="size-10" />
                   <span>
                     <span className="block font-semibold">{group.label}</span>
-                    {group.on_sale ? null : <span className="mt-0.5 block text-xs font-medium text-slate-500">Soon</span>}
                   </span>
                 </Link>
               </li>

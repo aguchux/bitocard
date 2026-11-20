@@ -132,7 +132,7 @@ const footerLink = "inline-flex min-h-10 items-center hover:text-navy-900";
  */
 export function StoreFooter({ groups, store = null }: { groups: StoreNavigationGroup[]; store?: HostedStore | null }) {
   const reseller = Boolean(store) && !store!.house;
-  // Any store (house or reseller) lists only what it sells; bitocard.com every group, "Soon" where none is open yet.
+  // Any store (house or reseller) lists only what it sells; bitocard.com every group (an empty one shows no products).
   const shown = store ? groups.filter(group => group.on_sale) : groups;
   // Reseller terms are for resellers: bitocard.com shows them with its business links, never on a store.
   const legal = legalDocuments.filter(doc => doc.href !== "/documents/reseller-terms");

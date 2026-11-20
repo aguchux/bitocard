@@ -163,7 +163,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                 </Carousel>
               </section>
             ))}
-          {rails.every(rail => !rail.products.length) ? <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">Products are on their way. Check back soon.</p> : null}
+          {rails.every(rail => !rail.products.length) ? <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">No products to show here.</p> : null}
         </>
       )}
     </div>

@@ -111,11 +111,6 @@ export function CatalogueView({
   result: Awaited<ReturnType<typeof loadCatalogue>>["result"];
 }) {
   const products = result.ok ? result.data.data : [];
-  // A category or menu group with nothing open yet says so, instead of "nothing matches".
-  const slug = path.replace(/^\/catalogs\/?/, "");
-  const every = groups.flatMap(group => group.categories);
-  const scope = !slug ? every : (groups.find(group => group.key === slug)?.categories ?? every.filter(category => category.category === slug));
-  const comingSoon = path.startsWith("/catalogs") && products.length === 0 && !scope.some(category => category.on_sale);
   const total = result.ok ? (result.data.total ?? products.length) : 0;
   const chips = [
     params.q ? { label: `“${params.q}”`, change: { q: undefined } } : null,
@@ -157,11 +152,7 @@ export function CatalogueView({
                           <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-5 rounded" ink="text-slate-500" tile="bg-slate-100" />
                           {category.label}
                         </span>
-                        {category.on_sale ? (
-                          <span className="text-xs text-slate-500">{category.products}</span>
-                        ) : (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
-                        )}
+                        <span className="text-xs text-slate-500">{category.on_sale ? category.products : 0}</span>
                       </Link>
                     </li>
                   ))}
@@ -257,7 +248,7 @@ export function CatalogueView({
           </ul>
         ) : result.ok ? (
           <p className="mt-6 rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
-            {comingSoon ? `${title} are coming soon. Check back shortly.` : "Nothing matches these filters yet."}
+            No products to show here.
           </p>
         ) : null}
         {result.ok && (page > 1 || result.data.has_more) ? (

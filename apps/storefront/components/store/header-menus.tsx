@@ -47,11 +47,7 @@ function GroupPanel({ group, close }: { group: StoreNavigationGroup; close: () =
                 <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-9" />
                 <span className="truncate">{category.label}</span>
               </span>
-              {category.on_sale ? (
-                <span className="text-xs font-normal text-slate-500">{category.products}</span>
-              ) : (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
-              )}
+              <span className="text-xs font-normal text-slate-500">{category.on_sale ? category.products : 0}</span>
             </Link>
           </li>
         ))}
@@ -115,7 +111,7 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                   >
                     <GroupIcon group={item} className="size-8" />
                     <span className="flex-1 truncate">{item.label}</span>
-                    {item.on_sale ? <ChevronRight className="size-4 text-slate-400" aria-hidden="true" /> : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>}
+                    <ChevronRight className="size-4 text-slate-400" aria-hidden="true" />
                   </Link>
                 </li>
               ))}
@@ -212,8 +208,6 @@ export function MobileMenu({ groups, signedIn = false, doors = null, links }: { 
                       <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-navy-900">
                         <GroupIcon group={group} className="size-10" />
                         <span className="flex-1">{group.label}</span>
-                        {/* A group of one category is that category: no list repeating its name. */}
-                        {group.categories.length === 1 && !group.on_sale ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-sans text-[11px] font-semibold text-slate-500">Soon</span> : null}
                       </Link>
                       {group.categories.length > 1 ? (
                         <ul className="mt-0.5">
@@ -224,7 +218,6 @@ export function MobileMenu({ groups, signedIn = false, doors = null, links }: { 
                                   <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-8" ink="text-slate-500" tile="bg-slate-100" />
                                   {category.label}
                                 </span>
-                                {category.on_sale ? null : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>}
                               </Link>
                             </li>
                           ))}

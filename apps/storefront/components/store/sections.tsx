@@ -150,7 +150,7 @@ function ProductRail({ section }: { section: Extract<ResolvedSection, { type: "p
         ) : null}
       </Heading>
       {products.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-500">Products appear here soon.</p>
+        <p className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-500">No products to show here.</p>
       ) : section.layout === "list" ? (
         <ul className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
           {products.map(product => (
@@ -203,7 +203,7 @@ function CategoryGrid({ section }: { section: Extract<ResolvedSection, { type: "
                 <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-11 rounded-xl sm:size-14" />
                 <span className="min-w-0">
                   <span className="font-display block leading-snug font-bold text-navy-900">{category.label}</span>
-                  <span className="text-sm text-slate-500">{category.on_sale ? `${category.products} ${category.products === 1 ? "product" : "products"}` : "Coming soon"}</span>
+                  <span className="text-sm text-slate-500">{category.on_sale ? `${category.products} ${category.products === 1 ? "product" : "products"}` : "No products"}</span>
                 </span>
               </Link>
             </li>

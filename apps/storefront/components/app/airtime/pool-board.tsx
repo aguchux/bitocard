@@ -25,7 +25,7 @@ export function AirtimePoolBoard({ pool, signedIn }: { pool: StoreAirtimePool; s
             <Radio className="size-4 text-green-600" aria-hidden="true" /> Live: updates as people sell and buy{pool.mode === "test" ? " (sandbox)" : ""}
           </p>
         </div>
-        {!pool.open ? <span className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-900">Opening soon</span> : null}
+        {!pool.open ? <span className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-900">No airtime available</span> : null}
       </div>
 
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">

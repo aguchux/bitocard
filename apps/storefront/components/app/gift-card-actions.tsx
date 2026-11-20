@@ -13,7 +13,7 @@ export function giftCardCount(group: StoreNavigationGroup | undefined) {
   return group?.categories.reduce((sum, category) => sum + (category.on_sale ? category.products : 0), 0) ?? 0;
 }
 
-export function ActionCard({ icon: Icon, tile, title, text, href, soon }: { icon: LucideIcon; tile: string; title: string; text: string; href?: string; soon?: boolean }) {
+export function ActionCard({ icon: Icon, tile, title, text, href }: { icon: LucideIcon; tile: string; title: string; text: string; href?: string }) {
   const body = (
     <>
       <span className={`grid size-12 place-items-center rounded-full text-white ${tile}`}>
@@ -21,7 +21,6 @@ export function ActionCard({ icon: Icon, tile, title, text, href, soon }: { icon
       </span>
       <span className="mt-5 flex items-center gap-2">
         <span className="text-lg font-bold text-navy-900">{title}</span>
-        {soon ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">Soon</span> : null}
         {href ? <ChevronRight className="ml-auto size-5 text-slate-400" aria-hidden="true" /> : null}
       </span>
       <span className="mt-1 block text-[15px] leading-relaxed text-slate-600">{text}</span>

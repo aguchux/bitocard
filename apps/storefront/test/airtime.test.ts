@@ -69,13 +69,14 @@ const pool: StoreAirtimePool = {
 };
 
 describe("the Mobile catalogue's tiles", () => {
-  test("airtime and data always; the exchange's two only as Soon until it is open", () => {
+  test("airtime and data always; the exchange's two left out until it is open", () => {
     const closed = renderToStaticMarkup(createElement(MobileActions, { exchangeOpen: false }));
-    for (const label of ["Buy airtime", "Buy data", "Sell unused airtime", "Buy unused airtime"]) expect(closed).toContain(label);
+    for (const label of ["Buy airtime", "Buy data"]) expect(closed).toContain(label);
+    for (const label of ["Sell unused airtime", "Buy unused airtime"]) expect(closed).not.toContain(label);
     expect(closed).toContain('href="/account/topup"');
     expect(closed).toContain('href="/account/topup?kind=data"');
     expect(closed).not.toContain("/account/airtime");
-    expect(closed.match(/Soon/g)).toHaveLength(2);
+    expect(closed).not.toContain("Soon");
 
     const open = renderToStaticMarkup(createElement(MobileActions, { exchangeOpen: true }));
     expect(open).toContain('href="/account/airtime/sell"');
@@ -86,20 +87,22 @@ describe("the Mobile catalogue's tiles", () => {
 });
 
 describe("Home's airtime and data", () => {
-  test("six equal actions, gift cards then airtime and data: three across on desktops, one sliding row on phones", () => {
+  test("equal actions, gift cards then airtime and data, only those offered: three across on desktops, one sliding row on phones", () => {
     const closed = renderToStaticMarkup(createElement(HomeActions, { giftCards: undefined, sellOpen: false, topUpOpen: true, exchangeOpen: false }));
-    expect(closed.match(/<li /g)).toHaveLength(6);
+    expect(closed.match(/<li /g)).toHaveLength(3);
     expect(closed).toContain("lg:grid-cols-3");
     expect(closed).toContain("snap-x");
-    for (const title of ["Buy airtime", "Buy data", "Sell unused airtime", "Buy unused airtime"]) expect(closed).toContain(title);
+    for (const title of ["Buy airtime", "Buy data"]) expect(closed).toContain(title);
+    for (const title of ["Sell gift cards", "Sell unused airtime", "Buy unused airtime"]) expect(closed).not.toContain(title);
     expect(closed).toContain('href="/account/topup"');
     expect(closed).toContain('href="/account/topup?kind=data"');
     expect(closed).not.toContain('href="/account/airtime/sell"');
-    expect(closed.match(/Soon/g)?.length).toBe(4);
+    expect(closed).not.toContain("Soon");
     const open = renderToStaticMarkup(createElement(HomeActions, { giftCards: undefined, sellOpen: false, topUpOpen: true, exchangeOpen: true }));
     expect(open).toContain('href="/account/airtime/sell"');
     expect(open).toContain('href="/account/airtime/buy"');
-    expect(open.match(/Soon/g)?.length).toBe(2);
+    expect(open.match(/<li /g)).toHaveLength(5);
+    expect(open).not.toContain("Soon");
   });
 });
 

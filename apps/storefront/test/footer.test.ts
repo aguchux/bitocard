@@ -21,7 +21,8 @@ describe("store footer", () => {
     const html = render(null);
     expect(html).toContain("All categories");
     expect(outsideDialog(html)).not.toContain("/catalogs/gift_cards");
-    expect(html).toMatch(/<dialog[^>]*>[\s\S]*\/catalogs\/gift_cards[\s\S]*Soon[\s\S]*<\/dialog>/);
+    expect(html).toMatch(/<dialog[^>]*>[\s\S]*\/catalogs\/gift_cards[\s\S]*<\/dialog>/);
+    expect(html).not.toContain("Soon");
   });
 
   test("bitocard.com shows its business links and credit", () => {
@@ -52,7 +53,7 @@ describe("store footer", () => {
     for (const text of ["Open a reseller store", "Reseller sign in", "Reseller terms", "A Golojan Ltd venture"]) expect(html).toContain(text);
     expect(html).not.toContain("Sold and delivered by BitoCard");
     expect(storeCredit(store(false, true), "A Golojan Ltd venture")).toBe("A Golojan Ltd venture");
-    // Only sells what the market has on sale, like a reseller's store, unlike root which shows every group with "Soon".
+    // Only sells what the market has on sale, like a reseller's store, unlike root which shows every group.
     expect(html).not.toContain("/catalogs/rdp");
   });
 });

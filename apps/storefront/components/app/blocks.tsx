@@ -45,7 +45,7 @@ function SolidGroupIcon({ group, tint }: { group: StoreNavigationGroup; tint: Re
   );
 }
 
-/** A menu group as a tinted entry card: icon tile, name, subtitle and chevron. Groups not open yet say "Coming soon". */
+/** A menu group as a tinted entry card: icon tile, name, subtitle and chevron. Every group opens its catalogue; one with nothing to sell in the market shows an empty list there. */
 export function CategoryEntry({ group }: { group: StoreNavigationGroup }) {
   const tint = groupTint(group.key);
   const uploaded = group.categories.some(category => category.icon_url);
@@ -54,22 +54,18 @@ export function CategoryEntry({ group }: { group: StoreNavigationGroup }) {
       {uploaded ? <GroupIcon group={group} className="size-14 rounded-2xl md:size-12 lg:size-16" ink={tint.ink} tile={tint.tile} /> : <SolidGroupIcon group={group} tint={tint} />}
       <span className="min-w-0 flex-1">
         <span className="block text-xl leading-tight font-bold text-navy-900 md:text-lg lg:text-xl">{group.label}</span>
-        <span className="mt-0.5 block truncate text-sm text-slate-500 lg:text-[15px]">{group.on_sale ? tint.subtitle : "Coming soon"}</span>
+        <span className="mt-0.5 block truncate text-sm text-slate-500 lg:text-[15px]">{tint.subtitle}</span>
       </span>
-      {group.on_sale ? (
-        <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full md:size-8 lg:size-10 ${tint.chevron}`}>
-          <ChevronRight className="size-5" strokeWidth={2.5} />
-        </span>
-      ) : null}
+      <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full md:size-8 lg:size-10 ${tint.chevron}`}>
+        <ChevronRight className="size-5" strokeWidth={2.5} />
+      </span>
     </>
   );
   const className = `flex min-h-[88px] items-center gap-4 rounded-3xl p-4 md:gap-3 lg:min-h-[104px] lg:gap-4 lg:p-5 ${tint.card}`;
-  return group.on_sale ? (
+  return (
     <Link href={`/account/catalog?group=${encodeURIComponent(group.key)}`} className={`${className} transition hover:-translate-y-0.5 hover:shadow-md`}>
       {body}
     </Link>
-  ) : (
-    <div className={className}>{body}</div>
   );
 }
 
