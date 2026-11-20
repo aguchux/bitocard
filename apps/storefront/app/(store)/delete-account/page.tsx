@@ -6,11 +6,11 @@ import { storeSubdomain } from "@/lib/store";
 
 /**
  * How to delete a BitoCard account, public for the app stores (Google Play asks for a web page; docs/BITOCARD_MOBILE_APP_PLAN.md,
- * phase 5). bitocard.com only: a reseller's store has its own customers and no app of ours.
+ * phase 5; `#some-data` is Play's "delete some data without deleting the account"). bitocard.com only: a reseller's store has its own customers and no app of ours.
  */
 export const metadata: Metadata = {
   title: "Delete your BitoCard account",
-  description: "How to delete your BitoCard account in the app or by email, and what we keep.",
+  description: "How to delete your BitoCard account, or only some of your data, in the app or by email, and what we keep.",
   alternates: { canonical: "/delete-account" },
 };
 
@@ -39,6 +39,22 @@ export default async function DeleteAccountPage() {
         <p>
           The law makes us keep your orders, payments and their accounting (usually for six years), with no name or contact details on the account. While your wallet still holds money, or an order, sale, trade, deposit or payout is still open, the account cannot be deleted until that is settled. See our{" "}
           <a className="font-semibold text-pink-600 underline" href={appUrl("legals", "/documents/privacy#retention")}>privacy notice</a>.
+        </p>
+      </section>
+      <section id="some-data" className="grid scroll-mt-24 gap-3 rounded-3xl border border-slate-100 bg-white p-6 text-slate-700 shadow-sm sm:p-8">
+        <h2 className="font-display text-xl font-bold text-navy-900">Delete some of your data and keep your account</h2>
+        <p>You can remove some things yourself, in the app or on bitocard.com:</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Mobile numbers you added: Account, then Profile, then remove the number (your main number stays).</li>
+          <li>Wallets you added in another currency, once they are empty: Wallet, then Remove.</li>
+        </ul>
+        <p>
+          For anything else, email{" "}
+          <a className="font-semibold text-pink-600 underline" href={`mailto:${legalContact}?subject=Delete%20some%20of%20my%20BitoCard%20data`}>{legalContact}</a>{" "}
+          from the address you sign in with and tell us what you want deleted. We reply within 30 days and delete what the law lets us.
+        </p>
+        <p>
+          We cannot delete records the law makes us keep while you have an account: your orders, payments and their accounting, and your identity check. We tell you which of what you asked for we have to keep, and why.
         </p>
       </section>
     </div>
