@@ -339,8 +339,21 @@ shots.forEach(([theme, scene, head, sub], n) => {
   shoot(shot(3840, 2160, theme, scene, head, sub), 3840, 2160, `chromebook/${name}`);
 });
 for (const [name, body] of features) shoot(page(body, 1024, 500, featureCss), 1024, 500, `feature-graphic/${name}.png`);
-// Play's icon: 512 x 512, the app's own 1024 px icon scaled down (Python's Pillow, as scripts/brand-assets.py uses).
-execFileSync('python', ['-c', 'import sys; from PIL import Image; Image.open(sys.argv[1]).convert("RGB").resize((512, 512), Image.LANCZOS).save(sys.argv[2])', join(app, 'assets/images/icon.png'), join(out, 'icon-512.png')]);
+// Play's icon: 512 x 512, the "b" from the master artwork (assets/logo.png) at two thirds of the height, centred on
+// white, so it sits inside Play's rounded mask with room around it (Python's Pillow, as scripts/brand-assets.py uses).
+const playIcon = [
+  'import sys',
+  'from PIL import Image',
+  'mark = Image.open(sys.argv[1]).convert("RGBA")',
+  'mark = mark.crop(mark.getchannel("A").point(lambda a: 255 if a > 40 else 0).getbbox())',
+  'height = 340',
+  'mark = mark.resize((round(mark.width * height / mark.height), height), Image.LANCZOS)',
+  'icon = Image.new("RGBA", (2048, 2048), "white")',
+  'big = mark.resize((mark.width * 4, mark.height * 4), Image.LANCZOS)',
+  'icon.alpha_composite(big, ((2048 - big.width) // 2, (2048 - big.height) // 2))',
+  'icon.convert("RGB").resize((512, 512), Image.LANCZOS).save(sys.argv[2])',
+].join('\n');
+execFileSync('python', ['-c', playIcon, join(app, '..', '..', 'assets/logo.png'), join(out, 'icon-512.png')]);
 console.log('icon-512.png  512x512');
 // Every image without transparency (Chrome sometimes keeps an alpha channel; Play's feature graphic refuses one).
 const flatten = ['import glob, sys', 'from PIL import Image', 'for f in glob.glob(sys.argv[1] + "/**/*.png", recursive=True):', '    im = Image.open(f)', '    if im.mode != "RGB": im.convert("RGB").save(f)'].join('\n');
