@@ -96,6 +96,8 @@ First release of the BitoCard app.
 | Phone screenshots (2 to 8) | `out/phone/01-home.png` to `08-orders.png`, in that order | 1080 × 1920 |
 | 7-inch tablet screenshots | `out/tablet-7in/01-…08` | 1920 × 1080 |
 | 10-inch tablet screenshots | `out/tablet-10in/01-…08` | 2560 × 1440 |
+| Chromebook screenshots | `out/chromebook/01-…08` | 3840 × 2160 |
+| Video | none: Play takes only a YouTube link | |
 
 The screens are drawn from the app's real screens with made-up data (Ada, ₦128,450.00, example codes); no real
 person, number, balance or code, and no other company's logo. Swap them for real captures from a sandbox account

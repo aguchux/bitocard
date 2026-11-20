@@ -1,6 +1,6 @@
 // Google Play listing images for the BitoCard app, drawn as HTML in the app's own colours, Inter and icons, and
 // photographed by Chrome at Play's sizes: phone screenshots (1080 x 1920), 7- and 10-inch tablet screenshots
-// (1920 x 1080, 2560 x 1440), feature graphics (1024 x 500) and the 512 px icon.
+// (1920 x 1080, 2560 x 1440), Chromebook screenshots (3840 x 2160), feature graphics (1024 x 500) and the 512 px icon.
 //
 // The phone screens follow the app's real screens (src/app) with made-up data: no real person, number, balance or
 // code, and no other company's logo (networks are named in plain text, gift cards are generic designs).
@@ -320,7 +320,7 @@ const features = [
 
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
-for (const dir of ['phone', 'tablet-7in', 'tablet-10in', 'feature-graphic']) mkdirSync(join(out, dir), { recursive: true });
+for (const dir of ['phone', 'tablet-7in', 'tablet-10in', 'chromebook', 'feature-graphic']) mkdirSync(join(out, dir), { recursive: true });
 
 const shoot = (html, w, h, target) => {
   const source = join(work, `${target.replace(/[\\/]/g, '_')}.html`);
@@ -335,10 +335,18 @@ shots.forEach(([theme, scene, head, sub], n) => {
   shoot(shot(1080, 1920, theme, scene, head, sub), 1080, 1920, `phone/${name}`);
   shoot(shot(1920, 1080, theme, scene, head, sub), 1920, 1080, `tablet-7in/${name}`);
   shoot(shot(2560, 1440, theme, scene, head, sub), 2560, 1440, `tablet-10in/${name}`);
+  // Chromebooks: each side 1,080 to 7,680 px.
+  shoot(shot(3840, 2160, theme, scene, head, sub), 3840, 2160, `chromebook/${name}`);
 });
 for (const [name, body] of features) shoot(page(body, 1024, 500, featureCss), 1024, 500, `feature-graphic/${name}.png`);
 // Play's icon: 512 x 512, the app's own 1024 px icon scaled down (Python's Pillow, as scripts/brand-assets.py uses).
 execFileSync('python', ['-c', 'import sys; from PIL import Image; Image.open(sys.argv[1]).convert("RGB").resize((512, 512), Image.LANCZOS).save(sys.argv[2])', join(app, 'assets/images/icon.png'), join(out, 'icon-512.png')]);
 console.log('icon-512.png  512x512');
+// Every image without transparency (Chrome sometimes keeps an alpha channel; Play's feature graphic refuses one).
+execFileSync('python', ['-c', 'import glob, sys
+from PIL import Image
+for f in glob.glob(sys.argv[1] + "/**/*.png", recursive=True):
+    im = Image.open(f)
+    if im.mode != "RGB": im.convert("RGB").save(f)', out]);
 rmSync(work, { recursive: true, force: true });
 console.log(`Done: ${out}`);
