@@ -143,6 +143,49 @@ describe('wallet top-ups through each gateway', () => {
     }
   });
 
+  test('below Stripe’s least charge: refused up front with the least amount, never an admin alert', async () => {
+    const { forgetStripeCurrencies } = await import('../dist/payments/stripe.provider.js');
+    forgetStripeCurrencies();
+    await prisma.exchangeRate.deleteMany({ where: { currency: 'GHS' } });
+    for (const source of ['open_exchange_rates', 'flutterwave']) {
+      await prisma.exchangeRate.create({ data: { currency: 'GHS', source, unitsPerUsd: 15, fetchedAt: new Date(Date.now() + 3600_000) } });
+    }
+    await setMethods('GH', 'wallet_top_up', ['stripe']);
+    stripe.state.refuseCurrencies.add('ghs');
+    const alerts = () => prisma.notification.count({ where: { type: 'admin.payment.gateway_refused' } });
+    const before = await alerts();
+    try {
+      const reseller = await verifiedReseller({ country: 'GH' });
+      // GH₵2 is $0.14: Stripe would refuse it. The first try learns cedis are charged in dollars, and is refused itself.
+      const first = await reseller.browser.post('/v1/wallet/top-ups', { amount: 200, method: 'stripe' });
+      assert.deepEqual([first.status, first.json.error?.code, first.json.error?.param], [400, 'amount_too_small', 'amount'], JSON.stringify(first.json));
+      const attempts = stripe.state.attempts.length;
+      // Known now to be charged in dollars: $0.50 at 14.775 cedis a dollar, rounded up, is GH₵7.39; refused before Stripe is asked.
+      const small = await reseller.browser.post('/v1/wallet/top-ups', { amount: 500, method: 'stripe' });
+      assert.deepEqual([small.status, small.json.error.code], [400, 'amount_too_small']);
+      assert.match(small.json.error.message, /at least GHS 7\.39/);
+      assert.equal(stripe.state.attempts.length, attempts, 'Stripe was not asked');
+      const enough = await reseller.browser.post('/v1/wallet/top-ups', { amount: 739, method: 'stripe' });
+      assert.equal(enough.status, 201, JSON.stringify(enough.json));
+
+      // A currency whose minimum BitoCard does not know: Stripe's refusal is the payer's, worded for them.
+      stripe.state.minimums.ngn = 100000;
+      const naira = await verifiedReseller();
+      await setMethods('NG', 'wallet_top_up', ['stripe']);
+      const refused = await naira.browser.post('/v1/wallet/top-ups', { amount: 50000, method: 'stripe' });
+      assert.deepEqual([refused.status, refused.json.error.code], [400, 'amount_too_small']);
+      const failed = await prisma.payment.findFirstOrThrow({ where: { resellerId: naira.resellerId, provider: 'stripe' }, orderBy: { createdAt: 'desc' } });
+      assert.equal(failed.status, 'failed');
+      assert.equal(await alerts(), before, 'admins are not told: nothing is wrong with the gateway');
+    } finally {
+      delete stripe.state.minimums.ngn;
+      stripe.state.refuseCurrencies.delete('ghs');
+      forgetStripeCurrencies();
+      await setMethods('GH', 'wallet_top_up', []);
+      await setMethods('NG', 'wallet_top_up', ['stripe', 'flutterwave', 'monnify']);
+    }
+  });
+
   test('Stripe: a Checkout page, credited once when the signed notification is confirmed with Stripe', async () => {
     const reseller = await verifiedReseller();
     const created = await reseller.browser.post('/v1/wallet/top-ups', { amount: 500000, method: 'stripe' });

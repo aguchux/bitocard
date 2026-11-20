@@ -18,6 +18,15 @@ type Refund = { id: string; status?: string; failure_reason?: string | null };
 
 /** Currencies Stripe counts in whole units (no cents); BitoCard keeps two decimal places for every currency. */
 const zeroDecimal = new Set(['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF']);
+/**
+ * The least Stripe charges in a currency, in BitoCard's minor units (stripe.com/docs/currencies#minimum-and-maximum-charge-amounts).
+ * A charge in a currency missing here is still refused by Stripe when too small, and reported as `amount_too_small`.
+ */
+export const stripeMinimums: Record<string, bigint> = {
+  USD: 50n, EUR: 50n, GBP: 30n, CAD: 50n, AUD: 50n, CHF: 50n, NZD: 50n, SGD: 50n, HKD: 400n, JPY: 5000n,
+  DKK: 250n, NOK: 300n, SEK: 300n, PLN: 200n, CZK: 1500n, HUF: 17500n, MXN: 1000n, BRL: 50n, INR: 50n, MYR: 200n,
+  THB: 1000n, AED: 200n, RON: 200n, BGN: 100n,
+};
 /** Currencies a Stripe account refused (by a hash of its key), so later payments go straight to US dollars. */
 const refusedCurrencies = new Map<string, Set<string>>();
 
@@ -131,6 +140,10 @@ export class StripeProvider implements CheckoutProvider {
     return createHmac('sha256', 'stripe-account').update(this.secretKey).digest('hex').slice(0, 16);
   }
 
+  minimumCharge(currency: string) {
+    return stripeMinimums[currency.toUpperCase()] ?? null;
+  }
+
   takesCurrency(currency: string) {
     return !refusedCurrencies.get(this.accountKey)?.has(currency.toUpperCase());
   }
@@ -146,6 +159,10 @@ export class StripeProvider implements CheckoutProvider {
         refused.add(input.currency.toUpperCase());
         refusedCurrencies.set(this.accountKey, refused);
         throw new ProviderError(this.name, `the Stripe account cannot take ${input.currency.toUpperCase()}`, true, 400, 'currency_unsupported');
+      }
+      // "The Checkout Session's total amount due must add up to at least $0.50 usd": the payer's amount, not the account.
+      if (error instanceof ProviderError && error.status === 400 && /must add up to at least|amount must be at least/i.test(error.message)) {
+        throw new ProviderError(this.name, error.message.replace(/^stripe: /, ''), true, 400, 'amount_too_small');
       }
       // Managed Payments applied although every session opts out (or the account does not know the opt-out) and this
       // payment has no eligible tax code: a clear refusal, explained.

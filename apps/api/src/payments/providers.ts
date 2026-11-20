@@ -57,6 +57,8 @@ export interface CheckoutProvider {
    * payment is charged in this one instead, converted at the rate that never leaves BitoCard short.
    */
   readonly fallbackCurrency?: string;
+  /** The least the gateway charges in a currency (minor units), or null when it does not say. */
+  minimumCharge?(currency: string): bigint | null;
   /** False once the gateway has refused this currency. */
   takesCurrency?(currency: string): boolean;
   /**

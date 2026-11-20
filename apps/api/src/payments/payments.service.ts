@@ -261,6 +261,9 @@ export class PaymentsService {
   }) {
     const provider: CheckoutProvider =
       input.mode === 'test' || input.gateway === 'sandbox' ? this.providers.sandbox : (input.own?.provider ?? (await this.providers.checkout(input.mode, input.gateway, input.country, input.currency)));
+    // Below the gateway's least charge (Stripe: $0.50) no page can open: say so before anything is recorded.
+    const least = await this.leastCharge(provider, input.currency);
+    if (least !== null && input.amount < least) throw tooSmall(least, input.currency);
     const payment = await this.prisma.payment.create({
       data: {
         id: input.id,
@@ -311,6 +314,11 @@ export class PaymentsService {
       });
     } catch (error) {
       this.logger.warn({ err: error, paymentId: payment.id, provider: provider.name }, 'Could not start a payment');
+      // The gateway's own minimum, in a currency missing from its table: the payer's amount, never an admin's problem.
+      if (error instanceof ProviderError && error.code === 'amount_too_small') {
+        await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed', failureReason: 'The amount is below the least this payment method takes.', completedAt: new Date() } });
+        throw tooSmall(null, input.currency);
+      }
       await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed', failureReason: 'The payment could not be started.', completedAt: new Date() } });
       // A clear refusal (bad credentials, a disabled product) needs an admin: say why, once a day per gateway and mode.
       if (error instanceof ProviderError && error.definite && !input.own) {
@@ -324,6 +332,23 @@ export class PaymentsService {
       }
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The payment could not be started. Try again shortly, or choose another payment method.');
     }
+  }
+
+  /**
+   * The least the payer can pay through this gateway, in their own currency (minor units): the gateway's minimum in that
+   * currency, or, where it charges its fallback instead, that minimum converted back at the rate a charge is made at.
+   * Null when the gateway does not say or the rate is unavailable (the gateway then decides).
+   */
+  private async leastCharge(provider: CheckoutProvider, currency: string): Promise<bigint | null> {
+    if (!provider.minimumCharge) return null;
+    const code = currency.toUpperCase();
+    const fallback = provider.fallbackCurrency && provider.fallbackCurrency !== code ? provider.fallbackCurrency : null;
+    if (!fallback || provider.takesCurrency?.(code) !== false) return provider.minimumCharge(code);
+    const least = provider.minimumCharge(fallback);
+    if (least === null || fallback !== 'USD') return null;
+    const rate = await this.fx.rate(code).catch(() => null);
+    if (!rate) return null;
+    return BigInt(new Decimal(least.toString()).mul(rate.receive).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0));
   }
 
   /**
@@ -1095,4 +1120,17 @@ export class PaymentsService {
     if (!monnify) return { handled: false };
     return { handled: true, ...(await this.recordDeposit('monnify', await monnify.verifyTransaction(transactionReference))) };
   }
+}
+
+/** A payment under the gateway's least charge: the payer's to fix, with the least amount when it is known. */
+function tooSmall(least: bigint | null, currency: string) {
+  return new ApiError(
+    HttpStatus.BAD_REQUEST,
+    'invalid_request_error',
+    'amount_too_small',
+    least === null
+      ? 'This amount is below the least this payment method takes. Pay a little more, or choose another payment method.'
+      : `This payment method takes at least ${formatMoney(least, currency.toUpperCase())}. Pay at least that, or choose another payment method.`,
+    'amount',
+  );
 }

@@ -685,7 +685,7 @@ export async function fakeStripe() {
   // idempotency keys to the refund they made, so a repeat returns it, as Stripe does.
   // `disputes` maps a dispute ID to { amount, currency, status, payment_intent, reason }.
   // `refuseCurrencies`: currencies the account cannot take (lower case), refused as Stripe does; `attempts` every session asked for.
-  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), attempts: [], managedPayments: false, ignoresOptOut: false, unknownManagedPayments: false };
+  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), minimums: {}, attempts: [], managedPayments: false, ignoresOptOut: false, unknownManagedPayments: false };
   const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
@@ -697,6 +697,11 @@ export async function fakeStripe() {
       if (state.refuseCurrencies.has(fields['line_items[0][price_data][currency]'])) {
         const currency = fields['line_items[0][price_data][currency]'];
         return { status: 400, body: { error: { type: 'invalid_request_error', message: `Invalid currency: ${currency}. You can change your account to process transactions in ${currency} by adding a bank account for this currency at https://dashboard.stripe.com/account. Your account currently supports these currencies: usd, ngn.` } } };
+      }
+      // Stripe's least charge (state.minimums: unit amount per lower-case currency; US dollars always 50 cents).
+      const least = state.minimums[fields['line_items[0][price_data][currency]']] ?? (fields['line_items[0][price_data][currency]'] === 'usd' ? 50 : 0);
+      if (Number(fields['line_items[0][price_data][unit_amount]']) < least) {
+        return { status: 400, body: { error: { type: 'invalid_request_error', message: "The Checkout Session's total amount due must add up to at least $0.50 usd" } } };
       }
       // Stripe Managed Payments on: every line item needs a product tax code.
       // An older API version that does not know the parameter refuses it, as Stripe refuses any unknown parameter.
