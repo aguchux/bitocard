@@ -107,7 +107,7 @@ export const configSchema = z.object({
   APNS_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
   APNS_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/, 'Ten capital letters and digits').optional(),
   APNS_PRIVATE_KEY: z.string().optional(),
-  APNS_TOPIC: z.string().regex(/^[A-Za-z0-9.-]+$/, 'A bundle ID, for example com.bitocard.app').optional(),
+  APNS_TOPIC: z.string().regex(/^[A-Za-z0-9.-]+$/, 'A bundle ID, for example com.golojan.bitocard.ios').optional(),
   APNS_SANDBOX: flag.default(false),
   APNS_API_URL: z.string().url().optional(),
   // The versions BitoCard's app must have (below the lowest it stops) or may update to, and its store pages.

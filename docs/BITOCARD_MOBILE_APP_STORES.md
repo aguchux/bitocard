@@ -1,7 +1,7 @@
 # BitoCard app: store listings and release checklist
 
 For whoever sets up the app in Google Play Console and App Store Connect. The app is `mobile/bitocard`
-(`com.bitocard.app` on both stores). Nothing here starts a build: EAS builds wait for the owner's go.
+(`com.golojan.bitocard.android` on Google Play, `com.golojan.bitocard.ios` on the App Store). Nothing here starts a build: EAS builds wait for the owner's go.
 
 ## Listing
 
@@ -70,12 +70,12 @@ Functionality, Fraud Prevention. No tracking. No data used for advertising.
 ## Before the first store build
 
 1. **Opening bitocard.com links in the app:** set on the storefront's Vercel project
-   `BITOCARD_IOS_APP_IDS` (`<Team ID>.com.bitocard.app`), `BITOCARD_ANDROID_PACKAGE` (`com.bitocard.app`) and
+   `BITOCARD_IOS_APP_IDS` (`<Team ID>.com.golojan.bitocard.ios`), `BITOCARD_ANDROID_PACKAGE` (`com.golojan.bitocard.android`) and
    `BITOCARD_ANDROID_CERT_SHA256` (Play App Signing's certificate fingerprint, from Play Console > App integrity).
    Then check `https://bitocard.com/.well-known/apple-app-site-association` and `…/assetlinks.json` answer JSON.
 2. **Push:** add Firebase's `google-services.json` to the app (`android.googleServicesFile` in `app.json`), and in
    admin Settings > Integrations > Phone push: the Firebase service account, and the APNs key ID, team ID, `.p8` key
-   and topic `com.bitocard.app` (Development builds off for TestFlight and the App Store).
+   and topic `com.golojan.bitocard.ios` (Development builds off for TestFlight and the App Store).
 3. **The update gate:** admin Settings > Integrations > Mobile app: the store links and the lowest and latest versions.
 4. **Try it on phones** in a development build against the live API: sign in, buy airtime in the sandbox, a
    notification arriving and opening its order, a bitocard.com order link opening the app.

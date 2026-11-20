@@ -8,7 +8,7 @@
     "scheme": "bitocard",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.bitocard.app",
+      "bundleIdentifier": "com.golojan.bitocard.ios",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
@@ -19,7 +19,7 @@
       ]
     },
     "android": {
-      "package": "com.bitocard.app",
+      "package": "com.golojan.bitocard.android",
       "adaptiveIcon": {
         "backgroundColor": "#002b85",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

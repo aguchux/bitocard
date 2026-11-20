@@ -279,7 +279,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('APNS_KEY_ID', 'APNs key ID', { help: 'Certificates, Identifiers and Profiles > Keys: a key with Apple Push Notifications service enabled.' }),
       field('APNS_TEAM_ID', 'Team ID', { help: 'Apple Developer > Membership details.' }),
       secret('APNS_PRIVATE_KEY', 'APNs private key (.p8)', { required: false, help: 'The whole file, from -----BEGIN PRIVATE KEY----- to the end.' }),
-      field('APNS_TOPIC', 'Bundle ID', { help: 'The app’s bundle ID: com.bitocard.app.' }),
+      field('APNS_TOPIC', 'Bundle ID', { help: 'The app’s bundle ID: com.golojan.bitocard.ios.' }),
       field('APNS_SANDBOX', 'Development builds', { kind: 'flag', help: 'On: APNs’ development service (builds made for development). Off: production (TestFlight and the App Store).' }),
       field('APNS_API_URL', 'APNs address', { kind: 'url', help: 'Leave empty: chosen by Development builds.' }),
     ],
@@ -295,7 +295,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('APP_IOS_STORE_URL', 'App Store page', { kind: 'url', required: false, help: 'App Store Connect > your app > App Information: the App Store link.' }),
       field('APP_ANDROID_MIN_VERSION', 'Android: lowest version allowed', { required: false, help: 'Three numbers, for example 1.0.0.' }),
       field('APP_ANDROID_LATEST_VERSION', 'Android: newest version', { required: false, help: 'The version live on Google Play.' }),
-      field('APP_ANDROID_STORE_URL', 'Google Play page', { kind: 'url', required: false, help: 'https://play.google.com/store/apps/details?id=com.bitocard.app' }),
+      field('APP_ANDROID_STORE_URL', 'Google Play page', { kind: 'url', required: false, help: 'https://play.google.com/store/apps/details?id=com.golojan.bitocard.android' }),
     ],
   },
   {

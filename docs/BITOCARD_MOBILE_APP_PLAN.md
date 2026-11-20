@@ -9,7 +9,7 @@ data, and buy and sell gift cards. The approved screens are the design canvas "B
 - **Expo (React Native) at `mobile/bitocard`**, outside the npm workspaces, like `mobile/udozo`: its own
   `package.json`, lockfile and tests (`npm test`, `npm run typecheck`, `npx expo lint`); packages added with
   `npx expo install`; `ios/` and `android/` never edited by hand (generated).
-- **App IDs:** `com.bitocard.app` on both platforms; URL scheme `bitocard`.
+- **App IDs:** `com.golojan.bitocard.android` on Android (the Play listing's), `com.golojan.bitocard.ios` on iOS; URL scheme `bitocard`.
 - **Customers only, bitocard.com's own store.** No reseller store, no Seller HQ. The app sends no `BitoCard-Store`
   header, which the API reads as bitocard.com. The account is the same one as on bitocard.com: the same email,
   password, wallet and orders.

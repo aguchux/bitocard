@@ -4,8 +4,8 @@
  * Only pages the app has its own screen for open there; everything else stays in the browser. Keep `appLinkPaths` in
  * step with `mobile/bitocard/src/lib/links.ts` and the app's intent filters in `mobile/bitocard/app.json`.
  *
- * Set in the environment once the store accounts exist: `BITOCARD_IOS_APP_IDS` (TEAMID.com.bitocard.app, separated by
- * commas), `BITOCARD_ANDROID_PACKAGE` (com.bitocard.app) and `BITOCARD_ANDROID_CERT_SHA256` (the signing certificates'
+ * Set in the environment once the store accounts exist: `BITOCARD_IOS_APP_IDS` (TEAMID.com.golojan.bitocard.ios, separated by
+ * commas), `BITOCARD_ANDROID_PACKAGE` (com.golojan.bitocard.android) and `BITOCARD_ANDROID_CERT_SHA256` (the signing certificates'
  * SHA-256 fingerprints, separated by commas). Until set, both answer 404.
  */
 export const appLinkPaths = [

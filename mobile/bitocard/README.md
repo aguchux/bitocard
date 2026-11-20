@@ -14,7 +14,7 @@ npx expo lint
 npx expo install <pkg>  # always, for SDK-compatible versions
 ```
 
-- `com.bitocard.app` on both platforms, scheme `bitocard`.
+- `com.golojan.bitocard.android` on Android, `com.golojan.bitocard.ios` on iOS, scheme `bitocard`.
 - It talks to `https://api.bitocard.com` (app.json's `extra.apiUrl`) as bitocard.com's own store: the same account,
   wallet and orders as the website. The session is kept in the phone's secure store.
 - No EAS build until the owner says go.
