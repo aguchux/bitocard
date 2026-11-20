@@ -5,3 +5,5 @@ dist/
 web-build/
 test/
 *.log
+# The Play service account is only for eas submit, never in a build
+google-service-account.json
