@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Button, Card, inter, Notice, Page, Segmented, T, useTheme } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
-import type { Page as List, Wallet, WalletTransaction } from '@/lib/types';
+import type { Page as List, Wallet, WalletCurrencyOption, WalletTransaction } from '@/lib/types';
 
 /**
  * The wallet: a tab per wallet (the country's currency, US dollars, any added), its balance, Add funds, Move money
@@ -17,6 +17,8 @@ export default function WalletTab() {
   const theme = useTheme();
   const [currency, setCurrency] = useState<string | null>(null);
   const wallet = useQuery({ queryKey: ['wallet', currency ?? 'primary'], queryFn: () => api<Wallet>(`/v1/store/wallet${currency ? `?currency=${currency}` : ''}`) });
+  // Currencies of other markets BitoCard opened for wallets (none until an admin opens one).
+  const addable = useQuery({ queryKey: ['wallet', 'currencies'], queryFn: () => api<{ data: WalletCurrencyOption[] }>('/v1/store/wallet/currencies') });
   const moved = useInfiniteQuery({
     queryKey: ['wallet', 'transactions'],
     initialPageParam: null as string | null,
@@ -59,6 +61,9 @@ export default function WalletTab() {
             {data.wallets.length > 1 ? <Action label="Move money" onPress={() => router.push({ pathname: '/move-money', params: { from: data.currency } })} /> : null}
             <Action label="Bank deposit" onPress={() => router.push({ pathname: '/bank-deposit', params: { currency: data.currency } })} />
           </View>
+          {data.enabled && (addable.data?.data.length || data.wallets.some(item => item.removable)) ? (
+            <Button kind="secondary" label={addable.data?.data.length ? 'Add or remove wallets' : 'Remove a wallet'} onPress={() => router.push('/wallets')} />
+          ) : null}
           {account ? (
             <Card>
               <T kind="small" muted>

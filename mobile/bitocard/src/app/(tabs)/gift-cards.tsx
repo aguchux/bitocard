@@ -56,7 +56,16 @@ export default function GiftCardsTab() {
 
       {mode === 'sell' && sales.data?.data.length ? (
         <View style={{ gap: 8 }}>
-          <T kind="heading">Your sales</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <T kind="heading" style={{ flex: 1 }}>
+              Your sales
+            </T>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/sold')} hitSlop={8}>
+              <T kind="label" color={theme.pinkText}>
+                See all
+              </T>
+            </Pressable>
+          </View>
           {sales.data.data.slice(0, 5).map(sale => {
             const status = saleStatusOf(sale.status);
             return (

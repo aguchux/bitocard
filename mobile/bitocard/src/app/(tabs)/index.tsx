@@ -1,22 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, type Href } from 'expo-router';
-import { ArrowUpRight, Bell, Gift, RefreshCw, Search, Smartphone, Sparkles, Wallet as WalletIcon, Wifi } from 'lucide-react-native';
+import { ArrowUpRight, Bell, Gift, KeyRound, RefreshCw, Search, ShieldCheck, Smartphone, Sparkles, Wallet as WalletIcon, Wifi, Zap } from 'lucide-react-native';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Card, inter, Notice, Page, T, useTheme } from '@/components/ui';
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
-import type { AccountSummary, SpinRewards, Wallet } from '@/lib/types';
+import type { AccountSummary, SpinRewards, StoreNavigation, Wallet } from '@/lib/types';
 
 /** What the "I want to" tiles open. */
-const actions: { label: string; href: Href; Icon: typeof Gift; tint: 'pink' | 'blue' | 'amber' | 'violet' | 'green' | 'sky' }[] = [
+const actions: { label: string; href: Href; Icon: typeof Gift; tint: 'pink' | 'blue' | 'amber' | 'violet' | 'green' | 'sky'; categories?: string[] }[] = [
   { label: 'Buy airtime', href: { pathname: '/mobile', params: { kind: 'airtime' } }, Icon: Smartphone, tint: 'pink' },
   { label: 'Buy data', href: { pathname: '/mobile', params: { kind: 'data' } }, Icon: Wifi, tint: 'blue' },
   { label: 'Sell airtime', href: '/airtime/sell', Icon: ArrowUpRight, tint: 'amber' },
   { label: 'Buy gift cards', href: { pathname: '/gift-cards', params: { mode: 'buy' } }, Icon: Gift, tint: 'violet' },
   { label: 'Sell gift cards', href: { pathname: '/gift-cards', params: { mode: 'sell' } }, Icon: WalletIcon, tint: 'green' },
   { label: 'Buy unused airtime', href: '/airtime/buy', Icon: RefreshCw, tint: 'sky' },
+  { label: 'Pay bills and TV', href: { pathname: '/browse', params: { category: 'bills' } }, Icon: Zap, tint: 'amber', categories: ['bills', 'pay_tv'] },
+  { label: 'Software', href: { pathname: '/browse', params: { category: 'software' } }, Icon: KeyRound, tint: 'violet', categories: ['software'] },
+  { label: 'VPN', href: { pathname: '/browse', params: { category: 'vpn' } }, Icon: ShieldCheck, tint: 'blue', categories: ['vpn'] },
 ];
 
 const tints = { pink: ['#ffe4ef', '#d10f5f'], blue: ['#e5ecff', '#1d4ed8'], amber: ['#fff1dc', '#b45309'], violet: ['#ede7ff', '#6d28d9'], green: ['#dcf5e8', '#047857'], sky: ['#e0f2fe', '#0369a1'] } as const;
@@ -37,6 +40,15 @@ export default function Home() {
   const summary = useQuery({ queryKey: ['account-summary'], queryFn: () => api<AccountSummary>('/v1/store/account/summary') });
   const unread = useQuery({ queryKey: ['notices-unread'], queryFn: () => api<{ unread_count: number }>('/v1/store/account/notifications/unread-count'), refetchInterval: 60_000 });
   const spins = useQuery({ queryKey: ['spins'], queryFn: () => api<SpinRewards>('/v1/store/spins') });
+  // What is on sale in the customer's market: the bills, software and VPN tiles show only where something is.
+  const navigation = useQuery({
+    queryKey: ['navigation', customer?.country],
+    enabled: Boolean(customer?.country),
+    queryFn: () => api<StoreNavigation>(`/v1/store/navigation?market=${customer!.country}`),
+    staleTime: 10 * 60_000,
+  });
+  const onSale = new Set(navigation.data?.groups.flatMap(group => group.categories.filter(item => item.on_sale).map(item => item.category)) ?? []);
+  const shownActions = actions.filter(action => !action.categories || action.categories.some(category => onSale.has(category)));
   const usd = wallet.data?.wallets.find(item => item.currency === 'USD' && !item.primary);
   const firstName = customer?.name.split(/\s+/)[0] ?? '';
 
@@ -101,7 +113,7 @@ export default function Home() {
           I want to
         </T>
         <View style={styles.grid}>
-          {actions.map(({ label, href, Icon, tint }) => (
+          {shownActions.map(({ label, href, Icon, tint }) => (
             <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={() => router.push(href)} style={[styles.tile, { backgroundColor: theme.card, borderColor: theme.line }]}>
               <View style={[styles.tileIcon, { backgroundColor: tints[tint][0] }]}>
                 <Icon color={tints[tint][1]} size={22} />

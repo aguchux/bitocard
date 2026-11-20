@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -8,14 +7,13 @@ import { BrandTile } from '@/components/brand-tile';
 import { Card, Field, Notice, Page, T } from '@/components/ui';
 import { useAccount } from '@/lib/account';
 import { api, ApiError } from '@/lib/api';
-import { siteUrl } from '@/lib/config';
 import { productRoute } from '@/lib/links';
 import { formatMoney } from '@/lib/money';
 import type { StoreSearch } from '@/lib/types';
 
 /**
  * Search everything on sale in the customer's market (`GET /v1/store/search`), as they type. Gift cards and top-ups
- * open their screen; what the app does not sell yet (bills, pay-TV, software) opens on bitocard.com.
+ * open their screens; anything else (bills, pay-TV, software, VPN) the product screen.
  */
 export default function SearchScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
@@ -48,14 +46,13 @@ export default function SearchScreen() {
             key={product.id}
             accessibilityRole="button"
             accessibilityLabel={product.name}
-            onPress={() => (to ? router.push(to as Href) : void WebBrowser.openBrowserAsync(`${siteUrl}/p/${encodeURIComponent(product.key)}`))}>
+            onPress={() => router.push(to as Href)}>
             <Card style={styles.row}>
               <BrandTile brand={product.brand} logo={product.logo_url} size={44} />
               <View style={{ flex: 1 }}>
                 <T kind="label">{product.name}</T>
                 <T kind="small" muted>
                   From {formatMoney(product.from, product.face_currency, { cents: false })}
-                  {to ? '' : ' · on bitocard.com'}
                 </T>
               </View>
             </Card>

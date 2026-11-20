@@ -1,7 +1,7 @@
 // Phase 4: a notice opens its screen and is marked read, and push is turned on only when asked; push choices save
 // (security notices stay locked); the chat starts with the first message and can ask for a person; a question about
 // an order names it; the wheel stops on what the server decided and rewards move to a wallet at the amount shown;
-// search opens gift cards in the app and the rest on bitocard.com.
+// search opens gift cards, pay-TV and everything else in the app.
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -112,7 +112,7 @@ test('the wheel stops on what the server decided; rewards move to a wallet at th
   expect(await screen.findByText('₦80.00 is in your wallet.')).toBeTruthy();
 });
 
-test('search opens gift cards in the app and the rest on bitocard.com', async () => {
+test('search opens gift cards, pay-TV and everything else in the app', async () => {
   const brand = { slug: 'amazon', name: 'Amazon', logo_url: null, color: '#111111', initials: 'A' };
   answers({
     'GET /v1/store/search': {
@@ -129,5 +129,5 @@ test('search opens gift cards in the app and the rest on bitocard.com', async ()
   await fireEvent.press(await screen.findByRole('button', { name: 'Amazon US' }));
   expect(router.push).toHaveBeenCalledWith({ pathname: '/gift-card/[key]', params: { key: 'gift_cards:US:amazon:usd' } });
   await fireEvent.press(screen.getByRole('button', { name: 'DStv Padi' }));
-  expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://bitocard.com/p/pay_tv%3ANG%3Adstv%3Apadi');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/product/[key]', params: { key: 'pay_tv:NG:dstv:padi' } });
 });

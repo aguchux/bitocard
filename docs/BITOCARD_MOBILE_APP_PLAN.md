@@ -94,7 +94,7 @@ Kept here so nothing left open is forgotten. Strike an item out when it ships.
 
 From phase 0:
 
-- **Forgot password in the app.** Sign in only says to reset it on bitocard.com. Use `POST /v1/store/account/password/forgot` and `…/password/reset` (code and new password).
+- ~~**Forgot password in the app.**~~ Done in phase 6 (`/forgot-password`).
 - ~~**App icons and splash.**~~ Done in phase 5 (`scripts/brand-assets.py`, `MOBILE`).
 - **`BitoCard-App` header.** The app sends it, but BitoCard's API ignores it. Read it if the API should tell app calls apart (sign-up journeys, counts).
 - **Tried on a phone.** Nothing has run on a real device or against the live API yet. Run it in a development build before a store build.
@@ -103,9 +103,9 @@ From phase 1:
 
 - **Data plans with several fixed values.** A data product with more than one fixed face value is offered at its `from` value only. Show its `denominations` (from `GET /v1/store/products/:key`) as separate plans.
 - **Ghana account numbers.** `POST /v1/store/wallet/reserved-accounts` takes `phone` for Ghana; the app sends only the BVN (Nigeria). Ask for the phone where the market is GH.
-- **Adding and removing wallets** (another currency where `customer_foreign_wallets` is open): `GET /v1/store/wallet/currencies`, `POST /v1/store/wallet/wallets`, `DELETE …/wallets/:currency`. The app only shows the wallets already held.
+- ~~**Adding and removing wallets.**~~ Done in phase 6 (`/wallets`).
 - **Transactions per wallet.** `GET /v1/store/wallet/transactions` has no currency filter; the app filters the page it loaded, so a wallet's list can look short. Add `currency` to the API, or keep loading until there are enough rows.
-- **Bank deposit history.** Only open deposits are listed; add the full list (`?show=done` and each status) as bitocard.com's Deposits page has.
+- ~~**Bank deposit history.**~~ Done in phase 6 (`/bank-deposit/all`).
 - **Pull to refresh** on Home and the Wallet tab (Orders has it).
 - **Paying by card for an order.** Orders are paid from the wallet only (`method: 'wallet'`). Where a market has wallets switched off (`wallet_required: false`), offer its checkout methods (`GET /v1/store/payment-methods`) and open the gateway's page as Add funds does.
 - **Cancelling an unpaid checkout or top-up** (`POST …/cancel`) from its page.
@@ -218,3 +218,25 @@ From phase 4:
   - **Stores:** listing copy, screenshots, Google's Data safety and Apple's App Privacy answers, review notes and the checklist before the first build are in `docs/BITOCARD_MOBILE_APP_STORES.md`.
   - **Builds:** not started. They wait for the owner's go, after the checklist in that file.
 - Next: the checklist in `docs/BITOCARD_MOBILE_APP_STORES.md`, then builds on the owner's go.
+- **Phase 6 built (20 November 2026), matching bitocard.com for customers:**
+  - **Every product in the app:** bills, pay-TV, electricity, software and VPN open a product screen (`/product/[key]`,
+    rules in `src/lib/products.ts`): the meter, smartcard or account number; pay-TV's renew or change of package (the
+    API's `recipient.transaction_type`); the value or amount in range; how many and where codes are emailed (software).
+    Lists by category (`/browse`, Bills holding electricity and pay-TV), from Home's Pay bills and TV, Software and VPN
+    tiles (shown only where `GET /v1/store/navigation` says something is on sale) and from search, which no longer
+    sends anything to bitocard.com.
+  - **Confirm payment shows whose meter or smartcard it is** before paying: the API's checkout preview now returns the
+    quote's `recipient` (account name, address, current package, as the provider's check gave them).
+  - **VPN orders:** the username and password masked until Reveal, and VPN access (status, when it ends, never renewed,
+    Reset password after Face ID; `src/components/vpn.tsx`). Codes show licence terms, serials and token units.
+  - **Reported problems** (`/disputes`, `/disputes/new` from an order's Report a problem, `/disputes/[id]`;
+    `src/lib/disputes.ts`).
+  - **Account** is a menu of its places as on bitocard.com; **Profile** (name, email, the country chosen once by an
+    older account), **Security** (change password), **Forgot password** on sign-in (the emailed code, then a new
+    password, which signs in).
+  - **Your wallets** (`/wallets`: add one in an opened market's currency, remove an empty added one), **Gift cards you
+    sold** (`/sold`) and **every bank deposit** with filters (`/bank-deposit/all`, `src/lib/deposits.ts`).
+  - bitocard.com's links to these open the app (`appLinkPaths` in `apps/storefront/lib/app-links.ts`, the intent
+    filters in `app.json`, `src/lib/links.ts`).
+  - Tests: `test/products.test.ts`, `test/links.test.ts`, `test/screens/more.test.tsx`; the API's in
+    `apps/api/test/customer-wallets.test.mjs`.

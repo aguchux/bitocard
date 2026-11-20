@@ -91,6 +91,51 @@
               "scheme": "https",
               "host": "bitocard.com",
               "pathPrefix": "/p/gift_cards"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/sold"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/disputes"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/disputes/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "path": "/account/profile"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/account/profile/"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/p/bills"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/p/pay_tv"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/p/software"
+            },
+            {
+              "scheme": "https",
+              "host": "bitocard.com",
+              "pathPrefix": "/p/vpn"
             }
           ],
           "category": [

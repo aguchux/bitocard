@@ -15,9 +15,13 @@ export function Codes({ deliveries, instructions }: { deliveries: Delivery[]; in
   const [shown, setShown] = useState(false);
   const secret = deliveries.filter(item => item.code || item.pin);
   if (!secret.length) return null;
+  const vpn = secret.some(item => item.kind === 'vpn_account');
   return (
     <Card>
-      <T kind="heading">{secret.length > 1 ? `Your ${secret.length} codes` : 'Your code'}</T>
+      <T kind="heading">{vpn ? 'Your VPN sign-in' : secret.length > 1 ? `Your ${secret.length} codes` : 'Your code'}</T>
+      <T kind="small" muted>
+        {vpn ? 'Your username and password for the VPN app. Keep them private: anyone with them can use your access.' : 'Keep these safe: anyone with a code can use it.'}
+      </T>
       {shown ? (
         <Revealed deliveries={secret} />
       ) : (
@@ -30,7 +34,7 @@ export function Codes({ deliveries, instructions }: { deliveries: Delivery[]; in
           <Button
             label="Reveal"
             onPress={async () => {
-              if (await confirmOnPhone('Show your codes')) setShown(true);
+              if (await confirmOnPhone(vpn ? 'Show your VPN sign-in' : 'Show your codes')) setShown(true);
             }}
           />
         </>
@@ -50,34 +54,51 @@ function Revealed({ deliveries }: { deliveries: Delivery[] }) {
   usePreventScreenCapture();
   return (
     <View style={{ gap: 12 }}>
-      {deliveries.map((item, index) => (
-        <View key={index} style={[styles.code, { borderColor: theme.field }]}>
-          {item.code ? (
-            <>
+      {deliveries.map((item, index) => {
+        const vpn = item.kind === 'vpn_account';
+        return (
+          <View key={index} style={[styles.code, { borderColor: theme.field }]}>
+            {vpn && item.serial ? <Secret label="Username" value={item.serial} /> : null}
+            {item.code ? <Secret label={vpn ? 'Password' : item.kind === 'licence_key' ? 'Licence key' : item.kind === 'token' ? 'Token' : 'Code'} value={item.code} /> : null}
+            {item.pin ? <Secret label="PIN" value={item.pin} /> : null}
+            {!vpn && item.serial ? (
               <T kind="small" muted>
-                Code
+                Serial: {item.serial}
               </T>
-              <T selectable style={styles.value}>
-                {item.code}
+            ) : null}
+            {detailsOf(item).map(([label, value]) => (
+              <T key={label} kind="small" muted>
+                {label}: {value}
               </T>
-              <Button kind="secondary" label="Copy code" onPress={() => void Clipboard.setStringAsync(item.code!)} />
-            </>
-          ) : null}
-          {item.pin ? (
-            <>
-              <T kind="small" muted>
-                PIN
-              </T>
-              <T selectable style={styles.value}>
-                {item.pin}
-              </T>
-              <Button kind="secondary" label="Copy PIN" onPress={() => void Clipboard.setStringAsync(item.pin!)} />
-            </>
-          ) : null}
-        </View>
-      ))}
+            ))}
+          </View>
+        );
+      })}
     </View>
   );
+}
+
+function Secret({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <T kind="small" muted>
+        {label}
+      </T>
+      <T selectable style={styles.value}>
+        {value}
+      </T>
+      <Button kind="secondary" label={`Copy ${label.toLowerCase()}`} onPress={() => void Clipboard.setStringAsync(value)} />
+    </>
+  );
+}
+
+/** The details shown beside a code, as bitocard.com shows them: a licence's term, when it expires, where to redeem, a token's units. */
+const detailLabels: Record<string, string> = { duration: 'Licence term', expires_at: 'Expires', redemption_url: 'Redeem at', units: 'Units' };
+
+export function detailsOf(item: Delivery): [string, string][] {
+  return Object.entries(item.details ?? {})
+    .filter(([key, value]) => detailLabels[key] && (typeof value === 'string' || typeof value === 'number'))
+    .map(([key, value]) => [detailLabels[key]!, String(value)]);
 }
 
 /** All but the last 4 characters as dots. */

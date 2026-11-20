@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { confirmOnPhone, useMoneyKey } from '@/lib/biometrics';
 import { siteUrl } from '@/lib/config';
 import { formatMoney } from '@/lib/money';
+import { recipientLines, recipientOf } from '@/lib/products';
 import type { Checkout, CheckoutPreview } from '@/lib/types';
 
 /**
@@ -17,19 +18,19 @@ import type { Checkout, CheckoutPreview } from '@/lib/types';
  */
 export default function Pay() {
   const queries = useQueryClient();
-  const params = useLocalSearchParams<{ product: string; face: string; phone?: string; email?: string; name?: string; quantity?: string }>();
+  const params = useLocalSearchParams<{ product: string; face: string; phone?: string; account?: string; transaction?: string; email?: string; name?: string; quantity?: string }>();
   const [walletCurrency, setWalletCurrency] = useState<string | null>(null);
   const key = useMoneyKey();
   const order = {
     product_id: params.product,
     face_value: Number(params.face),
     quantity: params.quantity ? Number(params.quantity) : undefined,
-    recipient: params.phone ? { phone: params.phone } : params.email ? { email: params.email } : undefined,
+    recipient: recipientOf(params),
     method: 'wallet',
     return_url: `${siteUrl}/checkout/return`,
   };
   const preview = useQuery({
-    queryKey: ['checkout-preview', params.product, params.face, params.phone, params.email, params.quantity],
+    queryKey: ['checkout-preview', params.product, params.face, params.phone, params.account, params.transaction, params.email, params.quantity],
     queryFn: () => api<CheckoutPreview>('/v1/store/checkouts', { body: { ...order, preview: true } }),
     staleTime: 0,
     gcTime: 0,
@@ -79,7 +80,11 @@ export default function Pay() {
           </T>
           <Card>
             <Line label="For" value={params.name ?? 'Your order'} />
-            {params.phone ? <Line label="To" value={params.phone} /> : null}
+            {params.account ? <Line label="To" value={params.account} /> : params.phone ? <Line label="To" value={params.phone} /> : null}
+            {recipientLines(quote.recipient).map(([label, value]) => (
+              <Line key={label} label={label} value={value} strong={label === 'Name on the account'} />
+            ))}
+            {params.transaction ? <Line label="Package" value={params.transaction === 'renew' ? 'Renew your current package' : 'Change to this package'} /> : null}
             {params.email ? <Line label="Codes sent to" value={params.email} /> : null}
             {quote.tax ? <Line label={`Includes ${quote.tax.name}`} value={formatMoney(quote.tax.amount, quote.currency)} /> : null}
             <Line label="From" value={`${chosen.currency} wallet · ${formatMoney(chosen.balance, chosen.currency)}`} />

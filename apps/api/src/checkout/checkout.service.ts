@@ -299,6 +299,8 @@ export class CheckoutService implements OnModuleInit {
         currency: quote.currency,
         tax: quote.taxName ? { name: quote.taxName, amount: minor(quote.taxMinor) } : null,
         expires_at: quote.expiresAt.toISOString(),
+        /** Who it goes to, as the quote checked it: a meter or smartcard's account name and details, for the customer to confirm before paying. */
+        recipient: (quote.recipient ?? null) as Record<string, string> | null,
         wallet_balance: options.find(option => option.currency === quote.currency)?.balance ?? 0,
         /** What each of the customer's wallets would pay: the price itself, or converted at BitoCard's rate. */
         wallet_options: options,

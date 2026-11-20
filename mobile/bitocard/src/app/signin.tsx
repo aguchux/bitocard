@@ -38,9 +38,7 @@ export default function SignIn() {
       {error ? <Notice tone="bad">{error}</Notice> : null}
       <Button label="Sign in" onPress={submit} busy={busy} />
       <Button kind="secondary" label="Create an account" onPress={() => router.replace('/signup')} />
-      <T kind="small" muted>
-        Forgot your password? Reset it on bitocard.com, then sign in here.
-      </T>
+      <Button kind="secondary" label="Forgot your password?" onPress={() => router.push('/forgot-password')} />
     </Page>
   );
 }

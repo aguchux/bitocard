@@ -36,6 +36,7 @@ export default function BankDepositStart() {
       <T kind="title" accessibilityRole="header">
         Bank deposit
       </T>
+      <Button kind="secondary" label="All your deposits" onPress={() => router.push('/bank-deposit/all')} />
       {open.data?.data.length ? (
         <View style={{ gap: 8 }}>
           <T kind="label">Your open deposits</T>

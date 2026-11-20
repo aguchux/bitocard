@@ -4,6 +4,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { StyleSheet, View } from 'react-native';
 
 import { Codes } from '@/components/codes';
+import { VpnAccess } from '@/components/vpn';
+import { canDispute } from '@/lib/disputes';
 import { Button, Card, Line, Notice, Page, T, useTheme } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
@@ -73,6 +75,7 @@ export default function OrderScreen() {
       </Card>
 
       {checkout.status === 'completed' && checkout.order?.deliveries?.length ? <Codes deliveries={checkout.order.deliveries} instructions={checkout.order.redeem_instructions} /> : null}
+      {checkout.order?.deliveries?.some(item => item.kind === 'vpn_account') ? <VpnAccess checkoutId={checkout.id} /> : null}
 
       <Card>
         <Line label="Paid" value={formatMoney(checkout.amount, checkout.currency)} />
@@ -87,6 +90,7 @@ export default function OrderScreen() {
       {checkout.status === 'refunded' ? <Notice tone="good">Your money is back where it came from.</Notice> : null}
       {checkout.checkout_url ? <Button label="Open the payment page" onPress={() => void WebBrowser.openBrowserAsync(checkout.checkout_url!).finally(() => void order.refetch())} /> : null}
       <Button kind="secondary" label="Ask us about this order" onPress={() => router.push({ pathname: '/help/new', params: { checkout: checkout.id } })} />
+      {canDispute(checkout.status) ? <Button kind="secondary" label="Report a problem" onPress={() => router.push({ pathname: '/disputes/new', params: { checkout: checkout.id } })} /> : null}
       {checkout.mode === 'test' && inProgress(checkout.status) ? (
         <Card>
           <T kind="small" muted>

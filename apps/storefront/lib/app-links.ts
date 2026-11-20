@@ -21,6 +21,15 @@ export const appLinkPaths = [
   "/account/verification",
   "/account/notifications",
   "/p/gift_cards*", // a gift card's page (its key, `gift_cards:US:amazon:usd`, as written or encoded)
+  "/account/sold",
+  "/account/disputes",
+  "/account/disputes/*",
+  "/account/profile",
+  "/account/profile/*",
+  "/p/bills*", // electricity and other bills, pay-TV, software and VPN open the app's product screen
+  "/p/pay_tv*",
+  "/p/software*",
+  "/p/vpn*",
 ] as const;
 
 const list = (value: string | undefined) => (value ?? "").split(",").map(item => item.trim()).filter(Boolean);

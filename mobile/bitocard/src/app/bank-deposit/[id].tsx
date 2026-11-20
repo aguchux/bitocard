@@ -7,16 +7,10 @@ import { View } from 'react-native';
 import { Button, Card, Chip, Field, Line, Notice, Page, T } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
+import { depositStatusWords } from '@/lib/deposits';
 import type { BankDeposit } from '@/lib/types';
 
-const statusWords: Record<BankDeposit['status'], string> = {
-  awaiting_payment: 'Waiting for your payment',
-  sent: 'Being checked by our team',
-  credited: 'Added to your wallet',
-  rejected: 'Not credited',
-  cancelled: 'Cancelled',
-  expired: 'Expired',
-};
+const statusWords = depositStatusWords;
 
 /** One bank deposit: where to pay with its reference, then "I've paid it" (how, and the name on the payment). */
 export default function BankDepositScreen() {

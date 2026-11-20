@@ -96,6 +96,17 @@ function ThemedApp() {
         <Stack.Screen name="help/new" options={{ title: 'Ask a question' }} />
         <Stack.Screen name="help/ticket/[id]" options={{ title: 'Your question' }} />
         <Stack.Screen name="delete-account" options={{ title: 'Delete your account' }} />
+        <Stack.Screen name="forgot-password" options={{ title: 'Reset your password' }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="security" options={{ title: 'Security' }} />
+        <Stack.Screen name="disputes/index" options={{ title: 'Reported problems' }} />
+        <Stack.Screen name="disputes/new" options={{ title: 'Report a problem' }} />
+        <Stack.Screen name="disputes/[id]" options={{ title: 'Reported problem' }} />
+        <Stack.Screen name="browse" options={{ title: 'Pay bills' }} />
+        <Stack.Screen name="product/[key]" options={{ title: 'Buy' }} />
+        <Stack.Screen name="wallets" options={{ title: 'Your wallets' }} />
+        <Stack.Screen name="sold" options={{ title: 'Gift cards you sold' }} />
+        <Stack.Screen name="bank-deposit/all" options={{ title: 'Your deposits' }} />
       </Stack>
     </ThemeProvider>
   );

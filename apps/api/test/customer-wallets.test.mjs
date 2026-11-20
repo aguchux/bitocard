@@ -167,6 +167,7 @@ describe('customer wallets on bitocard.com', () => {
     assert.equal(preview.status, 201, JSON.stringify(preview.json));
     assert.equal(preview.json.object, 'checkout_preview');
     assert.equal(preview.json.wallet_balance, 10_000_000);
+    assert.match(preview.json.recipient?.email ?? '', /@/, 'who it goes to, as the quote checked it');
     assert.equal((await shopper.get('/v1/store/wallet')).json.balance, 10_000_000, 'nothing paid');
     assert.equal(await prisma.checkout.count({ where: { customerId: shopper.id } }), 0);
 

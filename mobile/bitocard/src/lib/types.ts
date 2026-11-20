@@ -129,6 +129,8 @@ export type CheckoutPreview = {
   currency: string;
   tax: { name: string; amount: number } | null;
   expires_at: string;
+  /** Who it goes to, as the quote checked it: a meter or smartcard's account name and details to confirm. */
+  recipient?: Record<string, string> | null;
   wallet_balance: number;
   wallet_options: { currency: string; amount: number; balance: number; enough: boolean }[];
 };
@@ -379,4 +381,41 @@ export type VerificationStatus = {
   provider: 'bitocard' | 'didit';
   verified: boolean;
   latest: { status: string; url: string | null; reason: string | null } | null;
+};
+
+/** An order's VPN access (`GET /v1/store/checkouts/:id/vpn`): never renews; the password is reset on request. */
+export type StoreVpn = {
+  object: 'vpn_subscription';
+  id: string;
+  status: 'provisioning' | 'active' | 'expired' | 'revoked' | 'suspended' | 'failed' | 'needs_review';
+  term_days: number;
+  devices: number;
+  renews_automatically: false;
+  starts_at: string | null;
+  expires_at: string | null;
+  ended_at: string | null;
+  password_changed_at: string | null;
+};
+
+/** A problem the customer reported with an order: looked at first (`open`), then decided by BitoCard (`escalated`). */
+export type Dispute = {
+  object: 'dispute';
+  id: string;
+  reference: string;
+  subject: string;
+  status: 'open' | 'escalated' | 'resolved' | string;
+  checkout_id: string | null;
+  outcome: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  messages?: { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'system'; author_name: string | null; body: string; created_at: string }[];
+};
+
+/** A currency the customer may add a wallet in, or why not. */
+export type WalletCurrencyOption = { object: 'wallet_currency_option'; currency: string; country: string; country_name: string; available: boolean; reason: string | null };
+
+/** `GET /v1/store/navigation`: bitocard.com's menu groups in the customer's market, each category saying whether it is on sale. */
+export type StoreNavigation = {
+  object: 'store_navigation';
+  groups: { key: string; label: string; on_sale: boolean; categories: { category: string; label: string; on_sale: boolean }[] }[];
 };
