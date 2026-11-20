@@ -191,7 +191,8 @@
           "cameraPermission": "BitoCard uses the camera when you photograph a gift card you are selling.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "apiUrl": "https://api.bitocard.com",
