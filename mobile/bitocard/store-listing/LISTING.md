@@ -97,6 +97,7 @@ First release of the BitoCard app.
 | 7-inch tablet screenshots | `out/tablet-7in/01-…08` | 1920 × 1080 |
 | 10-inch tablet screenshots | `out/tablet-10in/01-…08` | 2560 × 1440 |
 | Chromebook screenshots | `out/chromebook/01-…08` | 3840 × 2160 |
+| Foldable screenshots (3 to 8) | `out/foldable/01-…08`: unfolded 1:1 (`01`, `04`, `07`), unfolded 4:3 (`02`, `05`, `08`), outer screen 10:16 (`03`, `06`) | 2160 × 2160, 2160 × 1620, 1200 × 1920 |
 | Video | none: Play takes only a YouTube link | |
 
 The screens are drawn from the app's real screens with made-up data (Ada, ₦128,450.00, example codes); no real

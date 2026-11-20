@@ -1,6 +1,7 @@
 // Google Play listing images for the BitoCard app, drawn as HTML in the app's own colours, Inter and icons, and
 // photographed by Chrome at Play's sizes: phone screenshots (1080 x 1920), 7- and 10-inch tablet screenshots
-// (1920 x 1080, 2560 x 1440), Chromebook screenshots (3840 x 2160), feature graphics (1024 x 500) and the 512 px icon.
+// (1920 x 1080, 2560 x 1440), Chromebook screenshots (3840 x 2160),
+// foldable screenshots (2160 x 2160, 2160 x 1620, 1200 x 1920), feature graphics (1024 x 500) and the 512 px icon.
 //
 // The phone screens follow the app's real screens (src/app) with made-up data: no real person, number, balance or
 // code, and no other company's logo (networks are named in plain text, gift cards are generic designs).
@@ -271,11 +272,14 @@ const shot = (w, h, theme, scene, head, sub) => {
       <div style="position:absolute;left:84px;right:84px;top:118px;text-align:center">${headline(t, head, sub, 74)}</div>
       <div style="position:absolute;left:50%;top:470px;transform:translateX(-50%)">${phone(scene, 640)}</div></div>`, w, h);
   }
-  const pw = Math.round(h * 0.62);
+  // Wide screens keep the phone at 62% of the height; squarer ones (foldables) cap it by the width so it clears the
+  // words, and size the words by the same base.
+  const pw = Math.round(Math.min(h * 0.62, w * 0.36));
+  const base = Math.min(h, w * 0.5625);
   return page(`<div style="width:${w}px;height:${h}px;background:${t.bg};position:relative;overflow:hidden">
     <div style="position:absolute;left:${w * 0.08}px;width:${w * 0.44}px;top:50%;transform:translateY(-50%)">
-      <div class="row" style="gap:${h * 0.016}px;margin-bottom:${h * 0.05}px"><img src="${theme === 'light' ? mark : markLight}" style="width:${h * 0.06}px;height:${h * 0.06}px"><span style="font-size:${h * 0.042}px;font-weight:800;color:${t.ink}">Bito<span style="color:${t.accent}">card</span></span></div>
-      ${headline(t, head, sub, Math.round(h * 0.085))}</div>
+      <div class="row" style="gap:${base * 0.016}px;margin-bottom:${base * 0.05}px"><img src="${theme === 'light' ? mark : markLight}" style="width:${base * 0.06}px;height:${base * 0.06}px"><span style="font-size:${base * 0.042}px;font-weight:800;color:${t.ink}">Bito<span style="color:${t.accent}">card</span></span></div>
+      ${headline(t, head, sub, Math.round(base * 0.085))}</div>
     <div style="position:absolute;right:${w * 0.1}px;top:${h * 0.1}px">${phone(scene, pw)}</div></div>`, w, h);
 };
 
@@ -316,11 +320,13 @@ const features = [
     </div></div>`],
 ];
 
+const foldable = [[2160, 2160], [2160, 1620], [1200, 1920]];
+
 // ---- Render --------------------------------------------------------------------------------------------------
 
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
-for (const dir of ['phone', 'tablet-7in', 'tablet-10in', 'chromebook', 'feature-graphic']) mkdirSync(join(out, dir), { recursive: true });
+for (const dir of ['phone', 'tablet-7in', 'tablet-10in', 'chromebook', 'foldable', 'feature-graphic']) mkdirSync(join(out, dir), { recursive: true });
 
 const shoot = (html, w, h, target) => {
   const source = join(work, `${target.replace(/[\\/]/g, '_')}.html`);
@@ -337,6 +343,9 @@ shots.forEach(([theme, scene, head, sub], n) => {
   shoot(shot(2560, 1440, theme, scene, head, sub), 2560, 1440, `tablet-10in/${name}`);
   // Chromebooks: each side 1,080 to 7,680 px.
   shoot(shot(3840, 2160, theme, scene, head, sub), 3840, 2160, `chromebook/${name}`);
+  // Foldables: each side 960 to 3,840 px; Play wants an unfolded 1:1, an unfolded 4:3 and the outer screen at 10:16.
+  const [fw, fh] = foldable[n % foldable.length];
+  shoot(shot(fw, fh, theme, scene, head, sub), fw, fh, `foldable/${name}`);
 });
 for (const [name, body] of features) shoot(page(body, 1024, 500, featureCss), 1024, 500, `feature-graphic/${name}.png`);
 // Play's icon: 512 x 512, the "b" from the master artwork (assets/logo.png) at two thirds of the height, centred on
