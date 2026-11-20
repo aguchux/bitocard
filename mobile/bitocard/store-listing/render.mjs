@@ -1,7 +1,7 @@
 // Google Play listing images for the BitoCard app, drawn as HTML in the app's own colours, Inter and icons, and
 // photographed by Chrome at Play's sizes: phone screenshots (1080 x 1920), 7- and 10-inch tablet screenshots
 // (1920 x 1080, 2560 x 1440), Chromebook screenshots (3840 x 2160),
-// foldable screenshots (2160 x 2160, 2160 x 1620, 1200 x 1920), feature graphics (1024 x 500) and the 512 px icon.
+// foldable screenshots (2160 x 2160, 2160 x 1620, 1200 x 1920), Android XR screenshots (3840 x 2160), feature graphics (1024 x 500) and the 512 px icon.
 //
 // The phone screens follow the app's real screens (src/app) with made-up data: no real person, number, balance or
 // code, and no other company's logo (networks are named in plain text, gift cards are generic designs).
@@ -283,6 +283,24 @@ const shot = (w, h, theme, scene, head, sub) => {
     <div style="position:absolute;right:${w * 0.1}px;top:${h * 0.1}px">${phone(scene, pw)}</div></div>`, w, h);
 };
 
+// Android XR (16:9): the app as a floating panel in a room, tilted a little towards the viewer, with the panel's own
+// move bar beneath it, as Android XR draws one.
+const xrRoom = `radial-gradient(1400px 900px at 70% 35%, rgba(255,255,255,.18), transparent 60%), radial-gradient(1600px 900px at 15% 110%, rgba(255,35,130,.22), transparent 60%), linear-gradient(180deg,#1b2350 0%,#2b2f5e 55%,#3a3555 100%)`;
+const xrShot = (w, h, scene, head, sub) => {
+  const panelW = Math.round(h * 0.36), scale = panelW / 390, panelH = Math.round(844 * scale);
+  return page(`<div style="width:${w}px;height:${h}px;background:${xrRoom};position:relative;overflow:hidden">
+    <div style="position:absolute;left:0;right:0;bottom:0;height:${h * 0.26}px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.07))"></div>
+    <div style="position:absolute;left:${w * 0.07}px;width:${w * 0.42}px;top:50%;transform:translateY(-50%)">
+      <div class="row" style="gap:${h * 0.014}px;margin-bottom:${h * 0.045}px"><img src="${markLight}" style="width:${h * 0.05}px;height:${h * 0.05}px"><span style="font-size:${h * 0.036}px;font-weight:800;color:#fff">Bito<span style="color:#ff6fab">card</span></span></div>
+      ${headline(themes.navy, head, sub, Math.round(h * 0.07))}</div>
+    <div style="position:absolute;right:${w * 0.12}px;top:${(h - panelH) / 2 - h * 0.03}px;perspective:${h * 2}px">
+      <div style="transform:rotateY(-12deg);transform-origin:left center">
+        <div style="width:${panelW}px;height:${panelH}px;border-radius:${28 * scale}px;overflow:hidden;box-shadow:0 ${h * 0.04}px ${h * 0.09}px rgba(0,0,0,.45), 0 0 0 ${2 * scale}px rgba(255,255,255,.25)">
+          <div style="transform:scale(${scale});transform-origin:0 0;width:390px;height:844px"><div class="screen">${scenes[scene]()}</div></div></div>
+        <div style="margin:${h * 0.018}px auto 0;width:${panelW * 0.18}px;height:${h * 0.008}px;border-radius:99px;background:rgba(255,255,255,.55)"></div>
+      </div></div></div>`, w, h);
+};
+
 const shots = [
   ['light', 'home', 'Airtime, data and gift cards in one app', 'One wallet for everything you top up and buy'],
   ['navy', 'mobile', 'Top up any network in seconds', 'Type the number. We find the network for you.'],
@@ -326,7 +344,7 @@ const foldable = [[2160, 2160], [2160, 1620], [1200, 1920]];
 
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
-for (const dir of ['phone', 'tablet-7in', 'tablet-10in', 'chromebook', 'foldable', 'feature-graphic']) mkdirSync(join(out, dir), { recursive: true });
+for (const dir of ['phone', 'tablet-7in', 'tablet-10in', 'chromebook', 'foldable', 'xr', 'feature-graphic']) mkdirSync(join(out, dir), { recursive: true });
 
 const shoot = (html, w, h, target) => {
   const source = join(work, `${target.replace(/[\\/]/g, '_')}.html`);
@@ -346,6 +364,8 @@ shots.forEach(([theme, scene, head, sub], n) => {
   // Foldables: each side 960 to 3,840 px; Play wants an unfolded 1:1, an unfolded 4:3 and the outer screen at 10:16.
   const [fw, fh] = foldable[n % foldable.length];
   shoot(shot(fw, fh, theme, scene, head, sub), fw, fh, `foldable/${name}`);
+  // Android XR: 16:9, each side 720 to 7,680 px.
+  shoot(xrShot(3840, 2160, scene, head, sub), 3840, 2160, `xr/${name}`);
 });
 for (const [name, body] of features) shoot(page(body, 1024, 500, featureCss), 1024, 500, `feature-graphic/${name}.png`);
 // Play's icon: 512 x 512, the "b" from the master artwork (assets/logo.png) at two thirds of the height, centred on
