@@ -343,10 +343,7 @@ for (const [name, body] of features) shoot(page(body, 1024, 500, featureCss), 10
 execFileSync('python', ['-c', 'import sys; from PIL import Image; Image.open(sys.argv[1]).convert("RGB").resize((512, 512), Image.LANCZOS).save(sys.argv[2])', join(app, 'assets/images/icon.png'), join(out, 'icon-512.png')]);
 console.log('icon-512.png  512x512');
 // Every image without transparency (Chrome sometimes keeps an alpha channel; Play's feature graphic refuses one).
-execFileSync('python', ['-c', 'import glob, sys
-from PIL import Image
-for f in glob.glob(sys.argv[1] + "/**/*.png", recursive=True):
-    im = Image.open(f)
-    if im.mode != "RGB": im.convert("RGB").save(f)', out]);
+const flatten = ['import glob, sys', 'from PIL import Image', 'for f in glob.glob(sys.argv[1] + "/**/*.png", recursive=True):', '    im = Image.open(f)', '    if im.mode != "RGB": im.convert("RGB").save(f)'].join('\n');
+execFileSync('python', ['-c', flatten, out]);
 rmSync(work, { recursive: true, force: true });
 console.log(`Done: ${out}`);
