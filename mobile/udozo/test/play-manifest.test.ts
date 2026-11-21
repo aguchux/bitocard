@@ -44,3 +44,22 @@ test('phone and overlay permissions stay out (the calls plugin blocks them)', ()
   const calls = fs.readFileSync(new URL('../plugins/with-udozo-calls.js', import.meta.url), 'utf8');
   for (const name of ['CALL_PHONE', 'READ_PHONE_NUMBERS', 'READ_PHONE_STATE', 'SYSTEM_ALERT_WINDOW']) assert.match(calls, new RegExp(`'android\.permission\.${name}'`));
 });
+
+test('photos and videos are still chosen and recorded: the system picker, never a media permission', () => {
+  const sources: string[] = [];
+  const walk = (dir: URL) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) walk(next);
+      else if (/\.tsx?$/.test(entry.name)) sources.push(fs.readFileSync(next, 'utf8'));
+    }
+  };
+  walk(new URL('../src/', import.meta.url));
+  const code = sources.join('\n');
+  // The library is Android's photo picker (PickVisualMedia), which needs no permission; asking for media access would
+  // be refused now that READ_MEDIA_* are blocked, so nothing may ask for it or opt into the legacy picker.
+  assert.doesNotMatch(code, /MediaLibraryPermissions|expo-media-library|legacy\s*:\s*true/);
+  for (const kind of ['images', 'videos']) assert.ok(code.includes(`launchImageLibraryAsync({ mediaTypes: ['${kind}']`), kind);
+  // Recording photos and videos asks only for the camera, which stays allowed.
+  assert.match(code, /requestCameraPermissionsAsync[\s\S]*launchCameraAsync\(\{ mediaTypes: \['videos'\]/);
+});
