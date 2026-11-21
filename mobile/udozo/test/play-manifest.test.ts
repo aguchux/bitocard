@@ -16,6 +16,8 @@ test('media and storage permissions are blocked, the microphone and camera kept 
     assert.ok(blocked.includes(`android.permission.${name}`), name);
   }
   assert.ok(!blocked.some(name => /RECORD_AUDIO|CAMERA/.test(name)));
+  // The advertising ID (which Facebook's SDK would add): nothing in the app advertises or tracks.
+  assert.ok(blocked.includes('com.google.android.gms.permission.AD_ID'));
 });
 
 test('the optional-features plugin is applied and marks portrait and Wi-Fi as not required', () => {
@@ -32,7 +34,7 @@ test('the optional-features plugin is applied and marks portrait and Wi-Fi as no
   });
   return Promise.resolve(result).then(({ modResults }) => {
     const features = modResults.manifest['uses-feature'].map(feature => feature.$);
-    for (const name of ['android.hardware.screen.portrait', 'android.hardware.wifi']) {
+    for (const name of ['android.hardware.screen.portrait', 'android.hardware.wifi', 'android.hardware.camera', 'android.hardware.camera.autofocus']) {
       const feature = features.filter(f => f['android:name'] === name);
       assert.equal(feature.length, 1, name);
       assert.equal(feature[0]['android:required'], 'false');
@@ -62,4 +64,19 @@ test('photos and videos are still chosen and recorded: the system picker, never 
   for (const kind of ['images', 'videos']) assert.ok(code.includes(`launchImageLibraryAsync({ mediaTypes: ['${kind}']`), kind);
   // Recording photos and videos asks only for the camera, which stays allowed.
   assert.match(code, /requestCameraPermissionsAsync[\s\S]*launchCameraAsync\(\{ mediaTypes: \['videos'\]/);
+});
+
+test("react-native-webrtc's screen-sharing service is removed: calls are audio only, so no mediaProjection service", () => {
+  const calls = require('../plugins/with-udozo-calls.js') as (config: object) => { mods: { android: { manifest: (mod: object) => unknown } } };
+  const config = calls({ name: 'x', slug: 'x', mods: {} });
+  const manifest = {
+    $: {},
+    application: [{ $: { 'android:name': '.MainApplication' }, service: [{ $: { 'android:name': 'com.oney.WebRTCModule.MediaProjectionService', 'android:foregroundServiceType': 'mediaProjection' } }] }],
+  };
+  return Promise.resolve(config.mods.android.manifest({ modResults: { manifest }, modRequest: { platform: 'android', nextMod: (mod: object) => mod } })).then(result => {
+    const merged = (result as { modResults: { manifest: typeof manifest } }).modResults.manifest;
+    assert.equal(merged.$['xmlns:tools' as never], 'http://schemas.android.com/tools');
+    const services = merged.application[0].service.filter(service => service.$['android:name'] === 'com.oney.WebRTCModule.MediaProjectionService');
+    assert.deepEqual(services.map(service => service.$), [{ 'android:name': 'com.oney.WebRTCModule.MediaProjectionService', 'tools:node': 'remove' }]);
+  });
 });

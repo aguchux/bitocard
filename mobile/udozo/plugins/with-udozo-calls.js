@@ -171,6 +171,8 @@ function withIosCalls(config) {
  * which this app does not use.
  */
 const callKeepServices = ['io.wazo.callkeep.RNCallKeepBackgroundMessagingService', 'io.wazo.callkeep.VoiceConnectionService'];
+/** react-native-webrtc's screen-sharing service (a `mediaProjection` foreground service): calls here are audio only. */
+const screenShare = 'com.oney.WebRTCModule.MediaProjectionService';
 const unused = ['android.permission.CALL_PHONE', 'android.permission.READ_PHONE_NUMBERS', 'android.permission.READ_PHONE_STATE', 'android.permission.SYSTEM_ALERT_WINDOW'];
 
 const webrtcRules = '# Udozo calls: WebRTC\n-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**';
@@ -205,11 +207,15 @@ function withAndroidCalls(config) {
   ]);
   // CallKeep's services as this app needs them. This runs before CallKeep's own plugin writes the manifest, which adds a
   // service only when it is missing, so these are the ones kept: the ConnectionService labelled Udozo with both service
-  // types, and the headless messaging service not exported (only the app itself starts it).
+  // types, and the headless messaging service not exported (only the app itself starts it). WebRTC's screen-sharing
+  // service is removed from the merged manifest, so Play sees no mediaProjection foreground service to declare.
   return withAndroidManifest(config, mod => {
+    const manifest = mod.modResults.manifest;
+    manifest.$ = { ...manifest.$, 'xmlns:tools': manifest.$?.['xmlns:tools'] ?? 'http://schemas.android.com/tools' };
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(mod.modResults);
-    app.service = (app.service ?? []).filter(service => !callKeepServices.includes(service.$['android:name']));
+    app.service = (app.service ?? []).filter(service => ![...callKeepServices, screenShare].includes(service.$['android:name']));
     app.service.push(
+      { $: { 'android:name': screenShare, 'tools:node': 'remove' } },
       { $: { 'android:name': 'io.wazo.callkeep.RNCallKeepBackgroundMessagingService', 'android:exported': 'false' } },
       {
         $: {

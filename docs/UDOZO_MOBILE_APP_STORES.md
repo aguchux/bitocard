@@ -15,11 +15,12 @@ third parties except service providers working for Udozo (Play does not count th
 | Data | Collected | Why | Optional |
 |---|---|---|---|
 | Name, email address, phone number | Yes | Account management, app functionality | Phone optional until something needs it |
+| Address (the delivery address on a UdozoPay order) | Yes, only when the buyer has an item delivered | App functionality | Yes |
 | Approximate location (the area the person chooses, typed or picked) | Yes | App functionality (ads near them) | Yes; no GPS is read |
 | Photos and videos | Yes, only those the person adds to an ad, a chat or a dispute | App functionality | Yes |
 | Voice (calls between buyers and sellers) | No: relayed live, never recorded or kept | | |
 | Messages (chats, requests, the assistant, support) | Yes | App functionality, customer support | Yes |
-| Financial info: purchase history, other financial info (wallet, UdozoPay orders, payout bank account) | Yes | App functionality, fraud prevention | Required to pay or be paid |
+| Financial info: purchase history, other financial info (wallet, UdozoPay orders, payout bank account; in Nigeria the BVN, passed to the bank partner to open a bank account number and never kept) | Yes | App functionality, fraud prevention | Required to pay or be paid |
 | Government ID and face photos (Udozo Verify, in the browser) | Yes, only where a check is required | Fraud prevention, legal compliance | Required only for some actions |
 | Date of birth, sex (profile's About you) | Yes, if the person gives them | App functionality | Yes |
 | App activity: ads viewed, searches, taps (personalisation) | Yes | Personalisation, analytics | Yes; turned off in Account > Privacy on udozo.com |
@@ -28,12 +29,14 @@ third parties except service providers working for Udozo (Play does not count th
 
 Payment card numbers are entered on the payment provider's page, never in the app. Face ID and fingerprints are
 checked by the phone; the app never receives them. Google and Facebook sign-in send Udozo only the name, email and an
-account ID; the Facebook SDK is built with app events, the advertising ID and automatic logging off.
+account ID; the Facebook SDK is built with app events, the advertising ID and automatic logging off, and the manifest
+blocks the advertising ID permission (`AD_ID`), so answer "No" to the advertising ID question.
 
 ### Permissions Play asks about
 
 The manifest (pinned by `mobile/udozo/test/play-manifest.test.ts`) has no photo, video, audio-file or storage
-permission (the system photo picker needs none), no phone-state, call-log or SMS permission, and nothing that draws
+permission (the system photo picker needs none), no advertising ID, no phone-state, call-log or SMS permission, no
+screen-sharing (`mediaProjection`) service (react-native-webrtc's is removed: calls are audio only), and nothing that draws
 over other apps. What needs a declaration:
 
 - **Foreground service, `phoneCall` and `microphone`** (`FOREGROUND_SERVICE_PHONE_CALL`, `FOREGROUND_SERVICE_MICROPHONE`):
@@ -51,8 +54,12 @@ over other apps. What needs a declaration:
   content: answer "No" to ads unless that changes.)
 - **Financial features:** the wallet and UdozoPay hold money through Udozo's licensed payment partners; payouts go to
   the person's own bank account. Answer the financial-features declaration accordingly once UdozoPay is on.
-- **App access (review):** give Google a test account (email and password, email confirmed) in a market with the
-  sandbox, and say that calls and chats need a second account to try.
+- **Payments (review notes):** the wallet and UdozoPay pay for physical items and in-person shop sales only; nothing
+  digital (no paid boosts or subscriptions) is sold in the app, so Google Play Billing does not apply. Say so in the
+  review notes, and keep it true: a paid digital feature in the app would need Play Billing.
+- **App access (review):** give Google a test account (email and password, email and mobile confirmed and the
+  profile finished, so no code is asked at sign-in) in a market with the sandbox, and say that calls and chats need a
+  second account to try and that money there is the sandbox's.
 - **Account deletion URL:** https://udozo.com/help/delete-account
 
 ## Before the first Play build

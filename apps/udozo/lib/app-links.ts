@@ -12,6 +12,7 @@ export const appLinkPaths = [
   "/*/seller/*",
   "/*/brand/*",
   "/*/c/*", // categories
+  "/account", // the dashboard itself
   "/account/*",
   "/i/*", // invite links keep their code
   "/pay/*", // a Udozo POS till's QR code

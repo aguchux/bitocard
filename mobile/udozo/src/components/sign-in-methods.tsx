@@ -133,7 +133,7 @@ function WhatsappSignIn({ intent, refCode, onBack }: { intent: 'signin' | 'signu
           <ThemedText type="subtitle" selectable accessibilityLabel={`Message: ${started.text}`}>
             {started.text}
           </ThemedText>
-          <Button title="Open WhatsApp" onPress={() => Linking.openURL(started.link)} />
+          <Button title="Open WhatsApp" onPress={() => Linking.openURL(started.link).catch(() => setError(new Error('WhatsApp could not be opened. Is it installed on this phone?')))} />
           <ThemedText type="small" themeColor="textSecondary">
             {state === 'waiting' ? 'Waiting for you to approve on WhatsApp…' : state === 'declined' ? 'You said no on WhatsApp.' : 'This code has expired. Go back and start again.'}
           </ThemedText>

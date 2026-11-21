@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { Camera, EllipsisVertical, Send } from 'lucide-react-native';
+import { EllipsisVertical, ImagePlus, Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -135,7 +135,7 @@ export default function ChatScreen() {
         ) : (
           <SafeAreaView edges={['bottom']} style={[styles.composer, { borderColor: theme.line }]}>
             <Pressable accessibilityRole="button" accessibilityLabel="Send a photo" onPress={() => photo.mutate()} style={styles.icon} disabled={photo.isPending}>
-              <Camera size={22} color={theme.primary} />
+              <ImagePlus size={22} color={theme.primary} />
             </Pressable>
             <TextInput
               value={text}
