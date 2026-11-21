@@ -200,7 +200,8 @@
           "microphonePermission": false
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/with-optional-features"
     ],
     "extra": {
       "apiUrl": "https://api.bitocard.com",
