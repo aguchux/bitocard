@@ -41,3 +41,12 @@ example
 # generated native folders
 /ios
 /android
+
+# Google keys: the Play service account (eas submit) and the Firebase file (an EAS file variable)
+google-service-account.json
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
+
+# Rendered store images: make them with node store-listing/render.mjs
+store-listing/out/

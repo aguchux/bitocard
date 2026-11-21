@@ -696,6 +696,21 @@ Views of listings opened in the app are not counted yet.
   **Request an ad** (`/wanted/new?words=<brand>` or `?category=<slug>`, `startingWanted` in `src/lib/wanted.ts`);
   signed out, posting and asking sign in first (`test/screens/brand.test.tsx`, `category.test.tsx`, `search.test.tsx`).
 
+**Phase 6, Google Play (21 November 2026, the owner's request):**
+
+- **The manifest Play sees:** no photo, video, audio-file or storage permissions (`blockedPermissions` in `app.json`;
+  the system photo picker needs none, and `expo-screen-capture` only blocks screenshots), the phone and overlay ones
+  already blocked by `plugins/with-udozo-calls.js`, and portrait screens and Wi-Fi wanted but not required
+  (`plugins/with-optional-features.js`, as BitoCard's), so Play offers the app to every device
+  (`test/play-manifest.test.ts`).
+- **EAS:** `submit.production` sends to Play's internal track as a draft with `google-service-account.json`, which
+  both ignore files keep out of git and builds, as they do Firebase keys.
+- **The listing:** `store-listing/LISTING.md` (name, descriptions with lines kept for features behind switches,
+  release notes, store settings) and its images drawn by `store-listing/render.mjs` from the app's screens with
+  made-up data (phone, tablets, Chromebook, foldables, Android XR, three feature graphics, the 512 px icon).
+- **The checklist:** `docs/UDOZO_MOBILE_APP_STORES.md` (Data safety, the foreground-service declaration for calls,
+  what to set before the first build, the build and upload).
+
 ## Testing
 
 - Unit and component tests with Jest and React Native Testing Library, kept beside each feature as the apps' Vitest tests are.
