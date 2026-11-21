@@ -29,7 +29,7 @@ this folder with `EAS_NO_VCS=1`, since the monorepo, not this folder, is the git
 - iPhones need an Apple Developer account even for testers (TestFlight or ad hoc);
 - `production` is for the stores, decided last (the plan's store accounts).
 
-The bundle ID and package are `com.udozo.app`, and can change until the store accounts exist.
+The Android package is `com.golojan.udozo.android` (its Play listing's) and the iOS bundle ID `com.golojan.udozo.ios`.
 
 ## How it fits
 

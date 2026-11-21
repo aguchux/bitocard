@@ -20,25 +20,25 @@ afterEach(() => vi.unstubAllEnvs());
 describe("the files", () => {
   test("nothing until the app's IDs are set", () => {
     expect(appleAssociation({})).toBeNull();
-    expect(androidAssetLinks({ UDOZO_ANDROID_PACKAGE: "com.udozo.app" })).toBeNull();
+    expect(androidAssetLinks({ UDOZO_ANDROID_PACKAGE: "com.golojan.udozo.android" })).toBeNull();
     expect(androidAssetLinks({ UDOZO_ANDROID_CERT_SHA256: cert })).toBeNull();
   });
 
   test("Apple's names the app and only the pages it opens, with shared passwords", () => {
-    const file = appleAssociation({ UDOZO_IOS_APP_IDS: "ABCDE12345.com.udozo.app, not-an-id" });
+    const file = appleAssociation({ UDOZO_IOS_APP_IDS: "ABCDE12345.com.golojan.udozo.ios, not-an-id" });
     expect(file).toEqual({
-      applinks: { details: [{ appIDs: ["ABCDE12345.com.udozo.app"], components: appLinkPaths.map(path => ({ "/": path })) }] },
-      webcredentials: { apps: ["ABCDE12345.com.udozo.app"] },
+      applinks: { details: [{ appIDs: ["ABCDE12345.com.golojan.udozo.ios"], components: appLinkPaths.map(path => ({ "/": path })) }] },
+      webcredentials: { apps: ["ABCDE12345.com.golojan.udozo.ios"] },
     });
     expect(appLinkPaths).toContain("/pay/*");
     expect(appLinkPaths).not.toContain("/api/*");
   });
 
   test("Android's names the package and its certificates, upper case", () => {
-    expect(androidAssetLinks({ UDOZO_ANDROID_PACKAGE: "com.udozo.app", UDOZO_ANDROID_CERT_SHA256: `${cert.toLowerCase()}, nonsense` })).toEqual([
+    expect(androidAssetLinks({ UDOZO_ANDROID_PACKAGE: "com.golojan.udozo.android", UDOZO_ANDROID_CERT_SHA256: `${cert.toLowerCase()}, nonsense` })).toEqual([
       {
         relation: ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
-        target: { namespace: "android_app", package_name: "com.udozo.app", sha256_cert_fingerprints: [cert] },
+        target: { namespace: "android_app", package_name: "com.golojan.udozo.android", sha256_cert_fingerprints: [cert] },
       },
     ]);
     expect(androidAssetLinks({ UDOZO_ANDROID_PACKAGE: "Udozo App", UDOZO_ANDROID_CERT_SHA256: cert })).toBeNull();
@@ -61,16 +61,16 @@ describe("the routes", () => {
   });
 
   test("JSON, cached an hour, once set up; 404 on a store's domain", async () => {
-    vi.stubEnv("UDOZO_IOS_APP_IDS", "ABCDE12345.com.udozo.app");
-    vi.stubEnv("UDOZO_ANDROID_PACKAGE", "com.udozo.app");
+    vi.stubEnv("UDOZO_IOS_APP_IDS", "ABCDE12345.com.golojan.udozo.ios");
+    vi.stubEnv("UDOZO_ANDROID_PACKAGE", "com.golojan.udozo.android");
     vi.stubEnv("UDOZO_ANDROID_CERT_SHA256", cert);
     const ios = await apple(request("/.well-known/apple-app-site-association"));
     expect(ios.status).toBe(200);
     expect(ios.headers.get("content-type")).toBe("application/json");
     expect(ios.headers.get("cache-control")).toBe("public, max-age=3600");
-    expect((await ios.json()).applinks.details[0].appIDs).toEqual(["ABCDE12345.com.udozo.app"]);
+    expect((await ios.json()).applinks.details[0].appIDs).toEqual(["ABCDE12345.com.golojan.udozo.ios"]);
     const droid = await android(request("/.well-known/assetlinks.json"));
-    expect((await droid.json())[0].target.package_name).toBe("com.udozo.app");
+    expect((await droid.json())[0].target.package_name).toBe("com.golojan.udozo.android");
     expect((await apple(request("/.well-known/apple-app-site-association", "shop.example.com"))).status).toBe(404);
   });
 

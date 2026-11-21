@@ -1,6 +1,6 @@
 # Udozo app: Google Play listing and release checklist
 
-For whoever sets up the app in Google Play Console. The app is `mobile/udozo` (`com.udozo.app`). The listing's words
+For whoever sets up the app in Google Play Console. The app is `mobile/udozo` (`com.golojan.udozo.android` on Google Play; `com.golojan.udozo.ios` on iOS). The listing's words
 and images are in `mobile/udozo/store-listing` (`LISTING.md`, and `node store-listing/render.mjs` for the images).
 EAS builds start only on the owner's go.
 
@@ -58,12 +58,16 @@ over other apps. What needs a declaration:
 ## Before the first Play build
 
 1. **EAS environment variables** (project @golojan/udozo, production): `GOOGLE_SERVICES_JSON` (a file variable,
-   Firebase's `google-services.json` for `com.udozo.app`; without it Android gets no push and no incoming calls),
+   Firebase's `google-services.json` for `com.golojan.udozo.android`; without it Android gets no push and no incoming calls),
    `GOOGLE_WEB_CLIENT_ID` (Continue with Google), `FACEBOOK_APP_ID` and `FACEBOOK_CLIENT_TOKEN` (Continue with
-   Facebook). Each feature is left out of the build, not broken, while its variable is missing.
+   Facebook). Each feature is left out of the build, not broken, while its variable is missing. Google sign-in on
+   Android also needs an Android OAuth client in the same Google Cloud project for package `com.golojan.udozo.android`
+   with Play App Signing's SHA-1 (and the upload key's, for builds tried before Play), and the Meta app needs the
+   package and its key hashes under Android. The iPhone app's bundle ID is `com.golojan.udozo.ios`: register it with
+   Apple, and use it for Phone push's APNs topic and Sign in with Apple's bundle IDs in the admin.
 2. **The API** (admin.udozo.com Settings > Integrations): Phone push (the Firebase service account), Calls
    (Cloudflare TURN), and Mobile app (the Play store link, the lowest and latest versions).
-3. **Opening udozo.com links in the app:** on the `udozo` Vercel project set `UDOZO_ANDROID_PACKAGE` (`com.udozo.app`)
+3. **Opening udozo.com links in the app:** on the `udozo` Vercel project set `UDOZO_ANDROID_PACKAGE` (`com.golojan.udozo.android`)
    and `UDOZO_ANDROID_CERT_SHA256` (Play App Signing's certificate fingerprint, from Play Console > Test and release >
    App integrity), then check `https://udozo.com/.well-known/assetlinks.json` answers JSON.
 4. **Build** (on the owner's go), from `mobile/udozo`:

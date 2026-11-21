@@ -8,7 +8,7 @@
     "scheme": "udozo",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.udozo.app",
+      "bundleIdentifier": "com.golojan.udozo.ios",
       "supportsTablet": false,
       "associatedDomains": [
         "applinks:udozo.com",
@@ -20,7 +20,7 @@
       "usesAppleSignIn": true
     },
     "android": {
-      "package": "com.udozo.app",
+      "package": "com.golojan.udozo.android",
       "adaptiveIcon": {
         "backgroundColor": "#185174",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

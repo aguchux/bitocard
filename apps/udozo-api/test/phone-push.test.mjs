@@ -58,7 +58,7 @@ before(async () => {
       APNS_KEY_ID: 'KEY1234567',
       APNS_TEAM_ID: 'TEAM123456',
       APNS_PRIVATE_KEY: await exportPKCS8(apple.privateKey),
-      APNS_TOPIC: 'com.udozo.app',
+      APNS_TOPIC: 'com.golojan.udozo.ios',
       APNS_API_URL: `http://127.0.0.1:${apns.address().port}`,
     },
   });
@@ -147,7 +147,7 @@ describe('Registering a phone', () => {
     const pushed = apnsCalls.slice(apnsBefore);
     assert.equal(pushed.length, 1, 'the VoIP token gets no notices');
     assert.equal(pushed[0].headers['apns-push-type'], 'alert');
-    assert.equal(pushed[0].headers['apns-topic'], 'com.udozo.app');
+    assert.equal(pushed[0].headers['apns-topic'], 'com.golojan.udozo.ios');
     assert.match(pushed[0].headers.authorization, /^bearer [\w-]+\.[\w-]+\.[\w-]+$/);
     assert.equal(pushed[0].body.aps.alert.title, 'Your ad expired');
     assert.equal(await prisma.device.count({ where: { customerId: android.id, channel: 'fcm' } }), 1, 'the unregistered token is dropped');
@@ -183,7 +183,7 @@ describe('Calls to a closed app', () => {
     await settle();
     const voip = apnsCalls.slice(apnsBefore).find(call => call.headers['apns-push-type'] === 'voip');
     assert.ok(voip, 'the iPhone rang through PushKit');
-    assert.equal(voip.headers['apns-topic'], 'com.udozo.app.voip');
+    assert.equal(voip.headers['apns-topic'], 'com.golojan.udozo.ios.voip');
     assert.deepEqual([voip.body.kind, voip.body.call_id, voip.body.caller], ['call', started.json.id, 'Dayo O.']);
     assert.deepEqual(Object.keys(voip.body).sort(), ['about', 'call_id', 'caller', 'kind'], 'the call and a public name, never a number');
     const ring = fcm.calls.slice(fcmBefore).find(call => call.body?.message?.data?.kind === 'call');

@@ -242,8 +242,8 @@ Everything in phases 1 to 4 is the first release: money and calls are in it.
 
 **Phase 0, first slice (12 November 2026):**
 
-- **The app's foundations** (`mobile/udozo`, Expo SDK 58, expo-router): Udozo's name, `com.udozo.app` on both
-  platforms (changeable until the store accounts exist), the `udozo` scheme, Udozo's light and dark colours
+- **The app's foundations** (`mobile/udozo`, Expo SDK 58, expo-router): Udozo's name, `com.golojan.udozo.android` on Android and
+  `com.golojan.udozo.ios` on iOS (21 November 2026, the owner's decision; first `com.udozo.app`), the `udozo` scheme, Udozo's light and dark colours
   (`src/constants/theme.ts`), the five tabs as native tabs (SF Symbols and Material Symbols), each holding a short
   placeholder until its phase. Also:
   - the API client (`src/lib/api-core.ts`: the session header, an Idempotency-Key on every POST, a money step's own key
@@ -262,7 +262,7 @@ Everything in phases 1 to 4 is the first release: money and calls are in it.
   `APP_IOS_STORE_URL`, `APP_ANDROID_STORE_URL`). Tests: `apps/udozo-api/test/app-config.test.mjs`.
 - **Deep links** (udozo.com): `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`
   (`apps/udozo/lib/app-links.ts`), only on udozo.com itself (never a store's domain; the proxy leaves `.well-known`
-  alone), 404 until the environment names the app: `UDOZO_IOS_APP_IDS` (`TEAMID.com.udozo.app`),
+  alone), 404 until the environment names the app: `UDOZO_IOS_APP_IDS` (`TEAMID.com.golojan.udozo.ios`),
   `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` (from the signing key once EAS makes it). Tests:
   `apps/udozo/test/app-links.test.ts`.
 
@@ -322,7 +322,7 @@ Tests: `apps/udozo-api/test/app-sign-in.test.mjs` (fake Google, Facebook and App
 `mobile/udozo/test` (`npm test`).
 
 **Owner's steps before testers use push, calls and native sign-in:** create the Firebase project and its Android app
-(`com.udozo.app`, whose `google-services.json` the app needs) and paste a service account key; an Apple Developer
+(`com.golojan.udozo.android`, whose `google-services.json` the app needs) and paste a service account key; an Apple Developer
 account (needed for any iPhone build), with an APNs key, a Sign in with Apple key and the bundle ID; the app's Google
 client IDs; Facebook Login's Android key hash and iOS bundle ID in the Meta app; and, once EAS has the signing keys,
 `UDOZO_IOS_APP_IDS`, `UDOZO_ANDROID_PACKAGE` and `UDOZO_ANDROID_CERT_SHA256` on udozo.com's Vercel project.

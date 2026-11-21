@@ -632,7 +632,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     description:
       'Sign in with Apple in Udozo’s iPhone app (App Store rules require it beside Google and Facebook). The app sends Apple’s identity token; the API checks it with Apple’s published keys. The team, key and private key let the API revoke the app’s access when someone deletes their account, as Apple requires.',
     fields: [
-      field('APPLE_BUNDLE_IDS', 'Bundle IDs', { required: true, help: 'The app’s bundle ID, for example com.udozo.app (several separated by commas).' }),
+      field('APPLE_BUNDLE_IDS', 'Bundle IDs', { required: true, help: 'The app’s bundle ID, for example com.golojan.udozo.ios (several separated by commas).' }),
       field('APPLE_TEAM_ID', 'Team ID', { help: 'Apple Developer > Membership details: ten letters and digits.' }),
       field('APPLE_KEY_ID', 'Key ID', { help: 'Certificates, Identifiers and Profiles > Keys: a key with Sign in with Apple enabled.' }),
       secret('APPLE_PRIVATE_KEY', 'Private key (.p8)', { required: false, help: 'The whole file, from -----BEGIN PRIVATE KEY----- to the end.' }),
@@ -653,7 +653,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('APNS_KEY_ID', 'APNs key ID', { help: 'Certificates, Identifiers and Profiles > Keys: a key with Apple Push Notifications service enabled.' }),
       field('APNS_TEAM_ID', 'Team ID', { help: 'Apple Developer > Membership details.' }),
       secret('APNS_PRIVATE_KEY', 'APNs private key (.p8)', { required: false, help: 'The whole file, from -----BEGIN PRIVATE KEY----- to the end.' }),
-      field('APNS_TOPIC', 'Bundle ID', { help: 'The app’s bundle ID, for example com.udozo.app.' }),
+      field('APNS_TOPIC', 'Bundle ID', { help: 'The app’s bundle ID, for example com.golojan.udozo.ios.' }),
       field('APNS_SANDBOX', 'Development builds', { kind: 'flag', help: 'On: APNs’ development service (builds made for development). Off: production (TestFlight and the App Store).' }),
       field('APNS_API_URL', 'APNs address', { kind: 'url', help: 'Leave empty: chosen by Development builds.' }),
     ],

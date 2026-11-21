@@ -12,7 +12,7 @@ const { PrismaService } = await import('../dist/database/prisma.service.js');
 const webClient = 'web.apps.googleusercontent.com';
 const androidClient = 'android.apps.googleusercontent.com';
 const fbApp = '1234567890';
-const bundle = 'com.udozo.app';
+const bundle = 'com.golojan.udozo.ios';
 let server;
 let idp;
 let prisma;
