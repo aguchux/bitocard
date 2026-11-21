@@ -7,6 +7,7 @@ import { Flag } from "@/components/flag";
 import { UdozoWordmark } from "@/components/header";
 import { ShopIcon } from "@/components/icon";
 import { markets } from "@/lib/api";
+import { registeredCompany } from "@/lib/legal";
 import { categoriesOf } from "@/lib/reference";
 import { campaignOf, faqs, reasons, startLinks, steps } from "@/lib/start-here";
 
@@ -269,7 +270,7 @@ export default async function StartHerePage({ searchParams }: Props) {
 
       <footer className="border-t border-navy-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-navy-600 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>© {new Date().getFullYear()} Udozo</p>
+          <p>© {new Date().getFullYear()} {registeredCompany.name}. Udozo is owned and operated by {registeredCompany.name} ({registeredCompany.number}).</p>
           <nav aria-label="Udozo links" className="flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/" className="hover:underline">
               Browse Udozo

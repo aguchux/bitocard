@@ -17,6 +17,12 @@ export const operator = {
   law: "the laws of the Federal Republic of Nigeria",
 };
 
+/**
+ * The operator as the Corporate Affairs Commission registers it, shown in the footer and on About us: payment partners
+ * (Flutterwave) check the website against the registered name. Incorporated in Nigeria on 2 August 2019 (golojan.com/about).
+ */
+export const registeredCompany = { name: "DE-GOLOJAN TECHNOLOGIES LTD", number: operator.number, incorporated: "2 August 2019" };
+
 export type LegalBlock = string | { list: string[] } | { table: { head: string[]; rows: string[][] } };
 export type LegalSection = { id: string; heading: string; body: LegalBlock[] };
 export type LegalDocument = { slug: string; title: string; summary: string; sections: LegalSection[] };

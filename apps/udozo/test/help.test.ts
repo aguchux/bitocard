@@ -20,10 +20,10 @@ beforeEach(() => api.customerApi.mockReset());
 describe("the Get help menu", () => {
   const html = renderToStaticMarkup(createElement(HelpMenu));
 
-  it("lists every place in order; UdozoPay, FAQs, Resell on Udozo, Connect Centres and Contact us open, the rest marked Soon", () => {
-    expect(helpLinks.map(link => link.label)).toEqual(["Help Centre", "UdozoPay", "Track orders", "FAQs", "Resell on Udozo", "Connect Centres", "Contact us"]);
+  it("lists every place in order; UdozoPay, FAQs, Resell on Udozo, Connect Centres, Contact us and About us open, the rest marked Soon", () => {
+    expect(helpLinks.map(link => link.label)).toEqual(["Help Centre", "UdozoPay", "Track orders", "FAQs", "Resell on Udozo", "Connect Centres", "Contact us", "About us"]);
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map(match => match[1]);
-    expect(links).toEqual(["/safe-trade#udozopay", "/help/faqs", "/start-here", "/connect-centres", "/help/contact"]);
+    expect(links).toEqual(["/safe-trade#udozopay", "/help/faqs", "/start-here", "/connect-centres", "/help/contact", "/about"]);
     for (const label of ["Help Centre", "Track orders"]) {
       const row = html.slice(html.lastIndexOf("<li", html.indexOf(label)), html.indexOf("</li>", html.indexOf(label)));
       expect(row).toContain('aria-disabled="true"');
@@ -107,5 +107,17 @@ describe("the FAQs", () => {
     expect(text).toContain("A small fee, shown before");
     expect(text).toMatch(/Udozo will not ask for your password/);
     expect(text).not.toMatch(/guarantee|24\/7|WhatsApp/i);
+  });
+});
+
+describe("who owns Udozo", () => {
+  it("the footer and About us name the registered company and its number", async () => {
+    const { SiteFooter } = await import("@/components/footer");
+    const { default: AboutPage } = await import("@/app/(global)/about/page");
+    for (const html of [renderToStaticMarkup(createElement(SiteFooter, {})), renderToStaticMarkup(createElement(AboutPage))]) {
+      expect(html).toContain("DE-GOLOJAN TECHNOLOGIES LTD");
+      expect(html).toContain("RC 1606658");
+    }
+    expect(renderToStaticMarkup(createElement(SiteFooter, {}))).toContain('href="/about"');
   });
 });

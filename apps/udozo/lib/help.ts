@@ -4,7 +4,7 @@
  * channel Udozo does not run.
  */
 
-export type HelpIcon = "help" | "shield" | "package" | "questions" | "store" | "pickup" | "mail";
+export type HelpIcon = "help" | "shield" | "package" | "questions" | "store" | "pickup" | "mail" | "about";
 /** A place in the menu: `href` null is not open yet (shown, marked Soon, not a link). */
 export type HelpLink = { label: string; href: string | null; icon: HelpIcon; hint: string };
 
@@ -16,6 +16,7 @@ export const helpLinks: HelpLink[] = [
   { label: "Resell on Udozo", href: "/start-here", icon: "store", hint: "Sell, or open a store" },
   { label: "Connect Centres", href: "/connect-centres", icon: "pickup", hint: "Collect near you" },
   { label: "Contact us", href: "/help/contact", icon: "mail", hint: "Write to our team" },
+  { label: "About us", href: "/about", icon: "about", hint: "Who owns and runs Udozo" },
 ];
 
 /** What a Contact us message is about (the API's `contactKinds`, in the form's words). */

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { CookieSettingsButton } from "@/components/cookie-consent";
 import { connectUrl } from "@/lib/connect";
+import { registeredCompany } from "@/lib/legal";
 
 /**
  * Udozo's footer: Start selling (the sellers' landing page), Udozo on WhatsApp and Post a request where the market has
- * them, the Safe Trade Guide, the FAQs and Contact us, Udozo's own legal documents (on udozo.com, `/legal`) and the credit.
+ * them, the Safe Trade Guide, the FAQs, Contact us and About us, Udozo's own legal documents (on udozo.com, `/legal`), and
+ * the credit naming the company that owns Udozo by its registered name (payment partners check it against the website).
  */
 export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: string; name: string } | null; whatsapp?: string | null; wanted?: string | null }) {
   return (
@@ -51,6 +53,9 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           <Link href="/help/contact" className="hover:underline">
             Contact us
           </Link>
+          <Link href="/about" className="hover:underline">
+            About us
+          </Link>
           <Link href="/legal/terms" className="hover:underline">
             Terms of use
           </Link>
@@ -75,7 +80,17 @@ export function SiteFooter({ country, whatsapp, wanted }: { country?: { code: st
           <CookieSettingsButton />
         </nav>
       </div>
-      <p className="border-t border-navy-100 py-4 text-center text-xs text-navy-500">© {new Date().getFullYear()} Udozo</p>
+      <OwnerLine />
     </footer>
+  );
+}
+
+/** The credit: Udozo is owned and operated by its registered company, named exactly as registered. */
+export function OwnerLine() {
+  return (
+    <p className="border-t border-navy-100 px-4 py-4 text-center text-xs text-navy-500">
+      © {new Date().getFullYear()} {registeredCompany.name}. Udozo is owned and operated by {registeredCompany.name} ({registeredCompany.number}), a company registered in
+      Nigeria.
+    </p>
   );
 }
