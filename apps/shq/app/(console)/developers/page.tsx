@@ -1,343 +1,298 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { BookOpen, KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
-import {
-  ActionDialog,
-  Badge,
-  Button,
-  Card,
-  CardHeader,
-  DataTable,
-  Dialog,
-  errorMessage,
-  Field,
-  formatDateTime,
-  formatRelative,
-  Input,
-  Notice,
-  PageHeader,
-  Select,
-} from "@bitocard/admin-ui";
-import { type ApiKey, type ApiKeyScope, apiKeyScopes, type Mode, useApiKeysQuery, useCreateApiKeyMutation, useRevokeApiKeyMutation, useRollApiKeyMutation, useStoresQuery } from "@bitocard/api-client/reseller";
+import { useState, type ReactNode } from "react";
+import { Activity, ArrowRight, BookOpen, CheckCircle2, FileClock, FlaskConical, KeyRound, Radio, ShoppingBag, Webhook } from "lucide-react";
+import { Card, CardHeader, ErrorState, errorMessage, formatRelative, humanise, LineChart, Notice, PageHeader, Skeleton, StatCard, Tabs, cn } from "@bitocard/admin-ui";
+import { AppLink } from "@bitocard/admin-ui/shell";
+import { type DeveloperOverview, type Mode, useDeveloperOverviewQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
-import { CopyButton, ModeBadge, SecretDialog } from "./developer-parts";
+import { EnvironmentPanel, environments } from "@/components/environment";
 
 const docsUrl = "https://docs.bitocard.com";
-const apiUrl = "https://api.bitocard.com";
+const number = (value: number) => new Intl.NumberFormat("en-GB").format(value);
+const shortDay = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
-const scopeLabels: Record<ApiKeyScope, string> = {
-  "catalogue:read": "See the catalogue",
-  "quotes:write": "Create quotes",
-  "orders:read": "See orders",
-  "orders:write": "Place orders",
-  "wallet:read": "See the wallet",
-  "wallet:write": "Top up the wallet",
-  "webhooks:manage": "Manage webhooks",
-  "events:read": "Read events",
-  "stores:manage": "Manage the store",
-  "customers:verify": "Verify customers",
-  "disputes:read": "See disputes",
-  "disputes:write": "Handle disputes",
-  "support:read": "Read support tickets",
-  "support:write": "Open and answer support tickets",
-};
-
-const isPast = (iso: string | null) => Boolean(iso && new Date(iso).getTime() <= Date.now());
-
-function keyStatus(key: ApiKey) {
-  if (key.revoked_at) return <Badge tone="red">Revoked</Badge>;
-  if (isPast(key.expires_at)) return <Badge tone="grey">Expired</Badge>;
-  if (key.expires_at) return <Badge tone="amber">{`Expires ${formatRelative(key.expires_at)}`}</Badge>;
-  return <Badge tone="green">Active</Badge>;
-}
-
-const usable = (key: ApiKey) => !key.revoked_at && !isPast(key.expires_at);
-
-function CreateKeyDialog({ open, onClose, onCreated, verified }: { open: boolean; onClose: () => void; onCreated: (secret: string) => void; verified: boolean }) {
-  const [name, setName] = useState("");
-  const [mode, setMode] = useState<Mode>("test");
-  const [scopes, setScopes] = useState<ApiKeyScope[]>([...apiKeyScopes]);
-  const [storeId, setStoreId] = useState("");
-  const stores = useStoresQuery().data?.data ?? [];
-  const [create, state] = useCreateApiKeyMutation();
-
-  const close = () => {
-    setName("");
-    setMode("test");
-    setScopes([...apiKeyScopes]);
-    setStoreId("");
-    state.reset();
-    onClose();
-  };
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const created = await create({ name: name.trim(), mode, scopes, ...(stores.length > 1 ? { store_id: storeId || stores[0].id } : {}) }).unwrap().catch(() => null);
-    if (!created) return;
-    close();
-    onCreated(created.secret);
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={close}
-      title="Create an API key"
-      description="For your own website, app or back office to call the BitoCard API."
-      footer={
-        <>
-          <Button variant="ghost" type="button" onClick={close} disabled={state.isLoading}>
-            Cancel
-          </Button>
-          <Button type="submit" form="create-api-key" loading={state.isLoading} disabled={!name.trim() || !scopes.length}>
-            Create key
-          </Button>
-        </>
-      }
-    >
-      <form id="create-api-key" onSubmit={submit} className="space-y-5">
-        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-        <Field label="Name" htmlFor="key-name" hint="To recognise the key by, such as the system that uses it.">
-          <Input id="key-name" value={name} onChange={event => setName(event.target.value)} maxLength={60} placeholder="Website backend" required autoFocus />
-        </Field>
-        {stores.length > 1 ? (
-          <Field label="Store" htmlFor="key-store" hint="The key sees only this store's orders, events and webhooks, and works within its plan.">
-            <Select id="key-store" value={storeId || stores[0].id} onChange={event => setStoreId(event.target.value)}>
-              {stores.map(store => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        ) : null}
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-semibold text-ink">Mode</legend>
-          {(
-            [
-              { value: "test", title: "Test (sandbox)", text: "Test money and simulated orders. Starts with bc_test_." },
-              { value: "live", title: "Live", text: "Real orders and real money. Starts with bc_live_." },
-            ] as const
-          ).map(option => (
-            <label key={option.value} htmlFor={`key-mode-${option.value}`} className="flex cursor-pointer items-start gap-3 rounded-lg border border-line px-3 py-2.5 text-sm has-checked:border-brand-500 has-checked:bg-brand-50">
-              <input id={`key-mode-${option.value}`} type="radio" name="key-mode" className="mt-0.5 size-4 accent-brand-500" checked={mode === option.value} onChange={() => setMode(option.value)} />
-              <span>
-                <span className="block font-semibold text-ink">{option.title}</span>
-                <span className="text-muted">{option.text}</span>
-              </span>
-            </label>
-          ))}
-          {mode === "live" && !verified ? <p className="text-xs text-amber-700">Live keys are available once your business is verified. Use a test key until then.</p> : null}
-        </fieldset>
-        <fieldset className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <legend className="text-sm font-semibold text-ink">What the key may do</legend>
+/** Live and sandbox side by side: what each holds, the current one marked, the other a click away. */
+function EnvironmentCards({ data }: { data: DeveloperOverview | undefined }) {
+  const { mode, setMode } = useReseller();
+  const card = (value: Mode) => {
+    const current = mode === value;
+    const counts = data?.environments[value];
+    const live = value === "live";
+    return (
+      <div
+        key={value}
+        className={cn(
+          "flex flex-col gap-4 rounded-2xl border p-5 transition-shadow",
+          current ? (live ? "border-emerald-300 bg-emerald-50/60 ring-2 ring-emerald-200" : "border-amber-300 bg-amber-50/70 ring-2 ring-amber-200") : "border-line bg-white",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span aria-hidden className={cn("grid size-10 place-items-center rounded-xl", live ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+              {live ? <Radio className="size-5" /> : <FlaskConical className="size-5" />}
+            </span>
+            <div>
+              <p className="font-bold text-ink">{environments[value].name}</p>
+              <p className="text-xs text-muted">
+                Keys start <code className="font-mono">{environments[value].prefix}</code>
+              </p>
+            </div>
+          </div>
+          {current ? (
+            <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold", live ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950")}>
+              <CheckCircle2 className="size-3.5" aria-hidden />
+              You are here
+            </span>
+          ) : (
             <button
               type="button"
-              className="text-xs font-semibold text-brand-600 hover:underline"
-              onClick={() => setScopes(scopes.length === apiKeyScopes.length ? [] : [...apiKeyScopes])}
+              onClick={() => setMode(value)}
+              className={cn(
+                "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-bold text-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2",
+                live ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-500 hover:bg-amber-600",
+              )}
             >
-              {scopes.length === apiKeyScopes.length ? "Clear all" : "Select all"}
+              {live ? "Open live" : "Open sandbox"}
+              <ArrowRight className="size-3.5" aria-hidden />
             </button>
-          </div>
-          <div className="grid gap-1 sm:grid-cols-2">
-            {apiKeyScopes.map(scope => (
-              <label key={scope} htmlFor={`scope-${scope}`} className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm hover:bg-canvas">
-                <input
-                  id={`scope-${scope}`}
-                  type="checkbox"
-                  className="size-4 shrink-0 accent-brand-500"
-                  checked={scopes.includes(scope)}
-                  onChange={event => setScopes(event.target.checked ? [...scopes, scope] : scopes.filter(item => item !== scope))}
-                />
-                <span className="min-w-0">
-                  <span className="block text-ink">{scopeLabels[scope]}</span>
-                  <span className="block font-mono text-xs text-subtle">{scope}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-          {!scopes.length ? <p className="text-xs text-red-700">Choose at least one.</p> : <p className="text-xs text-muted">Give each key only what its system needs.</p>}
-        </fieldset>
-      </form>
-    </Dialog>
+          )}
+        </div>
+        <dl className="grid grid-cols-2 gap-3">
+          {[
+            ["Active API keys", counts?.api_keys],
+            ["Webhook endpoints", counts?.webhook_endpoints],
+          ].map(([label, value]) => (
+            <div key={label as string} className="rounded-xl bg-white/80 p-3 ring-1 ring-line">
+              <dt className="text-xs text-muted">{label}</dt>
+              <dd className="text-xl font-extrabold text-ink">{value === undefined ? <Skeleton className="mt-1 h-6 w-10" /> : number(value as number)}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    );
+  };
+  return <div className="grid gap-4 md:grid-cols-2">{(["live", "test"] as const).map(card)}</div>;
+}
+
+/** A row of the event types with a bar for each, longest first. */
+function TopEvents({ data }: { data: DeveloperOverview }) {
+  const top = data.events.top_types;
+  const most = Math.max(1, ...top.map(item => item.count));
+  return (
+    <Card className="p-5 sm:p-6">
+      <CardHeader title="Most frequent events" description={`What happened to your account in the last ${data.days} days.`} />
+      {top.length === 0 ? (
+        <p className="mt-4 rounded-xl border border-dashed border-line p-4 text-sm text-muted">No events yet. They appear as orders, top-ups and checks happen.</p>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {top.map(item => (
+            <li key={item.type}>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <code className="truncate font-mono text-ink">{item.type}</code>
+                <span className="font-semibold tabular-nums text-ink">{number(item.count)}</span>
+              </div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
+                <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-brand-500" style={{ width: `${Math.max(4, (item.count / most) * 100)}%` }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 
-/** API keys for resellers' own systems. Secrets are shown once, after create or roll, and kept only in this page's state. */
-export default function ApiKeysPage() {
-  const { membership } = useReseller();
+/** Webhook health: the success rate as a ring, and the endpoints' state. */
+function WebhookHealth({ data }: { data: DeveloperOverview }) {
+  const rate = data.deliveries.success_rate;
+  const tone = rate === null ? "#94a3b8" : rate >= 98 ? "#059669" : rate >= 90 ? "#d97706" : "#dc2626";
+  const circumference = 2 * Math.PI * 42;
+  return (
+    <Card className="p-5 sm:p-6">
+      <CardHeader title="Webhook health" description="Deliveries to your endpoints in this period." />
+      <div className="mt-4 flex flex-wrap items-center gap-6">
+        <svg viewBox="0 0 100 100" className="size-28 shrink-0 -rotate-90" role="img" aria-label={rate === null ? "No deliveries yet" : `${rate}% delivered`}>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" strokeWidth="10" />
+          <circle cx="50" cy="50" r="42" fill="none" stroke={tone} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${((rate ?? 0) / 100) * circumference} ${circumference}`} />
+          <text x="50" y="50" textAnchor="middle" dominantBaseline="central" className="fill-ink text-[18px] font-extrabold" transform="rotate(90 50 50)">
+            {rate === null ? "–" : `${rate}%`}
+          </text>
+        </svg>
+        <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <div>
+            <dt className="text-muted">Delivered</dt>
+            <dd className="font-bold text-emerald-700">{number(data.deliveries.succeeded)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Failed</dt>
+            <dd className="font-bold text-red-600">{number(data.deliveries.failed)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Retrying</dt>
+            <dd className="font-bold text-ink">{number(data.deliveries.pending)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Endpoints</dt>
+            <dd className="font-bold text-ink">{`${number(data.webhooks.enabled)} on · ${number(data.webhooks.disabled)} off`}</dd>
+          </div>
+        </dl>
+      </div>
+      {data.webhooks.failing ? (
+        <div className="mt-4">
+          <Notice tone="red" title={`${data.webhooks.failing} endpoint${data.webhooks.failing === 1 ? " is" : "s are"} failing`}>
+            Deliveries keep failing. Endpoints that fail for 3 days are switched off. <AppLink href="/developers/webhooks" className="font-semibold underline">Check your endpoints</AppLink>
+          </Notice>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function QuickAction({ href, icon, title, text, external }: { href: string; icon: ReactNode; title: string; text: string; external?: boolean }) {
+  const body = (
+    <>
+      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-500 group-hover:text-white">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-semibold text-ink">{title}</span>
+        <span className="block text-xs text-muted">{text}</span>
+      </span>
+      <ArrowRight className="ml-auto size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden />
+    </>
+  );
+  const className = "group flex items-center gap-3 rounded-2xl border border-line bg-white p-4 shadow-card transition-shadow hover:shadow-lg";
+  return external ? (
+    <a href={href} target="_blank" rel="noreferrer" className={className}>
+      {body}
+    </a>
+  ) : (
+    <AppLink href={href} className={className}>
+      {body}
+    </AppLink>
+  );
+}
+
+/** Developers > Overview: the environment with its switch, both environments side by side, and the period's figures. */
+export default function DevelopersOverviewPage() {
+  const { membership, mode } = useReseller();
   const allowed = can(membership, "admin", "developer");
-  const keys = useApiKeysQuery(undefined, { skip: !allowed });
-  const stores = useStoresQuery(undefined, { skip: !allowed }).data?.data ?? [];
-  const storeName = (id: string) => stores.find(store => store.id === id)?.name ?? "—";
-  const [roll] = useRollApiKeyMutation();
-  const [revoke] = useRevokeApiKeyMutation();
-  const [creating, setCreating] = useState(false);
-  const [rolling, setRolling] = useState<ApiKey | null>(null);
-  const [overlap, setOverlap] = useState("24");
-  const [revoking, setRevoking] = useState<ApiKey | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
+  const [days, setDays] = useState<"7" | "30">("7");
+  const query = useDeveloperOverviewQuery({ days: Number(days) as 7 | 30 }, { skip: !allowed });
+  const data = query.data;
+  const loading = !data && query.isLoading;
+  const labels = data?.series.map(item => shortDay(item.day)) ?? [];
 
   return (
-    <ShqShell
-      section="developers"
-      current="/developers"
-      crumbs={[{ label: "Developers", href: "/developers" }, { label: "API keys" }]}
-    >
+    <ShqShell section="developers" current="/developers" crumbs={[{ label: "Developers", href: "/developers" }, { label: "Overview" }]}>
+      <EnvironmentPanel live={data?.live} />
       <PageHeader
-        title="API keys"
-        description="Connect your own website, app or back office to BitoCard. Each key has its own mode, whatever the dashboard switch shows."
-        actions={
-          allowed ? (
-            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
-              Create key
-            </Button>
-          ) : null
-        }
+        title="Developer overview"
+        description={`How your integration is doing in the ${environments[mode].name.toLowerCase()}: API keys, orders through the API, events and webhook deliveries.`}
+        actions={<Tabs variant="pills" label="Period" value={days} onChange={setDays} items={[{ value: "7", label: "7 days" }, { value: "30", label: "30 days" }]} />}
       />
-
-      <Card className="p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-2 text-sm text-muted">
-            <p>
-              Your API base URL is <code className="break-all rounded bg-canvas px-1.5 py-0.5 font-mono text-ink">{apiUrl}</code> for both sandbox and live.
-            </p>
-            <p>
-              The key decides the mode: test keys start <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-ink">bc_test_</code> and use the sandbox; live keys start{" "}
-              <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-ink">bc_live_</code> and move real money. Send it as <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-ink [overflow-wrap:anywhere]">Authorization: Bearer &lt;key&gt;</code>.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <CopyButton value={apiUrl} label="Copy URL" />
-            <a href={docsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-brand-600 hover:bg-brand-50">
-              <BookOpen className="size-4" aria-hidden />
-              API docs
-            </a>
-          </div>
-        </div>
-      </Card>
 
       {!allowed ? (
         <Notice tone="grey" title="Owners, admins and developers only">
-          Your role cannot see or manage API keys. Ask the account owner if you need one.
+          Your role cannot see the developer tools. Ask the account owner if you need access.
         </Notice>
+      ) : query.isError && !data ? (
+        <ErrorState message={errorMessage(query.error)} onRetry={() => void query.refetch()} />
       ) : (
-        <Card>
-          <CardHeader title="Your keys" description="Up to 20 active keys. Revoked and expired keys stay listed for your records." />
-          <div className="mt-4">
-            <DataTable
-              caption="API keys"
-              rows={keys.data?.data}
-              loading={keys.isLoading}
-              error={keys.error ? errorMessage(keys.error) : null}
-              onRetry={keys.refetch}
-              rowKey={key => key.id}
-              empty="No API keys yet. Create a test key to try the API in the sandbox."
-              columns={[
-                {
-                  key: "name",
-                  header: "Name",
-                  cell: key => (
-                    <span className="flex min-w-0 items-center gap-2">
-                      <KeyRound className="size-4 shrink-0 text-subtle" aria-hidden />
-                      <span className="truncate font-semibold text-ink">{key.name}</span>
-                    </span>
-                  ),
-                },
-                ...(stores.length > 1 ? [{ key: "store", header: "Store", cell: (key: ApiKey) => <span className="text-sm">{storeName(key.store_id)}</span> }] : []),
-                { key: "mode", header: "Mode", cell: key => <ModeBadge mode={key.mode} /> },
-                { key: "key", header: "Key", cell: key => <code className="break-all font-mono text-xs text-muted">{`${key.prefix}…`}</code> },
-                {
-                  key: "scopes",
-                  header: "Access",
-                  hideOnMobile: true,
-                  cell: key =>
-                    key.scopes.length >= apiKeyScopes.length ? (
-                      <span className="text-sm">Everything</span>
-                    ) : (
-                      <span className="text-sm" title={key.scopes.join(", ")}>
-                        {key.scopes.length === 1 ? key.scopes[0] : `${key.scopes.length} scopes`}
-                      </span>
-                    ),
-                },
-                {
-                  key: "used",
-                  header: "Last used",
-                  hideOnMobile: true,
-                  cell: key => <span title={formatDateTime(key.last_used_at)}>{key.last_used_at ? formatRelative(key.last_used_at) : "Never"}</span>,
-                },
-                { key: "status", header: "Status", cell: keyStatus },
-                {
-                  key: "actions",
-                  header: "",
-                  align: "right",
-                  cell: key =>
-                    usable(key) ? (
-                      <span className="inline-flex flex-wrap justify-end gap-1">
-                        <Button variant="ghost" size="sm" icon={<RefreshCw className="size-4" aria-hidden />} onClick={() => setRolling(key)}>
-                          Roll
-                        </Button>
-                        <Button variant="ghost" size="sm" icon={<Trash2 className="size-4" aria-hidden />} onClick={() => setRevoking(key)}>
-                          Revoke
-                        </Button>
-                      </span>
-                    ) : null,
-                },
-              ]}
+        <>
+          <EnvironmentCards data={data} />
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Orders through the API"
+              tone="blue"
+              icon={<ShoppingBag />}
+              loading={loading}
+              value={data ? number(data.orders.through_api) : null}
+              footer={data ? <span className="text-xs text-muted">{`${number(data.orders.completed)} delivered · ${number(data.orders.failed)} failed of ${number(data.orders.total)}`}</span> : null}
+            />
+            <StatCard
+              label="Active API keys"
+              tone="violet"
+              icon={<KeyRound />}
+              loading={loading}
+              value={data ? number(data.api_keys.active) : null}
+              footer={
+                data ? (
+                  <span className="text-xs text-muted">{data.api_keys.last_used_at ? `${data.api_keys.last_used_by} used ${formatRelative(data.api_keys.last_used_at)}` : "Not used yet"}</span>
+                ) : null
+              }
+            />
+            <StatCard
+              label="Webhooks delivered"
+              tone="green"
+              icon={<Webhook />}
+              loading={loading}
+              value={data ? (data.deliveries.success_rate === null ? "–" : `${data.deliveries.success_rate}%`) : null}
+              footer={data ? <span className="text-xs text-muted">{`${number(data.deliveries.total)} deliveries`}</span> : null}
+            />
+            <StatCard
+              label="Events"
+              tone="amber"
+              icon={<FileClock />}
+              loading={loading}
+              value={data ? number(data.events.total) : null}
+              footer={data ? <span className="text-xs text-muted">{`Since ${shortDay(data.from)}`}</span> : null}
             />
           </div>
-        </Card>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card className="p-5 sm:p-6 xl:col-span-2">
+              <CardHeader title="Activity" description="Orders and events each day (UTC)." />
+              <div className="mt-4">
+                {data ? (
+                  <LineChart
+                    label="Orders and events each day"
+                    labels={labels}
+                    series={[
+                      { name: "Events", color: "#7c3aed", values: data.series.map(item => item.events), format: number },
+                      { name: "Orders", color: "#2563eb", values: data.series.map(item => item.orders), format: number, axis: "right" },
+                    ]}
+                  />
+                ) : (
+                  <Skeleton className="h-56 w-full" />
+                )}
+              </div>
+            </Card>
+            {data ? <WebhookHealth data={data} /> : <Skeleton className="h-72 w-full rounded-2xl" />}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card className="p-5 sm:p-6 xl:col-span-2">
+              <CardHeader title="Webhook deliveries" description="Delivered and failed each day." />
+              <div className="mt-4">
+                {data ? (
+                  <LineChart
+                    label="Webhook deliveries each day"
+                    labels={labels}
+                    series={[
+                      { name: "Delivered", color: "#059669", values: data.series.map(item => item.deliveries_succeeded), format: number },
+                      { name: "Failed", color: "#dc2626", values: data.series.map(item => item.deliveries_failed), format: number },
+                    ]}
+                  />
+                ) : (
+                  <Skeleton className="h-56 w-full" />
+                )}
+              </div>
+            </Card>
+            {data ? <TopEvents data={data} /> : <Skeleton className="h-72 w-full rounded-2xl" />}
+          </div>
+
+          <section aria-label="Get going" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <QuickAction href="/developers/keys" icon={<KeyRound className="size-5" />} title="API keys" text={`Create a ${environments[mode].prefix} key`} />
+            <QuickAction href="/developers/webhooks" icon={<Webhook className="size-5" />} title="Webhooks" text="Get told the moment an order changes" />
+            <QuickAction href="/developers/events" icon={<Activity className="size-5" />} title="Events" text="Everything that happened, to catch up" />
+            <QuickAction href={docsUrl} external icon={<BookOpen className="size-5" />} title="API docs" text={`Try it in the ${humanise(mode === "test" ? "sandbox" : "live")}`} />
+          </section>
+        </>
       )}
-
-      <CreateKeyDialog open={creating} onClose={() => setCreating(false)} onCreated={setSecret} verified={membership.reseller.status === "active"} />
-
-      <ActionDialog
-        open={Boolean(rolling)}
-        onClose={() => {
-          setRolling(null);
-          setOverlap("24");
-        }}
-        title="Roll this key?"
-        description={rolling ? `"${rolling.name}" gets a new secret with the same mode and access.` : undefined}
-        confirmLabel="Roll key"
-        requireReason={false}
-        onConfirm={async () => {
-          if (!rolling) return;
-          const created = await roll({ id: rolling.id, overlap_hours: Number(overlap) }).unwrap();
-          setSecret(created.secret);
-        }}
-      >
-        <Field label="Keep the old key working for" htmlFor="roll-overlap" hint="Time to put the new key in place before the old one stops.">
-          <Select id="roll-overlap" value={overlap} onChange={event => setOverlap(event.target.value)}>
-            <option value="0">No time: stop it now</option>
-            <option value="1">1 hour</option>
-            <option value="24">24 hours</option>
-            <option value="72">72 hours</option>
-          </Select>
-        </Field>
-      </ActionDialog>
-
-      <ActionDialog
-        open={Boolean(revoking)}
-        onClose={() => setRevoking(null)}
-        title="Revoke this key?"
-        description={revoking ? `"${revoking.name}" stops working immediately. Any system using it will get errors. This cannot be undone.` : undefined}
-        confirmLabel="Revoke key"
-        tone="danger"
-        requireReason={false}
-        onConfirm={async () => {
-          if (revoking) await revoke(revoking.id).unwrap();
-        }}
-      />
-
-      <SecretDialog
-        secret={secret}
-        title="Your new API key"
-        description="Use it from your server only, sent as a Bearer token."
-        onClose={() => setSecret(null)}
-      />
     </ShqShell>
   );
 }

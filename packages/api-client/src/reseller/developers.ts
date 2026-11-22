@@ -86,12 +86,33 @@ export type WebhookEvent = {
   data: { object: Record<string, unknown> & { id?: string; object?: string } };
 };
 
+/** SHQ's Developers > Overview, for the dashboard's mode (`BitoCard-Mode`) over the last 7 or 30 days. */
+export type DeveloperOverview = {
+  object: 'developer_overview';
+  mode: Mode;
+  days: 7 | 30;
+  from: string;
+  /** Whether live is open: verified (or a test account) and activated by BitoCard. */
+  live: { ready: boolean; reason: 'verified' | 'test_account' | 'identity_check' | 'awaiting_activation' | 'suspended' };
+  environments: Record<Mode, { api_keys: number; webhook_endpoints: number }>;
+  api_keys: { active: number; used_in_period: number; last_used_at: string | null; last_used_by: string | null };
+  webhooks: { endpoints: number; enabled: number; disabled: number; failing: number };
+  deliveries: { total: number; succeeded: number; failed: number; pending: number; success_rate: number | null };
+  events: { total: number; top_types: Array<{ type: string; count: number }> };
+  orders: { total: number; completed: number; processing: number; failed: number; refunded: number; through_api: number };
+  series: Array<{ day: string; events: number; orders: number; deliveries_succeeded: number; deliveries_failed: number }>;
+};
+
 /**
  * API keys (dashboard sessions only; each key has its own mode), webhook endpoints and events (in the dashboard's
  * live or sandbox mode, sent by the base query).
  */
 export const resellerDevelopersApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
+    developerOverview: build.query<DeveloperOverview, { days: 7 | 30 }>({
+      query: ({ days }) => ({ url: '/v1/developers/overview', params: { days } }),
+      providesTags: ['ApiKey', { type: 'WebhookEndpoint', id: 'LIST' }, 'Event'],
+    }),
     apiKeys: build.query<List<ApiKey>, void>({ query: () => '/v1/api-keys', providesTags: ['ApiKey'] }),
     createApiKey: build.mutation<CreatedApiKey, { name: string; mode: Mode; scopes?: Array<ApiKeyScope | UdozoApiKeyScope>; store_id?: string }>({
       query: body => ({ url: '/v1/api-keys', method: 'POST', body }),
@@ -166,6 +187,7 @@ export const resellerDevelopersApi = bitocardApi.injectEndpoints({
 });
 
 export const {
+  useDeveloperOverviewQuery,
   useApiKeysQuery,
   useCreateApiKeyMutation,
   useRollApiKeyMutation,

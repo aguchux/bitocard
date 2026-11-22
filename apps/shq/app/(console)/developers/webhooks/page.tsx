@@ -5,6 +5,7 @@ import { BookOpen, Plus } from "lucide-react";
 import { Button, Card, DataTable, Dialog, errorMessage, Field, formatDateTime, formatRelative, Input, Notice, PageHeader, Select, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { type WebhookEventType, useCreateWebhookEndpointMutation, useStoresQuery, useUpdateWebhookEndpointMutation, useWebhookEndpointsQuery } from "@bitocard/api-client/reseller";
+import { EnvironmentPanel } from "@/components/environment";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { disabledReason, EventPicker, eventsSummary, ModeExplainer, SecretDialog } from "../developer-parts";
@@ -89,6 +90,7 @@ export default function WebhooksPage() {
 
   return (
     <ShqShell section="developers" current="/developers/webhooks" crumbs={[{ label: "Developers", href: "/developers" }, { label: "Webhooks" }]}>
+      <EnvironmentPanel />
       <PageHeader
         title="Webhooks"
         description="BitoCard tells your systems when something happens, such as an order completing. Each request is signed so you can check it came from us."

@@ -8,6 +8,7 @@ import {
   Code2,
   CreditCard,
   FileClock,
+  Gauge,
   House,
   KeyRound,
   LifeBuoy,
@@ -129,7 +130,8 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
   developers: {
     title: "Developers",
     items: [
-      { label: "API keys", href: "/developers", icon: KeyRound },
+      { label: "Overview", href: "/developers", icon: Gauge },
+      { label: "API keys", href: "/developers/keys", icon: KeyRound },
       { label: "Webhooks", href: "/developers/webhooks", icon: Webhook },
       { label: "Events", href: "/developers/events", icon: FileClock },
     ],

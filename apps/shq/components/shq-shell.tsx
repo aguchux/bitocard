@@ -2,10 +2,11 @@
 
 import type { ReactNode } from "react";
 import { ArrowLeftRight, FlaskConical } from "lucide-react";
-import { cn, humanise } from "@bitocard/admin-ui";
+import { humanise } from "@bitocard/admin-ui";
 import { AccountMenu, ConsoleShell, type Crumb, NotificationBell } from "@bitocard/admin-ui/shell";
 import { menus, sections, type ShqSection } from "./nav";
 import { useReseller, useSignOut } from "./reseller";
+import { ModeToggle } from "./environment";
 
 function ShqAccountMenu() {
   const { user, membership, memberships, switchAccount } = useReseller();
@@ -33,30 +34,27 @@ function ShqAccountMenu() {
 
 /** Live or sandbox: the sandbox uses test money and simulated fulfilment, never real suppliers. */
 export function ModeSwitch() {
-  const { mode, setMode } = useReseller();
-  return (
-    <button
-      type="button"
-      onClick={() => setMode(mode === "live" ? "test" : "live")}
-      aria-pressed={mode === "test"}
-      className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold", mode === "test" ? "bg-amber-100 text-amber-800" : "bg-canvas text-muted hover:text-ink")}
-    >
-      <FlaskConical className="size-3.5" aria-hidden />
-      {mode === "test" ? "Sandbox" : "Live"}
-    </button>
-  );
+  return <ModeToggle />;
 }
 
 function SandboxBanner() {
   const { mode, setMode } = useReseller();
   if (mode !== "test") return null;
   return (
-    <div role="status" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">
-      <span>
-        <span className="font-semibold">Sandbox.</span> Test money and simulated orders: nothing here is real.
+    <div role="status" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 px-4 py-2 text-center text-sm text-amber-950">
+      <span className="inline-flex items-center gap-1.5">
+        <FlaskConical className="size-4 shrink-0" aria-hidden />
+        <span>
+          <span className="font-bold">Sandbox.</span> Test money and simulated orders: nothing here is real.
+        </span>
       </span>
-      <button type="button" onClick={() => setMode("live")} className="font-semibold underline underline-offset-2">
-        Back to live
+      <button
+        type="button"
+        onClick={() => setMode("live")}
+        className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-amber-950 px-3.5 text-xs font-bold text-white shadow-sm hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        <span aria-hidden className="size-2 rounded-full bg-emerald-400" />
+        Go live
       </button>
     </div>
   );

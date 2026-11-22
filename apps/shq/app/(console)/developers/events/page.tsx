@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, DataTable, Dialog, errorMessage, FilterSelect, formatDateTime, formatRelative, KeyValue, LoadMore, PageHeader } from "@bitocard/admin-ui";
 import { type WebhookEvent, type WebhookEventType, useEventsInfiniteQuery, webhookEventTypes } from "@bitocard/api-client/reseller";
+import { EnvironmentPanel } from "@/components/environment";
 import { ShqShell } from "@/components/shq-shell";
 import { useReseller } from "@/components/reseller";
 import { CopyButton, ModeBadge, ModeExplainer } from "../developer-parts";
@@ -59,6 +60,7 @@ export default function EventsPage() {
 
   return (
     <ShqShell section="developers" current="/developers/events" crumbs={[{ label: "Developers", href: "/developers" }, { label: "Events" }]}>
+      <EnvironmentPanel />
       <PageHeader
         title="Events"
         description="What happened in your account, oldest first, kept for 30 days. Your systems can fetch the same list from GET /v1/events to catch up on anything a webhook missed."

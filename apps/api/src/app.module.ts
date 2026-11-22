@@ -14,6 +14,7 @@ import { DomainsModule } from './domains/domains.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StoresModule } from './stores/stores.module.js';
 import { ApiKeysModule } from './api-keys/api-keys.module.js';
+import { DevelopersModule } from './developers/developers.js';
 import { TeamModule } from './team/team.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CronModule } from './cron/cron.module.js';
@@ -97,6 +98,7 @@ export class AppModule {
         HealthModule,
         AuthModule,
         ApiKeysModule,
+        DevelopersModule,
         TeamModule,
         LedgerModule,
         ProvidersModule,
