@@ -140,7 +140,7 @@ describe('Africa’s Talking catalogue', () => {
 
   test('each country’s stock serves only its own resellers and their customers, whatever their plan', async () => {
     const { browser, resellerId } = await resellerClient(server, { country: 'NG' });
-    await prisma.reseller.update({ where: { id: resellerId }, data: { status: 'active', planCode: 'premium' } });
+    await prisma.reseller.update({ where: { id: resellerId }, data: { status: 'active', maxStores: 10 } });
     assert.equal((await admin.put('/v1/admin/suppliers/africas_talking/markets/NG/airtime', { enabled: true })).status, 200);
     await prisma.countryCategory.update({ where: { countryCode_category: { countryCode: 'NG', category: 'airtime' } }, data: { enabled: true } });
 

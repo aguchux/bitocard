@@ -275,7 +275,7 @@ describe('BitoCard’s assistant for resellers', () => {
       assert.equal((await admin.post(`/v1/admin/support/bots/${platformId}/activate`)).json.status, 'active');
     }
     const reseller = await resellerClient(server);
-    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'premium' } });
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { maxStores: 10 } });
     ai.state.tool = { name: 'my_account', arguments: {} };
     ai.state.next = 'Your account is pending until your identity check is done.';
     const chat = (await reseller.browser.post('/v1/support/bitocard-chat/messages', { body: 'Why can I not sell live?' })).json;

@@ -120,6 +120,11 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity', 'Fee'],
     }),
+    /** Operations (BitoCard): how many stores the reseller may run; null follows everyone's ceiling. Audited. */
+    setResellerStoreLimit: build.mutation<ResellerDetail, { id: string; max_stores: number | null; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/store-limit`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, 'Activity'],
+    }),
     /** Operations: lets the reseller go live without the owner's identity check (activating at once if asked). Audited. */
     waiveResellerIdentity: build.mutation<ResellerDetail, { id: string; reason: string; activate?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/identity-waiver`, method: 'POST', body }),
@@ -471,6 +476,7 @@ export const {
   useResellerQuery,
   useResellerHistoryQuery,
   useUpdateResellerMutation,
+  useSetResellerStoreLimitMutation,
   useWaiveResellerIdentityMutation,
   useRemoveResellerIdentityWaiverMutation,
   useUnsuspendResellerMutation,

@@ -125,7 +125,7 @@ export const domainsDocs: DocsArea = {
         object: constant('list'),
         data: array(ref('StoreDomain')),
         buying: shape({ available: bool('Whether domains can be bought here now (otherwise connect one you own).'), tlds: array(str('An ending, for example `com`.')) }),
-        max_domains: nullableInt('The most domains a store can have on your plan; null when the plan has no limit.'),
+        max_domains: nullableInt('The most domains a store can have (5); null for no limit.'),
       }),
       example: { object: 'list', data: [domainExample, connectedExample], buying: { available: true, tlds: ['com'] }, max_domains: 5 },
     },

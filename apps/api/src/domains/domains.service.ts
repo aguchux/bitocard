@@ -1,7 +1,6 @@
 import { InvoicesService } from '../billing/invoices.service.js';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
-import { formatMoney } from '../notifications/templates.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -17,7 +16,7 @@ import { domainName, isManaged, lookupPublicRecords, mailProviders, mailRecords,
 import { ResendDomains, type SendingRecord } from './resend-domains.js';
 import { domainSender } from './sender.js';
 import { type Contact, VercelDomains } from './vercel.js';
-import { PlanAccessService } from '../plans/plan-access.js';
+import { domainsPerStore, limitReached } from '../resellers/limits.js';
 
 /** At most this many domains per store (in use: not removed or failed). */
 /** The default domains per store; each plan sets its own (`domains_per_store`). */
@@ -65,7 +64,6 @@ export class DomainsService {
     private readonly audit: AuditService,
     private readonly inbox: InboxService,
     private readonly settings: SettingsService,
-    private readonly planAccess: PlanAccessService,
     @Inject(APP_CONFIG) private readonly appConfig: AppConfig,
   ) {
     this.clients = integrations.derive(config => {
@@ -102,8 +100,6 @@ export class DomainsService {
     if (!(await this.settings.isOn('custom_domains', resellerId))) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'domains_not_enabled', 'Custom domains are not open for your account yet.');
     }
-    // On Udozo a store goes live only on its own domain, so domains are open on every plan (the switch still gates them).
-    if (this.appConfig.APP_PRODUCT !== 'udozo') await this.planAccess.requireForStore(store.id, 'custom_domains');
     return store;
   }
 
@@ -116,7 +112,7 @@ export class DomainsService {
 
   private async assertRoom(storeId: string) {
     const used = await this.prisma.storeDomain.count({ where: { storeId, status: { notIn: ['removed', 'failed'] } } });
-    await this.planAccess.requireStoreRoom(storeId, 'domains_per_store', used, { code: 'too_many_domains', param: 'domain' });
+    if (used >= domainsPerStore) throw limitReached(`A store can have ${domainsPerStore} domains. Remove one first.`, { code: 'too_many_domains', param: 'domain' });
   }
 
   private async assertFree(name: string) {
@@ -142,7 +138,7 @@ export class DomainsService {
       object: 'list' as const,
       data: domains.map(domain => this.present(domain)),
       buying: { available: marginBps !== null && this.clients().vercel.configured(), tlds: [...tlds] },
-      max_domains: (await this.planAccess.storeLimit(storeId, 'domains_per_store')).value,
+      max_domains: domainsPerStore,
     };
   }
 
@@ -272,101 +268,6 @@ export class DomainsService {
     }
     await this.checkPurchase(id);
     return this.present(await this.prisma.storeDomain.findUniqueOrThrow({ where: { id } }));
-  }
-
-  // Udozo's free domain ---------------------------------------------------------------------------------------------------
-
-  /**
-   * Premium's free domain for a Udozo store (docs/UDOZO_SPINOFF_PLAN.md, step 3): how many the store's plan gives
-   * (`free_domains`), how many it has, and the most one may cost: what the store's Premium month and, when it was paid
-   * with it, the seller's setup fee collected, in the wallet's currency. Never on BitoCard.
-   */
-  async freeDomain(resellerId: string, storeId: string, query?: string) {
-    await this.storeOf(resellerId, storeId);
-    const allowance = await this.freeAllowance(resellerId, storeId);
-    // With `q`: the search's offers, each saying whether the free domain covers it (its price in the wallet's
-    // currency within what the store's Premium collected), so Seller HQ can show it before the seller tries.
-    const offers = query && allowance.available ? await this.coveredOffers(resellerId, storeId, query, allowance) : null;
-    return {
-      object: 'free_domain' as const,
-      allowance: allowance.limit,
-      used: allowance.used,
-      available: allowance.available,
-      covers_up_to: { amount: Number(allowance.covered), currency: allowance.currency },
-      ...(offers ? { offers } : {}),
-    };
-  }
-
-  private async coveredOffers(resellerId: string, storeId: string, query: string, allowance: { covered: bigint; currency: string }) {
-    const { data } = await this.search(resellerId, storeId, query);
-    return Promise.all(
-      data.map(async offer => {
-        if (!offer.available || !offer.price) return { domain: offer.domain, available: false, price: null, covered: false };
-        const local = allowance.currency === 'USD' ? BigInt(offer.price.amount) : await this.fx.chargeForUsdCents(offer.price.amount, allowance.currency).then(result => result.amount, () => null);
-        return { domain: offer.domain, available: true, price: local === null ? null : { amount: Number(local), currency: allowance.currency }, covered: local !== null && local <= allowance.covered };
-      }),
-    );
-  }
-
-  private async freeAllowance(resellerId: string, storeId: string) {
-    const { currency } = await this.wallets.currencyOf(resellerId);
-    if (this.appConfig.APP_PRODUCT !== 'udozo') return { limit: 0 as number | null, used: 0, available: false, covered: 0n, currency };
-    const limit = (await this.planAccess.storeLimit(storeId, 'free_domains')).value;
-    const used = await this.prisma.storeDomain.count({ where: { storeId, free: true, status: { notIn: ['removed', 'failed'] } } });
-    const [subscription, reseller] = await Promise.all([
-      this.prisma.storeSubscription.findUnique({ where: { storeId } }),
-      this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { setupFeeStoreId: true, setupFeeMinor: true, setupFeeCurrency: true } }),
-    ]);
-    let covered = 0n;
-    // Only a month the seller paid for (a plan an admin gave without billing collected nothing).
-    if (subscription?.renewsAt && subscription.paidCurrency === currency) covered += subscription.paidMinor;
-    if (reseller.setupFeeStoreId === storeId && reseller.setupFeeCurrency === currency) covered += reseller.setupFeeMinor ?? 0n;
-    return { limit, used, available: (limit === null || used < limit) && covered > 0n, covered, currency };
-  }
-
-  /**
-   * Buys the store's free domain: nothing is taken from the wallet, as long as the store has one left and the domain
-   * costs no more than its Premium collected (`domain_not_covered` otherwise: choose another ending, or buy it as usual).
-   */
-  async purchaseFree(resellerId: string, storeId: string, input: { domain: string; contact: Contact }) {
-    const store = await this.storeOf(resellerId, storeId);
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-    if (reseller.status !== 'active') throw conflict('reseller_not_verified', 'Finish verifying your business before buying a domain.');
-    const name = this.parse(input.domain);
-    const { tlds } = this.clients();
-    if (!tlds.has(tldOf(name))) throw invalid('tld_not_offered', `Only ${[...tlds].map(tld => `.${tld}`).join(', ')} can be bought here for now.`, 'domain');
-    const allowance = await this.freeAllowance(resellerId, store.id);
-    if (!allowance.available) throw conflict('free_domain_unavailable', 'This store has no free domain left. Its Premium plan includes one per store.', 'domain');
-    await this.assertRoom(store.id);
-    await this.assertFree(name);
-    const vercel = this.vercel;
-    if (!(await vercel.availability(name).catch(() => false))) throw conflict('domain_unavailable', 'This domain is not available to buy.', 'domain');
-    const cost = await vercel.price(name);
-    const price = this.priceFor(cost.purchaseCents);
-    const local = allowance.currency === 'USD' ? BigInt(price) : (await this.fx.chargeForUsdCents(price, allowance.currency)).amount;
-    if (local > allowance.covered) {
-      throw conflict('domain_not_covered', `${name} costs ${formatMoney(local, allowance.currency)}, more than the ${formatMoney(allowance.covered, allowance.currency)} your Premium covers. Choose another ending, or buy it as usual.`, 'domain');
-    }
-    const domain = await this.prisma.storeDomain
-      .create({ data: { resellerId, storeId: store.id, name, source: 'purchased', status: 'purchasing', dnsMode: 'vercel', costCents: cost.purchaseCents, priceCents: 0, free: true } })
-      .catch(error => {
-        if ((error as { code?: string }).code === 'P2002') throw conflict('domain_in_use', 'This domain is already connected to a store.', 'domain');
-        throw error;
-      });
-    // Two requests at once take one free domain between them: the later one is refused, never bought.
-    const taken = await this.prisma.storeDomain.count({ where: { storeId: store.id, free: true, status: { notIn: ['removed', 'failed'] } } });
-    if (allowance.limit !== null && taken > allowance.limit) {
-      await this.prisma.storeDomain.update({ where: { id: domain.id }, data: { status: 'failed', lastError: 'free_domain_used' } });
-      throw conflict('free_domain_unavailable', 'This store has no free domain left. Its Premium plan includes one per store.', 'domain');
-    }
-    return this.register(domain.id, name, cost.purchaseCents, input.contact);
-  }
-
-  /** Udozo: whether a free domain renews free, as long as its store's plan still includes free domains. */
-  private async renewsFree(domain: StoreDomain) {
-    if (this.appConfig.APP_PRODUCT !== 'udozo' || !domain.free) return false;
-    const limit = (await this.planAccess.storeLimit(domain.storeId, 'free_domains')).value;
-    return limit === null || limit > 0;
   }
 
   /** The price of each ending sold (US cents, the margin added), for admins' checks; null while it cannot be read. */
@@ -741,21 +642,6 @@ export class DomainsService {
     if (claimed.count === 0) throw conflict('renewal_in_progress', 'This domain is being renewed. Try again in a few minutes.');
     const vercel = this.vercel;
     const cost = await vercel.price(domain.name);
-    if (await this.renewsFree(domain)) {
-      // Udozo's free domain, while its store keeps Premium: renewed with nothing taken from the wallet.
-      try {
-        await vercel.renew(domain.name, { years: 1, costCents: cost.renewalCents });
-      } catch (error) {
-        if (error instanceof ProviderError && error.definite) {
-          await this.prisma.storeDomain.update({ where: { id: domain.id }, data: { renewalError: 'renewal_failed' } });
-          throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'renewal_failed', 'The domain could not be renewed right now. Nothing was taken from your wallet.');
-        }
-        await this.prisma.storeDomain.update({ where: { id: domain.id }, data: { renewalError: 'renewal_pending', holdId: null, costCents: cost.renewalCents } });
-        return;
-      }
-      await this.finishRenewal(domain, null, cost.renewalCents, period);
-      return;
-    }
     const price = this.priceFor(cost.renewalCents);
     const { currency } = await this.wallets.currencyOf(domain.resellerId);
     const amount = currency === 'USD' ? BigInt(price) : (await this.fx.chargeForUsdCents(price, currency)).amount;
@@ -787,7 +673,7 @@ export class DomainsService {
     await this.finishRenewal(domain, hold.id, cost.renewalCents, period);
   }
 
-  /** `holdId` null: a free renewal (Udozo's Premium domain), with nothing held to take. */
+  /** `holdId` null: nothing held to take. */
   private async finishRenewal(domain: StoreDomain, holdId: string | null, costCents: number, period: string) {
     if (holdId) {
       const hold = await this.prisma.hold.findUniqueOrThrow({ where: { id: holdId } });

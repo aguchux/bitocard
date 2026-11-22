@@ -60,12 +60,16 @@ describe('creating and updating', () => {
     assert.equal((await browser.get('/v1/stores')).json.data.length, 1);
   });
 
-  test('up to five stores per reseller, each on its own address', async () => {
-    const { browser } = await resellerClient(server);
-    for (const name of ['one', 'two', 'three', 'four', 'five']) assert.equal((await browser.post('/v1/stores', { name, subdomain: sub(name) })).status, 201);
-    assert.equal((await browser.get('/v1/stores')).json.data.length, 5);
-    const sixth = await browser.post('/v1/stores', { name: 'Six', subdomain: sub('six') });
-    assert.deepEqual([sixth.status, sixth.json.error.code], [409, 'store_limit_reached']);
+  test('one store per reseller until admins allow more, each on its own address', async () => {
+    const { browser, resellerId } = await resellerClient(server);
+    assert.equal((await browser.post('/v1/stores', { name: 'One', subdomain: sub('one') })).status, 201);
+    const second = await browser.post('/v1/stores', { name: 'Two', subdomain: sub('two') });
+    assert.deepEqual([second.status, second.json.error.code], [409, 'store_limit_reached']);
+    assert.equal((await admin.put(`/v1/admin/resellers/${resellerId}/store-limit`, { max_stores: 3, reason: 'Growing' })).status, 200);
+    for (const name of ['two', 'three']) assert.equal((await browser.post('/v1/stores', { name, subdomain: sub(name) })).status, 201);
+    assert.equal((await browser.get('/v1/stores')).json.data.length, 3);
+    const fourth = await browser.post('/v1/stores', { name: 'Four', subdomain: sub('four') });
+    assert.deepEqual([fourth.status, fourth.json.error.code], [409, 'store_limit_reached']);
   });
 
   test('branding is validated; logos must be HTTPS', async () => {
@@ -144,7 +148,9 @@ describe('publishing and the public storefront', () => {
 
 describe('access', () => {
   test('API keys need the stores:manage scope; staff need the admin role', async () => {
-    const { browser } = await resellerClient(server);
+    const { browser, resellerId } = await resellerClient(server);
+    const raised = await admin.put(`/v1/admin/resellers/${resellerId}/store-limit`, { max_stores: 5, reason: 'Testing keys' });
+    assert.equal(raised.status, 200, JSON.stringify(raised.json));
     const full = (await browser.post('/v1/api-keys', { name: 'Full', mode: 'test' })).json.secret;
     const narrow = (await browser.post('/v1/api-keys', { name: 'Narrow', mode: 'test', scopes: ['catalogue:read'] })).json.secret;
     const create = (secret, name) =>
@@ -154,7 +160,8 @@ describe('access', () => {
         body: JSON.stringify({ name: 'Via API', subdomain: name }),
       });
     assert.equal((await create(narrow, sub('narrow'))).status, 403);
-    assert.equal((await create(full, sub('viaapi'))).status, 201);
+    const made = await create(full, sub('viaapi'));
+    assert.equal(made.status, 201, await made.clone().text());
   });
 
   test('store creation needs an Idempotency-Key, like every POST', async () => {

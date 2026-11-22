@@ -284,17 +284,6 @@ export function payoutFailedEmail(to: string, amount: string, reason: string): E
   };
 }
 
-export function planRenewalFailedEmail(to: string, plan: string, amount: string, graceDays: number): EmailMessage {
-  return {
-    to,
-    subject: `We could not renew your ${plan} plan`,
-    ...layout(`Your ${plan} plan needs funds`, [
-      `We could not take ${amount} from your wallet to renew your ${plan} plan.`,
-      `Top up your wallet within ${graceDays} days to keep it; after that your account moves to the Startup plan.`,
-    ]),
-  };
-}
-
 /** A reseller's own integration changed: connected, waiting for review, approved, rejected, suspended or disconnected. */
 export function connectionEmail(
   to: string,
@@ -312,10 +301,6 @@ export function connectionEmail(
   }[event];
   const paragraphs = [copy[1], ...(note ? [`Reason: ${note}`] : []), 'If you did not expect this, contact BitoCard support and change the credentials with the provider.'];
   return { to, subject: copy[0], ...layout(copy[0], paragraphs) };
-}
-
-export function planEndedEmail(to: string, plan: string): EmailMessage {
-  return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Startup plan. You can upgrade again at any time.']) };
 }
 
 export function webhookEndpointDisabledEmail(to: string, url: string, mode: string, link: string): EmailMessage {

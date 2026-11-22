@@ -1,6 +1,6 @@
 import { InvoicesService } from '../../billing/invoices.service.js';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { PlanAccessService } from '../../plans/plan-access.js';
+import { ResellerLimitsService } from '../../resellers/limits.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { ApiError } from '../../common/errors/api-error.js';
 import { Encryption } from '../../common/encryption.js';
@@ -48,7 +48,7 @@ export class AiService {
     private readonly integrations: IntegrationsService,
     private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
-    private readonly planAccess: PlanAccessService,
+    private readonly limits: ResellerLimitsService,
   ) {}
 
   private encryption() {
@@ -86,9 +86,16 @@ export class AiService {
     return Number(this.integrations.config.AI_MONTHLY_REPLIES ?? 2000);
   }
 
-  /** Replies a month per store on BitoCard's AI for the reseller's plan (null: unlimited). */
+  /** Free replies a month per store on BitoCard's AI, the same for every reseller (null: unlimited, BitoCard's own). */
   async allowance(resellerId: string) {
-    return (await this.planAccess.limit(resellerId, 'ai_replies')).value;
+    const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { house: true } });
+    return this.limits.aiReplies(Boolean(reseller?.house));
+  }
+
+  /** A store's free replies a month (null: unlimited). */
+  private async storeAllowance(storeId: string) {
+    const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { reseller: { select: { house: true } } } });
+    return this.limits.aiReplies(Boolean(store?.reseller.house));
   }
 
   private bitocardProvider(provider: AiProviderName, platform: Platform = 'bitocard'): AiProvider | null {
@@ -151,25 +158,16 @@ export class AiService {
     return this.prisma.aiUsage.count({ where: { storeId, funding: 'bitocard', kind: { in: ['chat', 'ticket'] }, createdAt: { gte: monthStart() } } });
   }
 
-  /** Replies left this month for a store (Infinity when its plan has no limit). */
+  /** Free replies left this month for a store (Infinity for BitoCard's own). */
   async allowanceLeft(storeId: string) {
-    const allowance = (await this.planAccess.storeLimit(storeId, 'ai_replies')).value;
+    const allowance = await this.storeAllowance(storeId);
     return allowance === null ? Infinity : Math.max(0, allowance - (await this.usedThisMonth(storeId)));
   }
 
   /**
-   * Whether bots on BitoCard's keys are included: the store's own plan when there is a store, else the account's (its
-   * highest store plan).
-   */
-  async premium(resellerId: string, storeId?: string | null) {
-    if (storeId) return this.planAccess.storeHas(storeId, 'ai_assistant');
-    const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, include: { plan: true } });
-    return Boolean(reseller?.house || reseller?.plan.features.includes('ai_assistant'));
-  }
-
-  /**
-   * One AI call for support, recorded with its usage. On BitoCard's keys the plan must include the assistant and, for
-   * replies, the store must have allowance left (`ai_allowance_reached`). A key the provider refuses stops being used
+   * One AI call for support, recorded with its usage. On BitoCard's keys every store has a free monthly allowance; past
+   * it each reply is charged to the reseller's wallet (the store's `ai_overage`, `pay` by default), or refused with
+   * `ai_allowance_reached` when the store chose `stop`. A key the provider refuses stops being used
    * (`failed_at`) until it is replaced.
    */
   async reply(call: AiCall, request: Omit<AiRequest, 'model'>): Promise<AiReply & { costMicros: bigint }> {
@@ -188,13 +186,12 @@ export class AiService {
       client = this.bitocardProvider(call.provider, 'afrippa');
       if (!client) throw unavailable(`${aiProviderLabels[call.provider]} is not set up on Afrippa’s AI.`);
     } else if (call.funding === 'bitocard') {
-      if (!(await this.premium(call.resellerId, call.storeId))) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'ai_plan_required', 'Assistants on BitoCard’s AI need the Premium plan. Use your own AI key instead, or change plan.');
       if (!this.bitocardModels().some(item => item.provider === call.provider && item.model === call.model)) throw invalid('ai_model_unavailable', 'This model is not offered on BitoCard’s AI. Choose another.', 'model');
       if (call.storeId && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
         overage = (await this.prisma.store.findUnique({ where: { id: call.storeId }, select: { aiOverage: true } }))?.aiOverage === 'pay';
       }
       if (call.storeId && !overage && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
-        throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'ai_allowance_reached', 'This store has used this month’s assistant replies on BitoCard’s AI. People answer until next month, or add your own AI key.');
+        throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'ai_allowance_reached', 'This store has used this month’s free assistant replies on BitoCard’s AI and chose to stop there. People answer until next month; let further replies be charged to your wallet, or add your own AI key.');
       }
       // At the credit limit BitoCard's AI stops (people answer) until what is owed is paid.
       await this.invoices.requireCredit(call.resellerId);
@@ -242,20 +239,19 @@ export class AiService {
 
   /** What the reseller sees: providers, their keys, the models on BitoCard's AI, and this month's use per store. */
   async overview(resellerId: string) {
-    const [own, premium, stores] = await Promise.all([this.keysFor(resellerId), this.premium(resellerId), this.prisma.store.findMany({ where: { resellerId }, select: { id: true, name: true } })]);
+    const [own, stores] = await Promise.all([this.keysFor(resellerId), this.prisma.store.findMany({ where: { resellerId }, select: { id: true, name: true } })]);
     const usage = await Promise.all(
       stores.map(async store => ({
         store_id: store.id,
         store_name: store.name,
         bitocard_replies: await this.usedThisMonth(store.id),
-        /** This store's monthly replies on its own plan (null: no limit). */
-        replies_allowed: (await this.planAccess.storeLimit(store.id, 'ai_replies')).value,
+        /** This store's free replies a month (null: no limit). */
+        replies_allowed: await this.storeAllowance(store.id),
       })),
     );
     const bitocard = this.bitocardModels();
     return {
       object: 'support_ai' as const,
-      premium,
       allowance: { replies_per_store: await this.allowance(resellerId), month_start: monthStart().toISOString(), stores: usage },
       providers: aiProviders.map(provider => ({ provider, label: aiProviderLabels[provider], bitocard_models: bitocard.filter(item => item.provider === provider).map(item => item.model), own_key: own.find(item => item.provider === provider) ?? null })),
     };

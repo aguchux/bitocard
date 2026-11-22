@@ -136,7 +136,7 @@ export type PlanSettings = {
 };
 export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; available?: boolean; sort_order?: number; usage_margin_bps?: number };
 export type CreatePlanInput = { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean };
-export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; plan: string; created_at: string };
+export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; /** Udozo only: BitoCard has no plans. */ plan?: string; created_at: string };
 export type ResellerDetail = {
   object: 'reseller';
   id: string;
@@ -149,7 +149,11 @@ export type ResellerDetail = {
   signup_phone?: string | null;
   /** An admin let the reseller go live without the identity check: who, when and why. */
   identity_waiver: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
-  plan: Plan;
+  /** Udozo only: BitoCard has no plans. */
+  plan?: Plan;
+  /** BitoCard: how many stores the reseller may run, their own ceiling (null: everyone's) and what applies now (null: no limit). */
+  max_stores?: number | null;
+  stores_allowed?: number | null;
   /** `two_step`: the member's two-step sign-in method, or null when off; `phone`: their confirmed primary mobile number. Missing on older API versions. */
   members: Array<{ user_id: string; name: string; email: string | null; role: string; two_step?: TwoStepMethod | null; phone?: string | null }>;
   stores: Array<{ id: string; name: string; subdomain: string; status: string }>;

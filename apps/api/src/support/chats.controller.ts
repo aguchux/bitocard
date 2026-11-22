@@ -16,7 +16,6 @@ import { Mode } from '../ledger/mode.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { type ChatAuthor, type ChatStatus, chatStatuses, ChatsService, type ChatUpload, maxChatMessage, type StoreRequester, visitorHeader } from './chats.service.js';
 import { type TicketCategory, ticketCategories } from './tickets.service.js';
-import { PlanAccessService } from '../plans/plan-access.js';
 
 class ChatMessageDto {
   @IsString() @Length(1, maxChatMessage)
@@ -291,19 +290,16 @@ export class BitocardChatController {
   constructor(
     private readonly chats: ChatsService,
     private readonly prisma: PrismaService,
-    private readonly planAccess: PlanAccessService,
   ) {}
 
   @Get()
   async current(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
-    await this.planAccess.require(resellerOf(caller), 'priority_support');
     return { object: 'support_chat_current' as const, chat: await this.chats.currentForReseller(resellerOf(caller), mode) };
   }
 
   @Post('messages')
   @SkipIdempotency()
   async send(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: ChatMessageDto) {
-    await this.planAccess.require(resellerOf(caller), 'priority_support');
     return this.chats.sendAsReseller(resellerOf(caller), mode, await authorOf(this.prisma, caller, 'reseller'), body.body);
   }
 
@@ -311,7 +307,6 @@ export class BitocardChatController {
   @SkipIdempotency()
   @UseInterceptors(upload)
   async attach(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: ChatFileDto, @UploadedFile() file?: ChatUpload) {
-    await this.planAccess.require(resellerOf(caller), 'priority_support');
     return this.chats.attachAsReseller(resellerOf(caller), mode, await authorOf(this.prisma, caller, 'reseller'), file, body.body);
   }
 

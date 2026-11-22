@@ -45,8 +45,6 @@ const protectedRoutes = [
   ['put', '/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 100 }],
   ['put', '/v1/admin/classifieds/resale-settings/NG', { reseller_fee_bps: 100 }],
   ['post', '/v1/admin/theme/publish', {}],
-  ['put', '/v1/admin/setup-fees/NG', { enabled: false, amount: 0 }],
-  ['delete', '/v1/admin/setup-fees/NG'],
   ['post', `/v1/admin/classifieds/orders/${randomId}/payout-review`, { decision: 'approve', note: 'ok' }],
   ['post', `/v1/admin/vpn/subscriptions/${randomId}/enable`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/startup-allowance`, {}],
@@ -67,16 +65,11 @@ const protectedRoutes = [
   ['patch', `/v1/admin/bank-deposit-accounts/${randomId}`, {}],
   ['delete', `/v1/admin/bank-deposit-accounts/${randomId}`],
   ['post', `/v1/admin/bank-deposits/${randomId}/credit`, {}],
-  ['put', '/v1/admin/plans/premium/limits/stores', { value: 5 }],
-  ['put', `/v1/admin/stores/${randomId}/subscription`, { plan: 'premium' }],
   ['put', `/v1/admin/resellers/${randomId}/credit-limit`, { cents: 2500, reason: 'x' }],
-  ['patch', '/v1/admin/plans/premium', {}],
-  ['post', '/v1/admin/plans', {}],
-  ['put', '/v1/admin/plans/premium/features/priority_support', { enabled: true }],
-  ['delete', '/v1/admin/plans/premium'],
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver/remove`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/unsuspend`, { reason: 'x' }],
+  ['put', `/v1/admin/resellers/${randomId}/store-limit`, { max_stores: 2, reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/make-customer`, { reason: 'x' }],
   ['post', `/v1/admin/storefront/customers/${randomId}/make-reseller`, { business_name: 'x', reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/members/${randomId}/two-step/reset`, { reason: 'x' }],
@@ -146,15 +139,13 @@ describe('admin step-up window', () => {
     assert.equal((await switchOn()).json.error.code, 'step_up_required', 'closed once the five minutes pass');
   });
 
-  test('protective and routine actions need no window; activating a reseller or changing its plan does', async () => {
+  test('protective and routine actions need no window; activating a reseller does', async () => {
     const admin = await adminClient(server, ['super_admin'], { stepUp: false });
     const { resellerId } = await resellerClient(server);
     const suspended = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'suspended' });
     assert.equal(suspended.status, 200, 'suspending stays one click');
     const activate = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' });
     assert.equal(activate.json.error.code, 'step_up_required');
-    const plan = await admin.patch(`/v1/admin/resellers/${resellerId}`, { plan: 'premium' });
-    assert.equal(plan.json.error.code, 'step_up_required');
     assert.notEqual((await admin.get('/v1/admin/overview')).status, 403, 'reading needs no window');
     // A dispute rejection is not a money decision; a refund is.
     const reject = await admin.post(`/v1/admin/disputes/${randomId}/execute`, { action: 'reject', note: 'No' });

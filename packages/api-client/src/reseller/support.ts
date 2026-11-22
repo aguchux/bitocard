@@ -225,16 +225,17 @@ export const {
 
 export type AiProviderName = 'anthropic' | 'openai' | 'deepseek';
 
-/** The AI behind the reseller's assistants: BitoCard's (Premium, an allowance per store) or their own keys. */
+/** The AI behind the reseller's assistants: BitoCard's (a free allowance per store, then charged to the wallet) or their own keys. */
 export type SupportAi = {
   object: 'support_ai';
-  premium: boolean;
-  /** `replies_per_store`: on your plan; null: no limit. */
-  allowance: { replies_per_store: number | null; month_start: string; stores: Array<{ store_id: string; store_name: string; bitocard_replies: number }> };
+  /** Udozo only: whether its plan includes BitoCard's AI. BitoCard's every store has it. */
+  premium?: boolean;
+  /** `replies_per_store`: free replies a month; null: no limit. */
+  allowance: { replies_per_store: number | null; month_start: string; stores: Array<{ store_id: string; store_name: string; bitocard_replies: number; replies_allowed?: number | null }> };
   providers: Array<{
     provider: AiProviderName;
     label: string;
-    /** Models offered on BitoCard's AI (Premium). */
+    /** Models offered on BitoCard's AI. */
     bitocard_models: string[];
     own_key: { provider: AiProviderName; last4: string; models: string[]; checked_at: string; failed_at: string | null } | null;
   }>;

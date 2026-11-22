@@ -39,7 +39,8 @@ export type FeeStatement = {
     net: number;
     by_kind: Array<{ kind: FeeKind; transactions: number; base: number; charged: number; refunded: number }>;
   };
-  subscription: number;
+  /** Udozo only: plan charges in the month. */
+  subscription?: number;
   total: number;
   /** Accrued but not yet charged, in billionths of a minor unit (always below one unit). */
   carried_nano: string;

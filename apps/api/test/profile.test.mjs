@@ -212,10 +212,11 @@ describe('what every team member can read', () => {
     assert.ok(json.categories.every(category => !('taxable' in category)), 'admin-only fields stay private');
   });
 
-  test('plans are paid from the live wallet, so the sandbox refuses a plan change', async () => {
+  test('there are no plans: the subscription routes are unknown and the account names none', async () => {
     const owner = await resellerClient(server);
-    const res = await owner.browser.post('/v1/subscription', { plan: 'premium' }, { 'bitocard-mode': 'test' });
-    assert.deepEqual([res.status, res.json.error.code], [409, 'live_only']);
-    assert.equal((await owner.browser.get('/v1/subscription')).json.plan.code, 'standard');
+    for (const res of [await owner.browser.post('/v1/subscription', { plan: 'premium' }), await owner.browser.get('/v1/subscription'), await owner.browser.get('/v1/plans')]) {
+      assert.deepEqual([res.status, res.json.error.code], [404, 'resource_missing']);
+    }
+    assert.equal((await owner.browser.get('/v1/account')).json.plan, undefined);
   });
 });

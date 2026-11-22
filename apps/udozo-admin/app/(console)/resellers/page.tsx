@@ -55,7 +55,7 @@ export default function ResellersPage() {
           columns={[
             { key: "name", header: "Business", cell: reseller => <span className="font-semibold">{reseller.name}</span> },
             { key: "country", header: "Country", cell: reseller => reseller.country ?? "—" },
-            { key: "plan", header: "Plan", cell: reseller => humanise(reseller.plan) },
+            { key: "plan", header: "Plan", cell: reseller => (reseller.plan ? humanise(reseller.plan) : "—") },
             { key: "status", header: "Status", cell: reseller => <StatusBadge status={reseller.status} /> },
             { key: "joined", header: "Joined", cell: reseller => <span className="text-muted">{formatDate(reseller.created_at)}</span>, hideOnMobile: true },
           ]}

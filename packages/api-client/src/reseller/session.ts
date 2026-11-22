@@ -53,7 +53,8 @@ export type PlanDetail = Plan & {
 export type Account = {
   object: 'account';
   reseller: ResellerRef;
-  plan: Plan;
+  /** Udozo only: BitoCard has no plans. */
+  plan?: Plan;
   authenticated_as:
     | { type: 'session'; user_id: string; role: ResellerRole | null }
     | { type: 'api_key'; api_key_id: string; mode: 'test' | 'live'; scopes: string[] }

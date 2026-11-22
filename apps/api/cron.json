@@ -19,10 +19,6 @@
       "schedule": "15 * * * *"
     },
     {
-      "job": "plans",
-      "schedule": "0 6 * * *"
-    },
-    {
       "job": "invoices",
       "schedule": "20 * * * *"
     },

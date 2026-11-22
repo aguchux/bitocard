@@ -169,6 +169,8 @@ const integrationKeyList = [
   'DEEPSEEK_PRICES',
   'AI_BITOCARD_MODELS',
   'AI_MONTHLY_REPLIES',
+  'MAX_STORES_PER_RESELLER',
+  'USAGE_MARGIN_PERCENT',
   'GITHUB_REPO',
   'GITHUB_TOKEN',
   'GITHUB_WEBHOOK_SECRET',
@@ -549,7 +551,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
   {
     id: 'anthropic',
     name: 'Anthropic (Claude)',
-    description: 'Claude models for support bots that run on BitoCard’s keys (stores on Premium). Stores using their own Anthropic key never use this one. Test connection lists the models the key can use.',
+    description: 'Claude models for support bots that run on BitoCard’s keys (every store, within its free allowance). Stores using their own Anthropic key never use this one. Test connection lists the models the key can use.',
     fields: [
       secret('ANTHROPIC_API_KEY', 'API key', { help: 'Anthropic Console > Settings > API keys.' }),
       field('ANTHROPIC_PRICES', 'Prices', { required: false, help: 'For usage costs: one model per line or separated by semicolons, with its input, output and cached-input price in US dollars per million tokens, for example claude-haiku-5-5 1 5 0.1. Without a price, usage is counted but costs show as 0.' }),
@@ -559,7 +561,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
   {
     id: 'openai',
     name: 'OpenAI',
-    description: 'OpenAI models for support bots that run on BitoCard’s keys (stores on Premium). Stores using their own OpenAI key never use this one. Test connection lists the models the key can use.',
+    description: 'OpenAI models for support bots that run on BitoCard’s keys (every store, within its free allowance). Stores using their own OpenAI key never use this one. Test connection lists the models the key can use.',
     fields: [
       secret('OPENAI_API_KEY', 'API key', { help: 'OpenAI Platform > API keys (a project key).' }),
       field('OPENAI_PRICES', 'Prices', { required: false, help: 'For usage costs: model, input, output and cached-input price in US dollars per million tokens, one per line or separated by semicolons.' }),
@@ -569,7 +571,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
   {
     id: 'deepseek',
     name: 'DeepSeek',
-    description: 'DeepSeek models for support bots that run on BitoCard’s keys (stores on Premium). DeepSeek processes data in China: take advice before offering it on BitoCard’s keys. Test connection lists the models the key can use.',
+    description: 'DeepSeek models for support bots that run on BitoCard’s keys (every store, within its free allowance). DeepSeek processes data in China: take advice before offering it on BitoCard’s keys. Test connection lists the models the key can use.',
     fields: [
       secret('DEEPSEEK_API_KEY', 'API key', { help: 'DeepSeek Platform > API keys.' }),
       field('DEEPSEEK_PRICES', 'Prices', { required: false, help: 'For usage costs: model, input, output and cached-input price in US dollars per million tokens, one per line or separated by semicolons.' }),
@@ -579,10 +581,19 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
   {
     id: 'support_ai',
     name: 'Support assistant',
-    description: 'How support bots run on BitoCard’s keys: the models stores on Premium may choose, and how many bot replies each store gets a month. Past the allowance, chats go to people until the month resets or the store adds its own key.',
+    description: 'How support bots run on BitoCard’s keys: the models every store may choose, and how many bot replies each store gets free a month. Past the allowance, each reply is charged to the reseller’s wallet at cost plus the usage margin (Reseller limits and usage); a store can choose to hand chats to people instead.',
     fields: [
       field('AI_BITOCARD_MODELS', 'Models on BitoCard’s keys', { help: 'provider:model, separated by commas, for example anthropic:claude-haiku-5-5, openai:gpt-5-mini, deepseek:deepseek-chat. Cheaper models keep the allowance affordable.' }),
-      field('AI_MONTHLY_REPLIES', 'Bot replies a month per store', { kind: 'number', help: 'The Premium allowance on BitoCard’s keys. Default: 2000. Stores on their own keys have no BitoCard limit.' }),
+      field('AI_MONTHLY_REPLIES', 'Free bot replies a month per store', { kind: 'number', help: 'Every store’s allowance on BitoCard’s keys. Default: 2000. Stores on their own keys have no BitoCard limit.' }),
+    ],
+  },
+  {
+    id: 'reseller_limits',
+    name: 'Reseller limits and usage',
+    description: 'Every reseller may use every feature and integration (within each market’s switches). These are the ceilings and the margin BitoCard sets for everyone; a reseller’s own store ceiling is set on their page.',
+    fields: [
+      field('MAX_STORES_PER_RESELLER', 'Stores per reseller', { kind: 'number', help: 'How many stores each reseller may run unless their page sets their own. Default: 1.' }),
+      field('USAGE_MARGIN_PERCENT', 'Usage margin (%)', { kind: 'number', help: 'BitoCard’s margin over its cost on usage charged as it happens: AI replies past the allowance and mobile money deposit fees. Default: 10.' }),
     ],
   },
   {

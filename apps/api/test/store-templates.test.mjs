@@ -43,6 +43,7 @@ const sub = name => `${name}${(counter += 1)}${Date.now().toString(36)}`.slice(0
 /** A reseller who lists both products. */
 async function seller() {
   const reseller = await resellerClient(server);
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { maxStores: 10 } });
   await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
   await listForTest(server, { resellerId: reseller.resellerId, productIds: [giftCard.id, software.id] });
   return reseller;

@@ -19,7 +19,7 @@ const columnsFor = (currency: string): Array<Column<Row>> => [
 ];
 
 /**
- * Reports > P&L: your earnings from sales, less BitoCard's fees, your plan subscription, domains and any chargebacks borne,
+ * Reports > P&L: your earnings from sales, less BitoCard's fees, any past plan charges, domains and any chargebacks borne,
  * for a date range. Never shows BitoCard's supplier costs, which stay internal.
  */
 export default function ResellerPnlPage() {

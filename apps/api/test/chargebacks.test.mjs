@@ -137,22 +137,6 @@ describe('Stripe chargebacks', () => {
     await ledgerOk();
   });
 
-  test('chargeback protection (Premium): nothing is held, and BitoCard bears a loss', async () => {
-    const { browser, intent, resellerId } = await toppedUp(400_000);
-    await prisma.reseller.update({ where: { id: resellerId }, data: { planCode: 'premium' } });
-    const id = stripeDispute(intent, 400_000);
-    await stripeWebhook(disputeEvent(id));
-    const open = await prisma.chargeback.findFirstOrThrow({ where: { providerDisputeId: id } });
-    assert.deepEqual([open.protected, open.heldMinor], [true, 0n]);
-    assert.equal((await wallet(browser)).available, 400_000);
-    const losses = await balance('chargebacks');
-    stripe.state.disputes[id].status = 'lost';
-    await stripeWebhook(disputeEvent(id, 'charge.dispute.closed'));
-    assert.equal(losses - (await balance('chargebacks')), 400_000n);
-    assert.equal((await wallet(browser)).available, 400_000, 'the reseller keeps their money');
-    await ledgerOk();
-  });
-
   test('a dispute for a payment BitoCard does not know is acknowledged and changes nothing', async () => {
     const id = stripeDispute('pi_unknown', 1000);
     const res = await stripeWebhook(disputeEvent(id));

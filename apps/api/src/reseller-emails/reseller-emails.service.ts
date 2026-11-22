@@ -5,7 +5,6 @@ import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { resellerTeamEmail } from '../notifications/templates.js';
-import { freePlanCode } from '../plans/features.js';
 import { customEmailKey, paragraphsOf, quickEmails, type ResellerEmailState } from './catalogue.js';
 
 /** The same quick email to the same reseller at most this often, so a double click never sends it twice. */
@@ -53,7 +52,6 @@ export class ResellerEmailsService {
       publishedStores,
       listedProducts,
       liveApiKeys,
-      paidPlan: reseller.planCode !== freePlanCode,
       market: reseller.country,
       whatsappGroup: Boolean(whatsappGroupUrl),
     };

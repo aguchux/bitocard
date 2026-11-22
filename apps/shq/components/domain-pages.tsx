@@ -207,7 +207,7 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
             Buy a domain or connect one you own to use your own address.
           </EmptyState>
         )}
-        {manage && full ? <div className="px-5 pb-5 sm:px-6"><Notice tone="blue">Your store has {domains.max_domains} domains, the most your plan allows. Disconnect one, or change your plan in Settings &gt; Plan.</Notice></div> : null}
+        {manage && full ? <div className="px-5 pb-5 sm:px-6"><Notice tone="blue">Your store has {domains.max_domains} domains, the most a store can have. Disconnect one, or change your plan in Settings &gt; Plan.</Notice></div> : null}
       </Card>
       {!manage ? <Notice tone="blue">The owner or an admin of {membership.reseller.name} manages the store’s domains.</Notice> : null}
     </div>
@@ -218,7 +218,7 @@ function AddingClosed({ store, domains }: { store: Store; domains: StoreDomains 
   const { manage, full } = useAdding(domains);
   return (
     <Notice tone="blue">
-      {!manage ? "The owner or an admin manages the store’s domains." : full ? `Your store has ${domains.max_domains} domains, the most your plan allows. Disconnect one, or change your plan in Settings > Plan.` : null}{" "}
+      {!manage ? "The owner or an admin manages the store’s domains." : full ? `Your store has ${domains.max_domains} domains, the most a store can have. Disconnect one, or change your plan in Settings > Plan.` : null}{" "}
       <AppLink href={storeHref("/store/domains", store)} className="font-semibold underline">Back to domains</AppLink>
     </Notice>
   );

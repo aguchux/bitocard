@@ -22,9 +22,8 @@ import { can, useReseller } from "@/components/reseller";
 
 const statusLabels = { active: "Active", pending_review: "Waiting for review", rejected: "Not approved", suspended: "Suspended", disconnected: "Not connected" } as const;
 
-const accessHelp: Record<Exclude<IntegrationAccessReason, null>, { text: string; href?: string; action?: string }> = {
+const accessHelp: Record<Exclude<IntegrationAccessReason, null | "plan">, { text: string; href?: string; action?: string }> = {
   switch_off: { text: "Connecting your own integrations is not switched on for your account yet. Contact BitoCard support to ask for it." },
-  plan: { text: "Your plan does not include your own integrations.", href: "/settings/plan", action: "See plans" },
   not_verified: { text: "Live integrations need a live account: the business owner completes the identity check first.", href: "/settings/verification", action: "Identity check" },
   no_country: { text: "Choose your business country first.", href: "/settings", action: "Business settings" },
 };
@@ -104,24 +103,23 @@ function GatewayControls({ integration, manage }: { integration: ResellerIntegra
 }
 
 /** Why BitoCard's gateways collect although you chose your own. */
-const collectorReasons: Record<Exclude<PaymentCollector["reason"], null | "chosen">, { text: string; href?: string; action?: string }> = {
+const collectorReasons: Record<Exclude<PaymentCollector["reason"], null | "chosen" | "plan">, { text: string; href?: string; action?: string }> = {
   switch_off: { text: "Your own payment gateway is not switched on for your account or market yet. Contact BitoCard support to ask for it." },
-  plan: { text: "Your own payment gateway comes with Premium.", href: "/settings/plan", action: "See plans" },
   not_verified: { text: "Live payments need a live account: the business owner completes the identity check first.", href: "/settings/verification", action: "Identity check" },
   no_country: { text: "Choose your business country first.", href: "/settings", action: "Business settings" },
   no_gateway: { text: "Connect a payment gateway below (and keep it in use) for it to collect." },
 };
 
 /**
- * Who collects your hosted stores' customer payments. Your own gateway (Premium, where BitoCard switched it on for your
- * market): customers pay into your account at checkout and BitoCard takes its fee and the order's cost from your
+ * Who collects your hosted stores' customer payments. Your own gateway (where BitoCard switched it on for your account
+ * or market): customers pay into your account at checkout and BitoCard takes its fee and the order's cost from your
  * wallet. BitoCard's gateways: BitoCard collects and your margin reaches your wallet.
  */
 function CollectorCard({ collector, manage }: { collector: PaymentCollector; manage: boolean }) {
   const [choose, state] = useSetPaymentCollectorMutation();
-  const why = collector.reason && collector.reason !== "chosen" ? collectorReasons[collector.reason] : null;
+  const why = collector.reason && collector.reason !== "chosen" && collector.reason !== "plan" ? collectorReasons[collector.reason] : null;
   const options = [
-    { value: "own" as const, title: "My own payment gateway", text: "Customers pay into your own account at checkout. BitoCard takes its fee and the order’s cost from your wallet. Premium." },
+    { value: "own" as const, title: "My own payment gateway", text: "Customers pay into your own account at checkout. BitoCard takes its fee and the order’s cost from your wallet." },
     { value: "bitocard" as const, title: "BitoCard", text: "BitoCard’s gateways collect; your margin reaches your wallet. Customers can also pay from their store wallet." },
   ];
   return (
@@ -375,7 +373,7 @@ function Group({ title, icon, items, render }: { title: string; icon: React.Reac
 
 /**
  * Your own supplier and payment gateway accounts, where BitoCard offers them in your country. You fund them yourself;
- * BitoCard is paid by its fees and your subscription from your wallet. Owners and admins manage them.
+ * BitoCard is paid by its fees from your wallet. Owners and admins manage them.
  */
 export default function IntegrationsPage() {
   const { membership, mode, setMode } = useReseller();
@@ -391,7 +389,7 @@ export default function IntegrationsPage() {
   const shown = (data?.data ?? []).filter(item => words.every(word => [item.name, item.description, item.kind === "supplier" ? "supplier" : "payment gateway"].join(" ").toLowerCase().includes(word)));
   const current = data?.data.find(item => item.id === connecting) ?? null;
   const toRemove = data?.data.find(item => item.id === removing) ?? null;
-  const help = data?.access.reason ? accessHelp[data.access.reason] : null;
+  const help = data?.access.reason && data.access.reason !== "plan" ? accessHelp[data.access.reason] : null;
   // Own suppliers and own payment gateways are allowed separately.
   const allowedFor = (integration: ResellerIntegration) => Boolean(integration.kind === "payment_gateway" ? data?.gateway_access.allowed : data?.access.allowed);
 

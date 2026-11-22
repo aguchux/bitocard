@@ -1,11 +1,9 @@
-import { planLimitCatalogue, planLimitsFor } from '../../plans/features.js';
-import { planFeatureCatalogue, planFeatureGroups, planFeatures } from '../../plans/plans.service.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, num, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 /**
- * Wallet, top-ups, reserved bank accounts, BitoCard fees, exchange rates, payouts and plans. Amounts are integer minor
+ * Wallet, top-ups, reserved bank accounts, BitoCard fees, exchange rates, and payouts. Amounts are integer minor
  * units (kobo, pesewas, cents); fee rates are parts per billion. Top-ups and payouts reuse the webhook objects.
  */
 
@@ -108,7 +106,7 @@ const WalletTransaction = objectSchema(
     object: constant('wallet_transaction'),
     id: uuid('Transaction ID (a ledger entry).'),
     type: oneOf(
-      'What happened: `top_up` (checkout payment), `deposit` (bank transfer into your reserved account), `hold` (wholesale cost held for an order, plan or fee), `hold_release` (a hold returned), `hold_capture` (a hold taken: order delivered or plan paid), `earnings` (sale profit, on hold), `earnings_release` (profit became withdrawable), `payout` (withdrawal set aside or paid), `payout_reversal` (failed withdrawal returned), `order_refund`, `platform_fee`, `platform_fee_refund`, `adjustment` (a correction by BitoCard), `allowance_granted` or `allowance_revoked` (the startup allowance).',
+      'What happened: `top_up` (checkout payment), `deposit` (bank transfer into your reserved account), `hold` (wholesale cost held for an order, a domain or a fee), `hold_release` (a hold returned), `hold_capture` (a hold taken: order delivered or plan paid), `earnings` (sale profit, on hold), `earnings_release` (profit became withdrawable), `payout` (withdrawal set aside or paid), `payout_reversal` (failed withdrawal returned), `order_refund`, `platform_fee`, `platform_fee_refund`, `adjustment` (a correction by BitoCard), `allowance_granted` or `allowance_revoked` (the startup allowance).',
       transactionTypes,
     ),
     description: str('A plain description, for example `Wallet top-up` or `Order delivered: MTN Nigeria airtime`.'),
@@ -237,11 +235,10 @@ const FeeStatement = objectSchema(
       },
       'BitoCard fees on your own-integration transactions.',
     ),
-    subscription: money('Plan charges paid in the month'),
-    total: money('Net fees plus plan charges'),
+    total: money('Net fees'),
     carried_nano: nano('The fraction accrued but not yet charged, now (always below one minor unit).'),
   },
-  'What BitoCard charged you in one month: fees and plan charges.',
+  'What BitoCard charged you in fees in one month.',
 );
 
 const FeeRate = objectSchema(
@@ -255,7 +252,7 @@ const FeeRate = objectSchema(
     min_fee: nullableInt('The minimum fee per transaction, in minor units of `currency`, if any.'),
     currency: nullableStr('ISO 4217 currency of `min_fee`: the currency of your country, which is your wallet currency. Null only before your business country is set.'),
   },
-  'A BitoCard fee rate that applies to you now, for your country and plan. Zero means no fee.',
+  'A BitoCard fee rate that applies to you now, for your country. Zero means no fee.',
 );
 
 // ---- Exchange rates
@@ -268,7 +265,7 @@ const ExchangeRate = objectSchema(
     object: constant('exchange_rate'),
     base: constant('USD'),
     currency: str('ISO 4217 currency.'),
-    available: bool('False while conversions are paused (stale or disagreeing reference rates): quotes and plan charges needing this currency are refused.'),
+    available: bool('False while conversions are paused (stale or disagreeing reference rates): quotes needing this currency are refused.'),
     pay: decimal('Units of the currency charged per US dollar, margin included: used when you pay in this currency for a US dollar amount.'),
     receive: decimal('Units of the currency received per US dollar, margin deducted: used when US dollars are converted into this currency.'),
     margin_percent: num('BitoCard’s disclosed conversion margin, in percent.'),
@@ -306,7 +303,7 @@ const Chargeback = objectSchema(
     amount: money('The disputed amount'),
     currency: str('Currency of the payment (ISO 4217).'),
     status: oneOf('`open` while the card network decides, then `won` (the hold comes back) or `lost` (returned to the cardholder).', ['open', 'won', 'lost']),
-    protected: bool('Your plan has chargeback protection: nothing is held and BitoCard bears a loss.'),
+    protected: bool('Kept for chargebacks from before: BitoCard bore the loss and nothing was held. Always false now: a chargeback is held from your wallet, and you settle it with your customer.'),
     held: money('Held from your wallet for it'),
     shortfall: money('What your wallet could not cover when it was opened'),
     payouts_on_hold: bool('Whether it is holding up your withdrawals: open, or lost with a shortfall BitoCard has not yet settled with you.'),
@@ -343,71 +340,6 @@ const PayoutDetail = objectSchema(
   'A withdrawal of your earnings to a bank account.',
 );
 
-// ---- Plans
-
-const Plan = objectSchema(
-  'Plan',
-  {
-    object: constant('plan'),
-    code: str('Plan code, for example `standard` or `premium`.'),
-    name: str('Plan name.'),
-    price: shape(
-      {
-        amount: int('Monthly price in US cents (0 for Startup). You are charged `local_price` in your currency.'),
-        currency: constant('USD'),
-        interval: constant('month'),
-      },
-      'The price.',
-    ),
-    features: array(oneOf('A plan feature.', planFeatures), 'What the plan includes, by code: `feature_details` names and describes each. An API call needing a feature the plan does not include is refused (403 `plan_feature_required`, `param` the feature).'),
-    description: nullable(str('What the plan is for.')),
-    feature_details: array(
-      shape({ code: oneOf('The feature.', planFeatures), scope: oneOf('Where it applies: to each store (`store`) or to your whole account (`account`).', ['store', 'account']), group: oneOf('Where it is listed: running independently, selling, support and protection, or team.', Object.keys(planFeatureGroups)), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
-      'The features in words, in the order they are shown.',
-    ),
-    limits: shape(
-      Object.fromEntries(planLimitsFor('bitocard').map(limit => [limit, nullableInt(`${planLimitCatalogue[limit].name}: ${planLimitCatalogue[limit].description} Null: no limit.`)])),
-      'How much the plan allows. Adding one more past a limit is refused (409 `store_limit_reached`, `too_many_domains` or `plan_limit_reached` with `param` the limit; 400 `endpoint_limit`; 402 `ai_allowance_reached`); nothing is removed when a limit is lowered.',
-    ),
-    local_price: nullable(
-      shape(
-        {
-          amount: int('Monthly price in minor units of `currency`.'),
-          currency: str('ISO 4217 currency code.'),
-          fixed: bool('True when BitoCard set this price for the currency; false when it is the US dollar price at today’s rate (it moves with the rate).'),
-        },
-        'What the plan costs a month in your currency: on `GET /v1/plans?currency=`, and on your subscription. Null when not asked for, or when it cannot be priced right now.',
-      ),
-    ),
-  },
-  'A reseller plan.',
-);
-
-const StoreSubscription = objectSchema(
-  'StoreSubscription',
-  {
-    object: constant('store_subscription'),
-    store: shape({ id: uuid('The store.'), name: str('Its name.') }, 'The store.'),
-    plan: ref('Plan'),
-    renews_at: nullableTime('When the store’s plan is next charged; null when it is not billed (Startup, or a plan set by BitoCard).'),
-    cancel_at_period_end: bool('True when the plan ends at `renews_at` and the store goes back to Startup.'),
-    next_plan: nullable(shape({ code: str('Plan code.'), name: str('Plan name.') }, 'A cheaper plan taking over at `renews_at`.')),
-    past_due_since: nullableTime('When a renewal failed for lack of funds; the plan stays on for 7 days.'),
-  },
-  'A store’s plan and its billing. Each store pays for its own plan.',
-);
-
-const Subscription = objectSchema(
-  'Subscription',
-  {
-    object: constant('subscription'),
-    plan: ref('Plan'),
-    renews_at: nullableTime('When the plan is next charged; null when it is not billed (Startup, or a plan set by BitoCard).'),
-    cancel_at_period_end: bool('True when the plan ends at the end of the paid month instead of renewing.'),
-    past_due_since: nullableTime('When a renewal failed for lack of funds; the plan stays on for a grace period of 7 days.'),
-  },
-  'Your current plan.',
-);
 
 // ---- Examples
 
@@ -553,41 +485,6 @@ const payout = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const standardPlan = {
-  object: 'plan',
-  code: 'standard',
-  name: 'Startup',
-  price: { amount: 0, currency: 'USD', interval: 'month' },
-  features: ['multiple_stores', 'store_traffic', 'team_members'],
-  description: 'Everything you need to run your store and sell through the API.',
-  feature_details: (['multiple_stores', 'store_traffic', 'team_members'] as const).map(code => ({ code, ...planFeatureCatalogue[code] })),
-  limits: { stores: 5, domains_per_store: 5, own_connections: null, ai_replies: 2000, team_members: null, webhook_endpoints: 16 },
-  local_price: { amount: 0, currency: 'NGN', fixed: true },
-};
-const premiumPlan = {
-  object: 'plan',
-  code: 'premium',
-  name: 'Premium',
-  price: { amount: 2_500, currency: 'USD', interval: 'month' },
-  features: ['international_selling', 'chargeback_protection', 'priority_support'],
-  description: 'More protection, more reach and more tools, billed monthly from your wallet.',
-  feature_details: (['international_selling', 'chargeback_protection', 'priority_support'] as const).map(code => ({ code, ...planFeatureCatalogue[code] })),
-  limits: { stores: 5, domains_per_store: 5, own_connections: null, ai_replies: 2000, team_members: null, webhook_endpoints: 16 },
-  local_price: { amount: 3_500_000, currency: 'NGN', fixed: true },
-};
-
-const storeSubscription = {
-  object: 'store_subscription',
-  store: { id: '6f1c2a8e-3b7d-4e19-9a42-0c5d8b7e1f30', name: 'Ada Gifts' },
-  plan: premiumPlan,
-  renews_at: '2026-11-20T09:00:00.000Z',
-  cancel_at_period_end: false,
-  next_plan: null,
-  past_due_since: null,
-};
-
-const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '2026-11-06T09:00:00.000Z', cancel_at_period_end: false, past_due_since: null };
-
 const noMore = (item: Schema) => list(item, {}, false);
 
 
@@ -604,7 +501,7 @@ const invoiceFields = {
   paid: money('What your wallet has paid of it'),
   owed: money('What is still owed: your next top-ups pay it'),
   closed_at: nullableTime('When the month closed.'),
-  due_at: nullableTime('When it is due: 7 days after it closes, or sooner when the store’s subscription renews first.'),
+  due_at: nullableTime('When it is due: 7 days after it closes.'),
   paid_at: nullableTime('When nothing was owed any more.'),
   overdue: bool('Whether it went past its due date unpaid (your credit limit then dropped a step).'),
 };
@@ -613,7 +510,7 @@ const InvoiceLine = objectSchema(
   {
     object: constant('invoice_line'),
     id: uuid('The line.'),
-    kind: oneOf('What it was for.', ['subscription', 'domain', 'platform_fee', 'usage']),
+    kind: oneOf('What it was for (`subscription` only on invoices from when BitoCard had plans).', ['subscription', 'domain', 'platform_fee', 'usage']),
     description: str('What was charged.'),
     amount: money('What it cost'),
     paid: money('What your wallet paid when it happened, or since'),
@@ -637,7 +534,7 @@ const Credit = objectSchema(
   },
   'Your credit limit and what you owe.',
 );
-const invoiceLineExample = { object: 'invoice_line', id: '5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e', kind: 'subscription', description: 'Premium plan for Ada Digital: ₦38,062.50', amount: 3806250, paid: 3806250, owed: 0, created_at: '2026-10-01T06:00:00.000Z' };
+const invoiceLineExample = { object: 'invoice_line', id: '5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e', kind: 'usage', description: 'AI replies beyond this month’s allowance: ₦3,806.25', amount: 380625, paid: 380625, owed: 0, created_at: '2026-10-01T06:00:00.000Z' };
 const invoiceExample = {
   object: 'invoice',
   id: '4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d',
@@ -658,7 +555,7 @@ const invoiceExample = {
 const creditExample = { object: 'credit', limit_usd_cents: 1000, steps: [1000, 2500, 5000, 10000], owed: [], next_limit_usd_cents: 2500, can_raise: false, raise_blocked_by: 'no_paid_month' };
 
 export const moneyDocs: DocsArea = {
-  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, StoreSubscription, Subscription, Invoice, InvoiceDetail, InvoiceLine, Credit },
+  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Invoice, InvoiceDetail, InvoiceLine, Credit },
   responses: {
     'GET /v1/wallet': { status: 200, description: 'Your wallet in the mode of the key or session.', schema: 'Wallet', example: wallet },
     'GET /v1/wallet/transactions': { status: 200, description: 'Wallet transactions, newest first.', schema: list(ref('WalletTransaction')), example: listExample(transactions, true) },
@@ -757,8 +654,7 @@ export const moneyDocs: DocsArea = {
             { kind: 'gateway_payment', transactions: 4, base: 13_700_000, charged: 20_550, refunded: 0 },
           ],
         },
-        subscription: 3_806_250,
-        total: 3_989_583,
+        total: 183_333,
         carried_nano: '117500000',
       },
     },
@@ -823,17 +719,6 @@ export const moneyDocs: DocsArea = {
       schema: 'PayoutDetail',
       example: payout({ mode: 'test', status: 'failed', failure_reason: 'Simulated failure.' }),
     },
-    'GET /v1/plans': { status: 200, description: 'The reseller plans, cheapest first.', schema: noMore(ref('Plan')), example: { object: 'list', data: [standardPlan, premiumPlan] } },
-    'GET /v1/subscription': { status: 200, description: 'Your current plan.', schema: 'Subscription', example: subscription },
-    'POST /v1/subscription': { status: 200, description: 'Your plan after the change.', schema: 'Subscription', example: subscription },
-    'GET /v1/subscriptions': {
-      status: 200,
-      description: 'Every store’s plan, and the account’s plan (the highest among your stores).',
-      schema: shape({ object: constant('list'), account_plan: shape({ code: str('Plan code.'), name: str('Plan name.') }, 'The account’s plan: account-wide features and limits follow it.'), data: array(ref('StoreSubscription'), 'Your stores, oldest first.') }, 'Your stores’ plans.'),
-      example: { object: 'list', account_plan: { code: 'premium', name: 'Premium' }, data: [storeSubscription] },
-    },
-    'GET /v1/stores/{store}/subscription': { status: 200, description: 'The store’s plan.', schema: 'StoreSubscription', example: storeSubscription },
-    'POST /v1/stores/{store}/subscription': { status: 200, description: 'The store’s plan after the change.', schema: 'StoreSubscription', example: storeSubscription },
     'GET /v1/invoices': { status: 200, description: 'Your invoices, newest first.', schema: list(ref('Invoice')), example: listExample([invoiceExample]) },
     'GET /v1/invoices/{id}': { status: 200, description: 'The invoice with its lines.', schema: 'InvoiceDetail', example: { ...invoiceExample, lines: [invoiceLineExample] } },
     'POST /v1/invoices/{id}/pay': { status: 200, description: 'The invoice after paying what it owed.', schema: 'InvoiceDetail', example: { ...invoiceExample, status: 'paid', paid_at: '2026-11-03T10:00:00.000Z', lines: [invoiceLineExample] } },

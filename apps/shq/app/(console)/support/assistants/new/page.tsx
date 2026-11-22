@@ -29,11 +29,6 @@ export default function NewAssistantPage() {
         <Skeleton className="h-96 w-full" />
       ) : (
         <Card className="p-5 sm:p-6">
-          {!context.ai.premium && !Object.keys(context.ai.own).length ? (
-            <Notice tone="amber" title="Add an AI key first, or go Premium">
-              Your assistant needs an AI to answer with. Add your own Anthropic, OpenAI or DeepSeek key in Support &gt; AI keys, or change to Premium to use BitoCard’s.
-            </Notice>
-          ) : null}
           <AssistantProfileForm
             context={context}
             showStore

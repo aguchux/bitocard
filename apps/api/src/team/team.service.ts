@@ -7,7 +7,6 @@ import type { Invitation, ResellerRole } from '../generated/prisma/client.js';
 import { EmailService } from '../notifications/email.service.js';
 import { invitationEmail } from '../notifications/templates.js';
 import { InboxService } from '../notifications/inbox.service.js';
-import { PlanAccessService } from '../plans/plan-access.js';
 
 export const staffRoles = ['admin', 'developer', 'finance', 'support'] as const;
 const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1000;
@@ -40,7 +39,6 @@ export class TeamService {
     private readonly email: EmailService,
     private readonly integrations: IntegrationsService,
     private readonly inbox: InboxService,
-    private readonly planAccess: PlanAccessService,
   ) {}
 
   async team(resellerId: string) {
@@ -64,17 +62,9 @@ export class TeamService {
 
   /** Emails a 7-day invitation. A new invitation to the same address replaces the previous one. */
   async invite(resellerId: string, invitedById: string, emailInput: string, role: ResellerRole) {
-    await this.planAccess.require(resellerId, 'team_members');
     const email = emailInput.trim().toLowerCase();
     const existing = await this.prisma.resellerMember.findFirst({ where: { resellerId, user: { email, realm: 'reseller' } } });
     if (existing) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_a_member', 'This person is already on your team.', 'email');
-    // Members besides the owner, and invitations still waiting (except one to this address, which this one replaces).
-    const [members, waiting] = await Promise.all([
-      this.prisma.resellerMember.count({ where: { resellerId, role: { not: 'owner' } } }),
-      this.prisma.invitation.count({ where: { resellerId, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() }, email: { not: email } } }),
-    ]);
-    await this.planAccess.requireRoom(resellerId, 'team_members', members + waiting, { param: 'email' });
-
     const token = randomToken();
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const [, invitation] = await this.prisma.$transaction([

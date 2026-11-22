@@ -46,7 +46,7 @@ after(async () => {
 /** A verified (active) reseller on Premium with own suppliers and own payment gateways switched on. */
 async function allowedReseller(country = 'NG') {
   const reseller = await resellerClient(server, { country });
-  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', planCode: 'premium' } });
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', maxStores: 10 } });
   assert.equal((await admin.put('/v1/admin/switches/own_integrations', { reseller_id: reseller.resellerId, enabled: true })).status, 200);
   assert.equal((await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: reseller.resellerId, enabled: true })).status, 200);
   return reseller;
@@ -113,14 +113,12 @@ describe('availability', () => {
 });
 
 describe('gates', () => {
-  test('the switch, the plan, a country and (live) a verified account are all needed', async () => {
+  test('the switch, a country and (live) a verified account are all needed; no plan', async () => {
     await offer('reloadly', { global: true, countries: [], approval: 'automatic' });
     const { browser, resellerId } = await resellerClient(server);
     const reason = async headers => (await browser.get('/v1/integrations', headers)).json.access.reason;
     assert.equal(await reason(), 'switch_off');
     await admin.put('/v1/admin/switches/own_integrations', { reseller_id: resellerId, enabled: true });
-    assert.equal(await reason(), 'plan');
-    await prisma.reseller.update({ where: { id: resellerId }, data: { planCode: 'premium' } });
     assert.equal(await reason(), 'not_verified');
     assert.equal(await reason(testMode), null, 'the sandbox does not need the identity check');
     const refused = await browser.put('/v1/integrations/reloadly/connection', { values: reloadly });
@@ -299,20 +297,14 @@ describe('isolation', () => {
   });
 });
 
-describe('the plan’s limit on own connections', () => {
-  test('a new connection past the limit is refused; changing one already connected is not', async () => {
+describe('own connections', () => {
+  test('a reseller connects as many integrations as admins open to them', async () => {
     await offer('reloadly', { global: true, countries: [], approval: 'automatic' });
     await offer('zendit', { global: true, countries: [], approval: 'automatic' });
     const { browser } = await allowedReseller();
-    const finance = await adminClient(server, ['finance']);
-    assert.equal((await finance.put('/v1/admin/plans/premium/limits/own_connections', { value: 1 })).status, 200);
-    try {
-      assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-own' } }, testMode)).status, 200);
-      assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-new' } }, testMode)).status, 200, 'changing it is fine');
-      const refused = await browser.put('/v1/integrations/reloadly/connection', { values: reloadly }, testMode);
-      assert.deepEqual([refused.status, refused.json.error?.code, refused.json.error?.param], [409, 'plan_limit_reached', 'own_connections'], JSON.stringify(refused.json));
-    } finally {
-      await finance.put('/v1/admin/plans/premium/limits/own_connections', { reset: true });
-    }
+    assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-own' } }, testMode)).status, 200);
+    assert.equal((await browser.put('/v1/integrations/zendit/connection', { values: { api_key: 'zendit-new' } }, testMode)).status, 200, 'changing it is fine');
+    const second = await browser.put('/v1/integrations/reloadly/connection', { values: reloadly }, testMode);
+    assert.equal(second.status, 200, JSON.stringify(second.json));
   });
 });

@@ -18,7 +18,6 @@ import { Controller, Get, HttpStatus, Inject, Param, Req } from '@nestjs/common'
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CronOnly } from '../auth/caller.js';
-import { BillingService } from '../billing/billing.service.js';
 import { CheckoutService } from '../checkout/checkout.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
@@ -67,7 +66,6 @@ export class CronController {
     payments: PaymentsService,
     payouts: PayoutsService,
     wallets: WalletService,
-    billing: BillingService,
     suppliers: SuppliersService,
     orders: OrdersService,
     webhooks: WebhookDeliveryService,
@@ -121,7 +119,6 @@ export class CronController {
       /** Hourly. */
       earnings: () => wallets.releaseDueEarnings(),
       /** Daily. */
-      plans: () => billing.renewDue(),
       /** Hourly: close last month's invoices, drop the credit limit for overdue ones, pay what is owed from top-ups. */
       invoices: () => invoices.run(),
       /** Every 15 minutes: end VPN access at its expiry or after a refund (verified with the supplier), fix expiry drift, retry unconfirmed password resets. */

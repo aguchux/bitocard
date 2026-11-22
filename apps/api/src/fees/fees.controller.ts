@@ -38,11 +38,6 @@ class FeeRuleDto {
   @IsIn(categories)
   category?: ProductCategory | null;
 
-  @IsOptional()
-  @IsString()
-  @Length(1, 40)
-  plan_code?: string | null;
-
   /** Parts per billion: 1 = 0.0000001%, 100,000,000 = 10%. */
   @IsInt()
   @Min(0)
@@ -74,8 +69,8 @@ class ReportQueryDto {
   mode?: LedgerMode;
 
   @IsOptional()
-  @IsIn(['reseller', 'kind', 'category', 'country', 'plan'])
-  group_by?: 'reseller' | 'kind' | 'category' | 'country' | 'plan';
+  @IsIn(['reseller', 'kind', 'category', 'country'])
+  group_by?: 'reseller' | 'kind' | 'category' | 'country';
 }
 
 class AdminFeesQueryDto extends FeesQueryDto {
@@ -111,7 +106,7 @@ export class FeesController {
     return this.fees.statement(resellerOf(caller), mode, query.month ?? thisMonth());
   }
 
-  @ApiOperation({ summary: 'The fee rates that apply to you', description: 'Per fee kind and product category, for your country and plan, in parts per billion and as a percentage.' })
+  @ApiOperation({ summary: 'The fee rates that apply to you', description: 'Per fee kind and product category, for your country, in parts per billion and as a percentage.' })
   @Get('fee-rates')
   rates(@CurrentCaller() caller: Caller) {
     return this.fees.ratesFor(resellerOf(caller));

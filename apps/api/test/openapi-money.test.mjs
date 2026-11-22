@@ -127,30 +127,11 @@ describe('live wallet money', () => {
     assert.ok(transactions.data.some(item => item.type === 'platform_fee' && item.fee?.source?.type === 'order'));
   });
 
-  test('plans: the list, the subscription and upgrading from the live wallet', async () => {
-    const plans = await expect(client(server.base), 'GET', '/v1/plans', 'GET /v1/plans', 200);
-    assert.deepEqual(plans.data.map(plan => plan.code), ['standard', 'premium']);
-    const priced = await expect(client(server.base), 'GET', '/v1/plans?currency=NGN', 'GET /v1/plans', 200);
-    assert.equal(priced.data[0].local_price.currency, 'NGN');
-    const { browser, resellerId } = await resellerClient(server);
-    await wallets.adjust(null, { resellerId, mode: 'live', balance: 'funding', amount: 10_000_000, reason: 'Top-up' });
-    const store = (await browser.post('/v1/stores', { name: 'Docs Store', subdomain: `docs${Date.now().toString(36)}` })).json;
-    assert.ok(store.id, JSON.stringify(store));
-    await expect(browser, 'GET', '/v1/subscription', 'GET /v1/subscription', 200);
-    const upgraded = await expect(browser, 'POST', '/v1/subscription', 'POST /v1/subscription', 200, { plan: 'premium' });
-    assert.ok(upgraded.renews_at);
-    const cancelled = await expect(browser, 'POST', '/v1/subscription', 'POST /v1/subscription', 200, { plan: 'standard' });
-    assert.equal(cancelled.cancel_at_period_end, true);
-    // Plans per store.
-    const stores = await expect(browser, 'GET', '/v1/subscriptions', 'GET /v1/subscriptions', 200);
-    assert.deepEqual([stores.account_plan.code, stores.data[0].store.id], ['premium', store.id]);
-    await expect(browser, 'GET', `/v1/stores/${store.id}/subscription`, 'GET /v1/stores/{store}/subscription', 200);
-    const kept = await expect(browser, 'POST', `/v1/stores/${store.id}/subscription`, 'POST /v1/stores/{store}/subscription', 200, { plan: 'premium' });
-    assert.equal(kept.cancel_at_period_end, false);
-    const transactions = await expect(browser, 'GET', '/v1/wallet/transactions', 'GET /v1/wallet/transactions', 200);
-    assert.deepEqual(transactions.data.map(item => item.type), ['hold_capture', 'hold', 'adjustment']);
-    const wallet = await expect(browser, 'GET', '/v1/wallet', 'GET /v1/wallet', 200);
-    assert.equal(wallet.mode, 'live');
+  test('there are no plans: their routes are gone from the API and its documentation', async () => {
+    const { browser } = await resellerClient(server);
+    for (const path of ['/v1/plans', '/v1/subscription', '/v1/subscriptions']) assert.equal((await browser.get(path)).status, 404, path);
+    const doc = await (await fetch(`${server.base}/v1/openapi.json`)).json();
+    assert.deepEqual(Object.keys(doc.paths).filter(path => /plans|subscription/.test(path) && !/vpn/.test(path)), []);
   });
 
   test('exchange rates, available and paused', async () => {

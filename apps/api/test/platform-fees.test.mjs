@@ -65,16 +65,16 @@ describe('fee arithmetic', () => {
 });
 
 describe('fee rules', () => {
-  test('the most specific rule wins: country, then category, then plan; none means no fee', async () => {
+  test('the most specific rule wins: country, then category; there is no plan; none means no fee', async () => {
     const kind = 'gateway_payment';
     const { resellerId } = await funded(0, 'GH');
     assert.equal((await fees.quote({ resellerId, kind, baseMinor: 10_000n })).ratePpb, 0, 'no rule, no fee');
     assert.equal((await setRule({ kind, rate_ppb: 1_000_000 })).status, 200);
     assert.equal((await fees.quote({ resellerId, kind, baseMinor: 10_000n })).ratePpb, 1_000_000);
-    await setRule({ kind, plan_code: 'standard', rate_ppb: 900_000 });
-    assert.equal((await fees.quote({ resellerId, kind, baseMinor: 10_000n })).ratePpb, 900_000, 'plan beats global');
+    assert.equal((await setRule({ kind, plan_code: 'standard', rate_ppb: 900_000 })).status, 400, 'rules have no plan');
+    assert.equal((await fees.quote({ resellerId, kind, baseMinor: 10_000n })).ratePpb, 1_000_000);
     await setRule({ kind, country_code: 'gh', rate_ppb: 800_000 });
-    assert.equal((await fees.quote({ resellerId, kind, baseMinor: 10_000n })).ratePpb, 800_000, 'country beats plan');
+    assert.equal((await fees.quote({ resellerId, kind, baseMinor: 10_000n })).ratePpb, 800_000, 'country beats global');
     const again = await setRule({ kind, country_code: 'GH', rate_ppb: 700_000 });
     assert.equal(again.json.rate_percent, '0.07', 'one rule per scope, updated in place');
     const list = await admin.get('/v1/admin/fee-rules');

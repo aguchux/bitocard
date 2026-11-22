@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Percent, ReceiptText } from "lucide-react";
+import { Percent, ReceiptText } from "lucide-react";
 import { Card, CardHeader, type Column, DataTable, errorMessage, Field, formatDateTime, formatMoney, Input, Notice, PageHeader, StatCard, StatusBadge } from "@bitocard/admin-ui";
 import { type FeeCharge, useFeeChargesQuery, useFeeRatesQuery, useFeeStatementQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
@@ -18,7 +18,7 @@ function fraction(nano: string | null) {
 }
 
 /**
- * BitoCard's fees on your own-integration transactions: a monthly statement (fees and subscription), the rates that
+ * BitoCard's fees on your own-integration transactions: a monthly statement, the rates that
  * apply to you, and every fee with its exact amount and the fraction carried to your next transaction.
  */
 export default function FeesPage() {
@@ -52,9 +52,8 @@ export default function FeesPage() {
         }
       />
       {statement.error ? <Notice tone="red">{errorMessage(statement.error)}</Notice> : null}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Fees" value={formatMoney(statement.data?.fees.net ?? 0, currency)} icon={<Percent aria-hidden />} loading={statement.isLoading} footer={<p className="text-xs text-muted">{`${statement.data?.fees.transactions ?? 0} transactions${mode === "test" ? " · sandbox" : ""}`}</p>} />
-        <StatCard label="Subscription" value={formatMoney(statement.data?.subscription ?? 0, currency)} icon={<CalendarDays aria-hidden />} tone="blue" loading={statement.isLoading} />
         <StatCard
           label="Total for the month"
           value={formatMoney(statement.data?.total ?? 0, currency)}

@@ -204,7 +204,7 @@ describe('refunding delivered checkout orders', () => {
 async function resellerStore(products, { live = false, premium = false, markup = 0 } = {}) {
   const reseller = await resellerClient(server);
   await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
-  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', ...(premium ? { planCode: 'premium' } : {}) } });
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', ...(premium ? { maxStores: 10 } : {}) } });
   if (markup) await prisma.resellerMarkup.create({ data: { resellerId: reseller.resellerId, category: 'gift_cards', markupBps: markup } });
   const subdomain = `shop${(counter += 1)}${Date.now().toString(36)}`.slice(0, 30);
   const created = await reseller.browser.post('/v1/stores', { name: 'Ada Digital', subdomain });
@@ -439,7 +439,7 @@ describe('payments into a reseller’s own gateway', () => {
     }
   });
 
-  test('own gateways are Premium and switched on per market: otherwise BitoCard collects and connecting is refused', async () => {
+  test('own gateways are switched on per market: otherwise BitoCard collects and connecting is refused', async () => {
     const store = await ownGatewayStore();
     const shopper = await customer(store.subdomain);
     // An admin switches own gateways off for the reseller's market: their own Stripe stops collecting at once.
@@ -457,11 +457,9 @@ describe('payments into a reseller’s own gateway', () => {
     } finally {
       await admin.put('/v1/admin/switches/own_payment_gateways', { country_code: 'NG', enabled: null });
     }
-    // On the standard plan, BitoCard collects.
+    // Switched on for them again, their own gateway collects: no plan is needed.
     await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: store.resellerId, enabled: true });
-    await prisma.reseller.update({ where: { id: store.resellerId }, data: { planCode: 'standard' } });
-    const standard = (await store.browser.get('/v1/integrations/payment-collector')).json;
-    assert.deepEqual([standard.collecting, standard.reason], ['bitocard', 'plan']);
+    assert.equal((await store.browser.get('/v1/integrations/payment-collector')).json.collecting, 'own');
   });
 
   test('with store wallets on, BitoCard collecting means wallet only; their own gateway collecting means paying at checkout', async () => {

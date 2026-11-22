@@ -191,14 +191,13 @@ describe('catalogue', () => {
     assert.equal((await browser.get('/v1/catalogue/products?category=esim')).status, 400, 'no longer a category');
   });
 
-  test('a Ghanaian reseller sees gift cards in cedis, but not Nigerian airtime', async () => {
+  test('a Ghanaian reseller sees gift cards in cedis, and may sell Nigerian airtime too', async () => {
     const { browser } = await resellerClient(server, { country: 'GH' });
     const list = (await browser.get('/v1/catalogue/products?limit=100')).json.data;
-    assert.ok(!list.some(p => p.country === 'NG'));
     const amazon = list.find(p => p.name === 'Amazon US');
     // US$25.74 at GHS 15.225 = GHS 391.90 (rounded up), plus the 10% gift card markup = GHS 431.09.
     assert.deepEqual(amazon.pricing.denominations.find(d => d.face_value === 2500), { face_value: 2500, wholesale: 43_109, price: 43_109 });
-    assert.equal((await byKey(browser, 'airtime:NG:mtn:topup')).error.code, 'international_selling_required');
+    assert.equal((await byKey(browser, 'airtime:NG:mtn:topup')).key, 'airtime:NG:mtn:topup', 'no plan stands between a reseller and other countries’ products');
   });
 
   test('categories not open in a country, and products switched off, are unavailable', async () => {

@@ -20,7 +20,6 @@ import {
   PageHeader,
   PhoneContact,
   RefreshFailed,
-  Select,
   Skeleton,
   StatusBadge,
 } from "@bitocard/admin-ui";
@@ -31,9 +30,9 @@ import { ResellerSwitchesCard } from "@/components/reseller-switches";
 import { CancelCheck, cancellable } from "@/components/verification-list";
 import { ResellerWalletsCard } from "@/components/reseller-wallets";
 import { StartupAllowanceCard } from "@/components/startup-allowance";
+import { StoreLimit } from "@/components/store-limit";
 import {
   type ResellerStatus,
-  usePlansQuery,
   useRemoveResellerIdentityWaiverMutation,
   useUnsuspendResellerMutation,
   useResetMemberTwoStepMutation,
@@ -52,7 +51,6 @@ export default function ResellerPage() {
   const { data: reseller, error, isFetching, refetch } = useResellerQuery(id);
   const history = useResellerHistoryQuery(id);
   const checks = useVerificationsInfiniteQuery({ reseller_id: id, subject: "reseller" });
-  const plans = usePlansQuery();
   const [update, updateState] = useUpdateResellerMutation();
   const [action, setAction] = useState<ResellerStatus | null>(null);
   const [waiver, setWaiver] = useState<"waive" | "remove" | null>(null);
@@ -148,26 +146,7 @@ export default function ResellerPage() {
                 <KeyValue
                   items={[
                     { label: "Status", value: <StatusBadge status={reseller.status} /> },
-                    {
-                      label: "Plan",
-                      value: operator ? (
-                        <Select
-                          aria-label="Plan"
-                          value={reseller.plan.code}
-                          disabled={updateState.isLoading}
-                          onChange={event => update({ id: reseller.id, plan: event.target.value })}
-                          className="max-w-48"
-                        >
-                          {(plans.data?.data ?? [reseller.plan]).map(plan => (
-                            <option key={plan.code} value={plan.code}>
-                              {plan.name}
-                            </option>
-                          ))}
-                        </Select>
-                      ) : (
-                        reseller.plan.name
-                      ),
-                    },
+                    { label: "Stores", value: <StoreLimit reseller={reseller} operator={operator} /> },
                     { label: "Country", value: reseller.country ?? "—" },
                     {
                       label: "Phone at sign-up",

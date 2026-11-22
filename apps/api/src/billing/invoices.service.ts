@@ -8,7 +8,7 @@ import type { AccountKind, Invoice, InvoiceLine, Prisma } from '../generated/pri
 import { LedgerService, type PreparedEntry, type Tx } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
-import { freePlanCode } from '../plans/features.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
 
 /** The credit limit's steps, in US cents: raised one at a time, each after a full month's invoice is paid in full. */
 export const creditSteps = [1000, 2500, 5000, 10000] as const;
@@ -92,6 +92,7 @@ export class InvoicesService {
     private readonly fx: FxService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   /** The month's invoice for a store (or the account), made on first use. */
@@ -220,19 +221,14 @@ export class InvoicesService {
     });
   }
 
-  /** BitoCard's margin on usage for a store (its plan's; Startup's without one) or the account (its plan's). */
-  async usageMarginBps(resellerId: string, storeId?: string | null) {
-    if (storeId) {
-      const subscription = await this.prisma.storeSubscription.findUnique({ where: { storeId }, include: { plan: true } });
-      if (subscription) return subscription.plan.usageMarginBps;
-      return (await this.prisma.plan.findUnique({ where: { code: freePlanCode } }))?.usageMarginBps ?? 0;
-    }
-    return (await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { plan: true } })).plan.usageMarginBps;
+  /** BitoCard's margin on usage, the same for everyone (Settings > Integrations > Reseller limits and usage), in basis points. */
+  usageMarginBps() {
+    return Math.round(this.integrations.config.USAGE_MARGIN_PERCENT * 100);
   }
 
   /** A cost plus BitoCard's usage margin, rounded up to a whole minor unit. */
-  async withMargin(amount: bigint, resellerId: string, storeId?: string | null) {
-    const bps = BigInt(await this.usageMarginBps(resellerId, storeId));
+  withMargin(amount: bigint) {
+    const bps = BigInt(this.usageMarginBps());
     return (amount * (10_000n + bps) + 9_999n) / 10_000n;
   }
 
@@ -246,7 +242,7 @@ export class InvoicesService {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: input.resellerId }, select: { house: true, country: true } });
     if (reseller.house) return null;
     const currency = (reseller.country ? (await this.prisma.country.findUnique({ where: { code: reseller.country }, select: { currency: true } }))?.currency : null) ?? 'USD';
-    const marked = await this.withMargin(input.micros, input.resellerId, input.storeId);
+    const marked = this.withMargin(input.micros);
     // One US cent is 10,000 millionths of a dollar; `pay` is the currency's minor units per US cent.
     const amount = currency === 'USD' ? (marked + 9_999n) / 10_000n : BigInt((await this.fx.rate(currency)).pay.mul(marked.toString()).div(10_000).toDecimalPlaces(0, 0).toFixed(0));
     return this.charge({ resellerId: input.resellerId, storeId: input.storeId, currency, kind: 'usage', description: input.description, amount, reference: input.reference, revenue: 'platform_revenue', force: true });
@@ -324,17 +320,14 @@ export class InvoicesService {
   }
 
   /**
-   * The `invoices` job: closes last month's invoices (paid at once when nothing is owed; due 7 days later, or when the
-   * store's subscription renews first), drops the credit limit a step for each invoice that goes past its due date
+   * The `invoices` job: closes last month's invoices (paid at once when nothing is owed; due 7 days later), drops the credit limit a step for each invoice that goes past its due date
    * unpaid, and pays what is owed from top-ups.
    */
   async run(now = new Date()) {
     const ended = await this.prisma.invoice.findMany({ where: { status: 'open', periodEnd: { lte: now } }, take: 500 });
     let closed = 0;
     for (const invoice of ended) {
-      const renews = invoice.storeId ? await this.prisma.storeSubscription.findUnique({ where: { storeId: invoice.storeId }, select: { renewsAt: true } }) : null;
-      const week = new Date(now.getTime() + invoiceDueDays * day);
-      const dueAt = renews?.renewsAt && renews.renewsAt > now && renews.renewsAt < week ? renews.renewsAt : week;
+      const dueAt = new Date(now.getTime() + invoiceDueDays * day);
       const paid = invoice.paidMinor >= invoice.totalMinor;
       const claimed = await this.prisma.invoice.updateMany({
         where: { id: invoice.id, status: 'open' },

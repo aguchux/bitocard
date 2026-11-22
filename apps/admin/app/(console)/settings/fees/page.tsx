@@ -15,7 +15,6 @@ import {
   useFeeReconciliationQuery,
   useFeeReportQuery,
   useFeeRulesQuery,
-  usePlansQuery,
   useSetFeeRuleMutation,
 } from "@bitocard/api-client/admin";
 
@@ -25,12 +24,10 @@ const humanise = (value: string) => value.replace(/_/g, " ").replace(/^./, char 
 
 function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => void }) {
   const countries = useCountriesQuery();
-  const plans = usePlansQuery();
   const [save] = useSetFeeRuleMutation();
   const [kind, setKind] = useState<FeeKind>(rule?.kind ?? "supplier_order");
   const [country, setCountry] = useState(rule?.country_code ?? "");
   const [category, setCategory] = useState(rule?.category ?? "");
-  const [plan, setPlan] = useState(rule?.plan_code ?? "");
   const [rate, setRate] = useState(rule ? rule.rate_percent : "");
   const feeCurrency = countries.data?.data.find(item => item.code === country)?.currency ?? "USD";
   const [minFee, setMinFee] = useState(rule?.min_fee_minor && rule.country_code ? moneyInputValue(rule.min_fee_minor, countries.data?.data.find(item => item.code === rule.country_code)?.currency ?? "USD") : "");
@@ -43,7 +40,7 @@ function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => vo
       open
       onClose={onClose}
       title={editing ? "Change fee rate" : "Add a fee rate"}
-      description="The most specific rate for a transaction applies: country, then category, then plan. Rates run from 0.0000001% to 10%; fees are exact, with fractions carried to the reseller's next transaction."
+      description="The most specific rate for a transaction applies: country, then category. Rates run from 0.0000001% to 10%; fees are exact, with fractions carried to the reseller's next transaction."
       confirmLabel="Save rate"
       requireReason={false}
       onConfirm={async () => {
@@ -53,7 +50,6 @@ function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => vo
           kind,
           country_code: country || null,
           category: kind === "supplier_order" ? category || null : null,
-          plan_code: plan || null,
           rate_ppb: ppb,
           min_fee_minor: country && minFeeMinor ? minFeeMinor : null,
         }).unwrap();
@@ -73,16 +69,6 @@ function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => vo
           <Select id="rule-country" value={country} disabled={editing} onChange={event => setCountry(event.target.value)}>
             <option value="">Any country</option>
             {countries.data?.data.map(item => (
-              <option key={item.code} value={item.code}>
-                {item.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Plan" htmlFor="rule-plan">
-          <Select id="rule-plan" value={plan} disabled={editing} onChange={event => setPlan(event.target.value)}>
-            <option value="">Any plan</option>
-            {plans.data?.data.map(item => (
               <option key={item.code} value={item.code}>
                 {item.name}
               </option>
@@ -137,7 +123,7 @@ function Report() {
           description="Live fees, per currency."
           actions={
             <Select aria-label="Group by" value={group} onChange={event => setGroup(event.target.value as FeeReportGroup)} className="w-40">
-              {(["reseller", "kind", "category", "country", "plan"] as const).map(value => (
+              {(["reseller", "kind", "category", "country"] as const).map(value => (
                 <option key={value} value={value}>
                   {`By ${value}`}
                 </option>
@@ -202,7 +188,7 @@ export default function FeesPage() {
     {
       key: "scope",
       header: "Applies to",
-      cell: row => [row.country_code ?? "Any country", row.category ? humanise(row.category) : "any category", row.plan_code ? `${row.plan_code} plan` : "any plan"].join(" · "),
+      cell: row => [row.country_code ?? "Any country", row.category ? humanise(row.category) : "any category"].join(" · "),
     },
     { key: "rate", header: "Rate", align: "right", cell: row => `${row.rate_percent}%` },
     { key: "min", header: "Minimum", align: "right", hideOnMobile: true, cell: row => { const currency = row.country_code ? currencyOf(row.country_code) : undefined; return row.min_fee_minor && row.country_code ? (currency ? formatMoney(row.min_fee_minor, currency) : `${row.min_fee_minor} minor`) : "None"; } },

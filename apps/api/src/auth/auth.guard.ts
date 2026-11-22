@@ -7,7 +7,6 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { Realm, ResellerRole } from '../generated/prisma/client.js';
 import { type Caller, type CallerRequest, isAdminRealm, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, ROUTE_TWO_STEP_PENDING, requireStepUp } from './caller.js';
 import { twoStepPending } from './mfa-policy.js';
-import { freePlanCode } from '../plans/features.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
 import { reservedSubdomains } from '../stores/reserved.js';
 import { SessionsService } from './sessions.service.js';
@@ -91,10 +90,6 @@ export class AuthGuard implements CanActivate {
       const scopes = meta<string[]>(ROUTE_SCOPES) ?? [];
       const missing = scopes.filter(scope => !caller.scopes.includes(scope));
       if (missing.length) throw forbidden(`This API key is missing the scope ${missing.join(', ')}.`);
-      const restricted = scopes.filter(scope => caller.planRestrictions.includes(scope));
-      if (restricted.length) {
-        throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'plan_restricted', `Your plan does not include ${restricted.join(', ')}.`);
-      }
       return true;
     }
 
@@ -164,11 +159,11 @@ export class AuthGuard implements CanActivate {
     if (!session || session.realm !== 'reseller' || session.revokedAt || session.expiresAt <= new Date() || session.user.status !== 'active') throw unauthenticated();
     // Its session must have finished two-step sign-in (once it is on, or required, for the person).
     if (await twoStepPending(this.prisma, session)) throw unauthenticated();
-    const member = await this.prisma.resellerMember.findFirst({ where: { userId: session.userId, resellerId: claims.rid }, include: { reseller: { include: { plan: true } } } });
+    const member = await this.prisma.resellerMember.findFirst({ where: { userId: session.userId, resellerId: claims.rid }, include: { reseller: true } });
     if (!member || member.reseller.status === 'suspended' || (claims.mode === 'live' && member.reseller.status !== 'active')) throw unauthenticated();
     const readOnly = claims.ro || !docsWriteRoles.includes(member.role);
     // A docs token acts for one store: the one it was asked for, else the oldest published (else oldest) store.
-    const stores = await this.prisma.store.findMany({ where: { resellerId: claims.rid }, orderBy: { createdAt: 'asc' }, include: { subscription: { include: { plan: true } } } });
+    const stores = await this.prisma.store.findMany({ where: { resellerId: claims.rid }, orderBy: { createdAt: 'asc' } });
     const store = (claims.st ? stores.find(item => item.id === claims.st) : undefined) ?? stores.find(item => item.status === 'published') ?? stores[0];
     return {
       kind: 'api_key',
@@ -180,17 +175,11 @@ export class AuthGuard implements CanActivate {
       storeId: store?.id ?? null,
       mode: claims.mode,
       scopes: docsTokenScopes(readOnly),
-      planRestrictions: store?.subscription?.plan.apiRestrictions ?? (store ? await this.startupRestrictions() : member.reseller.plan.apiRestrictions),
     };
   }
 
-  /** The free plan's API restrictions: what a store without a plan of its own has. */
-  private async startupRestrictions() {
-    return (await this.prisma.plan.findUnique({ where: { code: freePlanCode } }))?.apiRestrictions ?? [];
-  }
-
   private async identifyApiKey(token: string): Promise<Caller> {
-    const key = await this.prisma.apiKey.findUnique({ where: { keyHash: sha256(token) }, include: { reseller: true, store: { include: { subscription: { include: { plan: true } } } } } });
+    const key = await this.prisma.apiKey.findUnique({ where: { keyHash: sha256(token) }, include: { reseller: true } });
     const now = new Date();
     if (!key || key.revokedAt || (key.expiresAt && key.expiresAt <= now) || key.reseller.status === 'suspended') throw unauthenticated();
     if (!key.lastUsedAt || now.getTime() - key.lastUsedAt.getTime() > touchEveryMs) {
@@ -205,8 +194,6 @@ export class AuthGuard implements CanActivate {
       storeId: key.storeId,
       mode: key.mode,
       scopes: key.scopes,
-      // A key is limited by its store's plan (Startup when the store has none).
-      planRestrictions: key.store.subscription?.plan.apiRestrictions ?? (await this.startupRestrictions()),
     };
   }
 }

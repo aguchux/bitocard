@@ -63,7 +63,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'List chargebacks',
     description:
-      'Card payments into your wallet or your store that the cardholder disputed (chargebacks), newest first. While one is `open` its amount is held from your wallet (`held`; what the wallet could not cover is `shortfall`) and withdrawals wait (`payouts_on_hold`). Won: the hold comes back. Lost: it is returned to the cardholder. With chargeback protection (`protected`, the Premium plan) nothing is held and BitoCard bears a loss.',
+      'Card payments into your wallet or your store that the cardholder disputed (chargebacks), newest first. While one is `open` its amount is held from your wallet (`held`; what the wallet could not cover is `shortfall`) and withdrawals wait (`payouts_on_hold`). Won: the hold comes back. Lost: it is returned to the cardholder. BitoCard settles the chargeback with you; you settle it with your customer, through the dispute it opens for you.',
   })
   @Scopes('wallet:read')
   @Get('chargebacks')

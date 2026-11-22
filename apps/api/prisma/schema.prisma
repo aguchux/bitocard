@@ -234,14 +234,13 @@ enum FeeKind {
   gateway_payment
 }
 
-/// An admin's fee rate. The most specific rule for a transaction wins (country, then category, then plan); none: no fee.
+/// An admin's fee rate. The most specific rule for a transaction wins (country, then category); none: no fee.
 model FeeRule {
   id          String           @id @default(uuid()) @db.Uuid
   kind        FeeKind
   countryCode String?          @map("country_code") @db.Char(2)
   category    ProductCategory?
-  planCode    String?          @map("plan_code")
-  /// `kind:country:category:plan` with `*` for any, so a scope has one rule.
+  /// `kind:country:category` with `*` for any, so a scope has one rule.
   scopeKey    String           @unique @map("scope_key")
   /// Parts per billion of the base: 1 = 0.0000001%, 100,000,000 = 10%.
   ratePpb     Int              @map("rate_ppb")
@@ -277,9 +276,8 @@ model FeeCharge {
   /// `fee:<source type>:<source id>`: one fee per transaction.
   reference       String           @unique
   category        ProductCategory?
-  /// The reseller's country and plan when charged, for reports.
+  /// The reseller's country when charged, for reports.
   countryCode     String?          @map("country_code") @db.Char(2)
-  planCode        String?          @map("plan_code")
   ruleId          String?          @map("rule_id") @db.Uuid
   ratePpb         Int              @map("rate_ppb")
   baseMinor       BigInt           @map("base_minor")
@@ -441,7 +439,7 @@ model Reseller {
   /// (docs/CRYPTO_SPINOFF_PLAN.md). BitoCard's admin, lists and reports never show Afrippa's.
   platform                  Platform                  @default(bitocard)
   /// Who collects their hosted stores' customer payments: `own` (their own payment gateway, where they may use and have
-  /// one; Premium and switched on for their market) or `bitocard` (BitoCard's gateways, the money reaching their wallet).
+  /// one, switched on for them or their market) or `bitocard` (BitoCard's gateways, the money reaching their wallet).
   paymentCollector          String                    @default("own") @map("payment_collector")
   name                      String
   /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
@@ -470,30 +468,22 @@ model Reseller {
   /// When BitoCard approved the business's KYB (registered businesses: documents checked). Registered, KYB-verified,
   /// active resellers review their own customers' identity checks.
   kybVerifiedAt             DateTime?                 @map("kyb_verified_at")
-  /// The account's plan: the highest plan among its stores' subscriptions (Startup without one), kept by
-  /// `StoreSubscriptionsService.syncAccountPlan`. Account-wide features and limits read it.
-  planCode                  String                    @default("standard") @map("plan_code")
   createdAt                 DateTime                  @default(now()) @map("created_at")
   updatedAt                 DateTime                  @updatedAt @map("updated_at")
   members                   ResellerMember[]
   invitations               Invitation[]
   apiKeys                   ApiKey[]
   countryRef                Country?                  @relation(fields: [country], references: [code])
-  plan                      Plan                      @relation(fields: [planCode], references: [code])
   stores                    Store[]
   domains                   StoreDomain[]
   options                   ResellerOption[]
   switches                  FeatureSwitch[]
-  /// Premium billing (M4): when the next monthly charge is due. Null means not billed (Standard, or a plan set by an admin).
-  planRenewsAt              DateTime?                 @map("plan_renews_at")
-  /// Switch to Standard at the next renewal instead of charging.
-  planCancelAtPeriodEnd     Boolean                   @default(false) @map("plan_cancel_at_period_end")
-  /// Set when a renewal charge failed; the plan drops to Standard after the grace period.
-  planPastDueSince          DateTime?                 @map("plan_past_due_since")
   /// What the account may owe BitoCard, in US cents: US$10 at first, raised a step at a time (25, 50, 100) after a full
   /// month's invoice is paid in full; admins may set any value up to US$100. An invoice unpaid past its due date drops it a step.
   creditLimitCents          Int                       @default(1000) @map("credit_limit_cents")
   creditLimitRaisedAt       DateTime?                 @map("credit_limit_raised_at")
+  /// How many stores this reseller may run; null follows the admin's setting for everyone (`MAX_STORES_PER_RESELLER`).
+  maxStores                 Int?                      @map("max_stores")
   ledgerAccounts            LedgerAccount[]
   holds                     Hold[]
   earningsLots              EarningsLot[]
@@ -517,12 +507,6 @@ model Reseller {
   house                     Boolean                   @default(false)
   /// Resale strikes before this no longer count (an admin lifted the reseller's limit).
   resaleStrikesClearedAt    DateTime?                 @map("resale_strikes_cleared_at")
-  /// Udozo's one-time Seller HQ setup fee, once paid (docs/UDOZO_SPINOFF_PLAN.md, step 3): when, how much, in which
-  /// currency, and the store whose Premium it was paid with (it helps pay for that store's free domain).
-  setupFeePaidAt            DateTime?                 @map("setup_fee_paid_at")
-  setupFeeMinor             BigInt?                   @map("setup_fee_minor")
-  setupFeeCurrency          String?                   @map("setup_fee_currency") @db.Char(3)
-  setupFeeStoreId           String?                   @map("setup_fee_store_id") @db.Uuid
   checkouts                 Checkout[]
   manualTopUps              ManualTopUp[]
   resaleListings            ResaleListing[]
@@ -585,7 +569,7 @@ enum ApiKeyMode {
 model ApiKey {
   id          String     @id @default(uuid()) @db.Uuid
   resellerId  String     @map("reseller_id") @db.Uuid
-  /// The store the key belongs to: it sees only that store's orders, events and webhooks, within that store's plan.
+  /// The store the key belongs to: it sees only that store's orders, events and webhooks.
   storeId     String     @map("store_id") @db.Uuid
   name        String
   mode        ApiKeyMode
@@ -608,7 +592,7 @@ model ApiKey {
 }
 
 // ---------------------------------------------------------------------------
-// M3: countries, settings chain, switches, plans and stores
+// M3: countries, settings chain, switches and stores
 // ---------------------------------------------------------------------------
 
 /// A market BitoCard operates in. BitoCard decides what is available in each country.
@@ -723,47 +707,6 @@ model FeatureSwitch {
   @@map("feature_switches")
 }
 
-/// Reseller plans: Standard (free) and Premium. The admin sets Premium's price.
-model Plan {
-  code               String              @id
-  name               String
-  /// Monthly price in US cents; converted to the reseller's currency when billed.
-  priceCents         Int                 @map("price_cents")
-  /// Plan features, for example chargeback_protection or international_selling.
-  features           String[]
-  /// API features switched off for this plan. Empty means every API feature is on (the default).
-  apiRestrictions    String[]            @default([]) @map("api_restrictions")
-  /// What the plan is for, shown with it (admins edit it).
-  description        String?
-  /// Resellers can choose it. A hidden plan keeps those already on it (they renew as before) but takes no one new.
-  available          Boolean             @default(true)
-  /// BitoCard's margin on usage billed as it happens (AI replies beyond the allowance, mobile money deposit fees), in
-  /// basis points over its cost.
-  usageMarginBps     Int                 @default(2000) @map("usage_margin_bps")
-  /// Where it is listed, lowest first.
-  sortOrder          Int                 @default(0) @map("sort_order")
-  /// How much the plan allows (`planLimitCatalogue`): a number, or null for unlimited; a limit not set has its default.
-  limits             Json                @default("{}")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
-  resellers          Reseller[]
-  localPrices        PlanPrice[]
-  storeSubscriptions StoreSubscription[]
-
-  @@map("plans")
-}
-
-/// A plan's fixed monthly price in one currency (minor units). Without one, the US dollar price is converted when charged.
-model PlanPrice {
-  planCode    String   @map("plan_code")
-  currency    String   @db.Char(3)
-  amountMinor BigInt   @map("amount_minor")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  plan        Plan     @relation(fields: [planCode], references: [code], onDelete: Cascade)
-
-  @@id([planCode, currency])
-  @@map("plan_prices")
-}
-
 /// The two products sharing this API and database: BitoCard, and Afrippa, the escrowed P2P crypto market that left it
 /// (docs/CRYPTO_SPINOFF_PLAN.md). Not the catalogue's product brands (`brands`).
 enum Platform {
@@ -808,8 +751,11 @@ model Store {
   theme                 String             @default("navy_pink")
   /// Single product stores: the product key they sell.
   focus                 String?
-  /// Beyond the month's AI replies on BitoCard's AI: `stop` (people answer) or `pay` (each reply billed as it goes).
-  aiOverage             String             @default("stop") @map("ai_overage")
+  /// Beyond the month's free AI replies on BitoCard's AI: `pay` (each reply charged to the wallet as it goes, the
+  /// default) or `stop` (people answer until next month).
+  aiOverage             String             @default("pay") @map("ai_overage")
+  /// Your brand only: the store's pages leave BitoCard's name out (the terms of sale still name the seller).
+  whiteLabel            Boolean            @default(false) @map("white_label")
   /// The home page being edited in SHQ, and the one shoppers see (null: the variant's starting page).
   homeDraft             Json?              @map("home_draft")
   homePublished         Json?              @map("home_published")
@@ -825,8 +771,6 @@ model Store {
   hostError             String?            @map("host_error")
   hostSyncedAt          DateTime?          @map("host_synced_at")
   createdAt             DateTime           @default(now()) @map("created_at")
-  /// A plan change in progress (a 2-minute claim), so two at once never both charge.
-  planChangingAt        DateTime?          @map("plan_changing_at")
   updatedAt             DateTime           @updatedAt @map("updated_at")
   reseller              Reseller           @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   notifications         Notification[]
@@ -840,7 +784,6 @@ model Store {
   domains               StoreDomain[]
   visitDays             StoreVisitDay[]
   homeVersions          StoreHomeVersion[]
-  subscription          StoreSubscription?
   publicSpinClaims      PublicSpinClaim[]
   resaleListings        ResaleListing[]
   resaleRules           ResaleRule[]
@@ -850,39 +793,6 @@ model Store {
   @@index([resellerId])
   @@index([hostStatus])
   @@map("stores")
-}
-
-/**
- * A store's paid plan. A store without one is on the free plan (Startup). Each is billed on its own from the reseller's
- * live wallet; the account's plan (`resellers.plan_code`) is the highest plan among its stores.
- */
-model StoreSubscription {
-  storeId            String    @id @map("store_id") @db.Uuid
-  resellerId         String    @map("reseller_id") @db.Uuid
-  planCode           String    @map("plan_code")
-  /// When the next monthly charge is due. Null: not billed (set by BitoCard).
-  renewsAt           DateTime? @map("renews_at")
-  /// When the paid month began, and what was paid for it (minor units, currency): the credit on an upgrade.
-  periodStartedAt    DateTime? @map("period_started_at")
-  paidMinor          BigInt    @default(0) @map("paid_minor")
-  paidCurrency       String?   @map("paid_currency") @db.Char(3)
-  /// Ends at the next renewal instead of charging.
-  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
-  /// A cheaper plan taking over at the next renewal.
-  nextPlanCode       String?   @map("next_plan_code")
-  /// Set when a renewal charge failed; the store goes back to Startup after the grace period.
-  pastDueSince       DateTime? @map("past_due_since")
-  /// Moved from the account's plan when plans became per store: the reseller is told before its first renewal.
-  migrated           Boolean   @default(false)
-  transitionNoticeAt DateTime? @map("transition_notice_at")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  store              Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  plan               Plan      @relation(fields: [planCode], references: [code])
-
-  @@index([resellerId])
-  @@index([renewsAt])
-  @@map("store_subscriptions")
 }
 
 /// Who changed what in the admin app. Written for every admin change; never edited.
@@ -1055,7 +965,7 @@ model Chargeback {
   currency          String     @db.Char(3)
   /// open, won or lost.
   status            String     @default("open")
-  /// The reseller's plan has chargeback protection: BitoCard bears it and nothing is held.
+  /// Chargebacks from before reseller plans were removed (22 November 2026) whose plan protected them: BitoCard bore them.
   protected         Boolean    @default(false)
   /// Held from the reseller's wallet while open, and what the wallet could not cover (BitoCard's loss if lost).
   holdId            String?    @map("hold_id") @db.Uuid
@@ -3934,7 +3844,7 @@ model AiUsage {
 }
 
 /// A support bot (assistant): one per store (or BitoCard's one for resellers in SHQ, `scope: platform`). It answers
-/// chats and/or tickets with an AI agent (BitoCard's keys on Premium, or the reseller's own), from its knowledge.
+/// chats and/or tickets with an AI agent (BitoCard's keys within the store's allowance, or the reseller's own), from its knowledge.
 model SupportBot {
   id               String                @id @default(uuid()) @db.Uuid
   resellerId       String                @map("reseller_id") @db.Uuid
@@ -3948,7 +3858,7 @@ model SupportBot {
   /// anthropic, openai or deepseek.
   provider         String
   model            String
-  /// bitocard (its keys, Premium) or own (the reseller's key).
+  /// bitocard (its keys) or own (the reseller's key).
   funding          String
   name             String
   avatarUrl        String?               @map("avatar_url")

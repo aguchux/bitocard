@@ -49,7 +49,7 @@ const runJob = () => fetch(`${server.base}/v1/cron/supplier-webhooks`, { headers
 /** A live, verified Premium reseller connected to their own account with these credentials. */
 async function connected(integration, values) {
   const reseller = await resellerClient(server);
-  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', planCode: 'premium' } });
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', maxStores: 10 } });
   await admin.put('/v1/admin/switches/own_integrations', { reseller_id: reseller.resellerId, enabled: true });
   await wallets.adjust(null, { resellerId: reseller.resellerId, mode: 'live', balance: 'funding', amount: 5_000_000, reason: 'Test funding' });
   const connection = await reseller.browser.put(`/v1/integrations/${integration}/connection`, { values });

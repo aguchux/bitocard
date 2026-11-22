@@ -27,8 +27,10 @@ export type Store = {
   checkout_mode: 'test' | 'live';
   /** The customer account app's menu on desktop; null follows BitoCard's default. */
   desktop_nav: 'rail' | 'bottom' | null;
-  /** Beyond the month's AI replies: `stop` (people answer) or `pay` (billed as it goes). */
+  /** Beyond the month's free AI replies: `pay` (charged to the wallet as it goes, the default) or `stop` (people answer). */
   ai_overage: 'stop' | 'pay';
+  /** BitoCard: Your brand only, the store's pages leave BitoCard's name out. Missing on Udozo's API. */
+  white_label?: boolean;
   /** Customers are asked for the identity check where BitoCard's market rules require one (true), or never. */
   customer_verification: boolean;
   /**
@@ -52,6 +54,7 @@ export type StoreInput = {
   checkout_mode?: 'test' | 'live';
   desktop_nav?: 'rail' | 'bottom' | null;
   ai_overage?: 'stop' | 'pay';
+  white_label?: boolean;
   customer_verification?: boolean;
   /** Udozo: the store's photo watermark text (2 to 30 letters, digits, spaces and . - _ @), or null for Udozo's. */
   watermark_text?: string | null;

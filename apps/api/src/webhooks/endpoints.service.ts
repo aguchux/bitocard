@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { PlanAccessService } from '../plans/plan-access.js';
+import { limitReached, webhookEndpointsPerStore } from '../resellers/limits.js';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { storeForNew } from '../stores/store-scope.js';
@@ -77,7 +77,6 @@ export class WebhookEndpointsService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly delivery: WebhookDeliveryService,
-    private readonly planAccess: PlanAccessService,
   ) {}
 
   private encryption() {
@@ -114,8 +113,10 @@ export class WebhookEndpointsService {
     if (existing.some(endpoint => endpoint.url === input.url)) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'endpoint_exists', 'An endpoint with this URL already exists.', 'url');
     }
-    // The plan's limit first: no address lookups for an endpoint that cannot be added anyway.
-    await this.planAccess.requireStoreRoom(storeId, 'webhook_endpoints', existing.length, { code: 'endpoint_limit', param: 'url', invalid: true });
+    // The limit first: no address lookups for an endpoint that cannot be added anyway.
+    if (existing.length >= webhookEndpointsPerStore) {
+      throw limitReached(`A store can have ${webhookEndpointsPerStore} webhook endpoints in each mode. Remove one first.`, { code: 'endpoint_limit', param: 'url', invalid: true });
+    }
     await this.checkUrl(input.url);
     const secret = newWebhookSecret();
     const endpoint = await this.prisma.webhookEndpoint.create({

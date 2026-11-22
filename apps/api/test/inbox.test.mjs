@@ -98,8 +98,8 @@ describe('who sees what', () => {
 
   test('the same subject reaches a person once', async () => {
     const owner = await resellerClient(server);
-    await inbox.reseller(owner.resellerId, 'plan.ended', content('same'));
-    await inbox.reseller(owner.resellerId, 'plan.ended', content('same'));
+    await inbox.reseller(owner.resellerId, 'top_up.credited', content('same'));
+    await inbox.reseller(owner.resellerId, 'top_up.credited', content('same'));
     assert.equal((await owner.browser.get('/v1/notifications')).json.data.length, 1);
   });
 });
@@ -230,7 +230,7 @@ describe('real events', () => {
     await admin.put('/v1/admin/integrations/vtpass/reseller-access', { enabled: true });
     await admin.put('/v1/admin/integrations/vtpass/reseller-availability', { global: true, countries: [], approval: 'review' });
     const owner = await resellerClient(server);
-    await prisma.reseller.update({ where: { id: owner.resellerId }, data: { status: 'active', planCode: 'premium', verifiedAt: new Date() } });
+    await prisma.reseller.update({ where: { id: owner.resellerId }, data: { status: 'active', maxStores: 10, verifiedAt: new Date() } });
     await admin.put('/v1/admin/switches/own_integrations', { reseller_id: owner.resellerId, enabled: true });
     const operations = await adminClient(server, ['operations']);
     // Sandbox connections are never reviewed; live ones here would call VTpass, so the review is created directly.

@@ -446,10 +446,9 @@ const schemas = {
       collector: oneOf('What you chose: `own` (your own payment gateway) or `bitocard` (BitoCard’s gateways).', ['own', 'bitocard']),
       collecting: oneOf('Who collects now: `own` only when you chose it, may use your own gateway and have one active; otherwise `bitocard`, the money reaching your wallet.', ['own', 'bitocard']),
       reason: nullable(
-        oneOf('Why BitoCard collects: `chosen` (you chose it), `switch_off` (own gateways not switched on for your account or market), `plan` (own gateways come with Premium), `no_country`, `not_verified` (live needs a verified account) or `no_gateway` (no active gateway connected). Null when your own collects.', [
+        oneOf('Why BitoCard collects: `chosen` (you chose it), `switch_off` (own gateways not switched on for your account or market), `no_country`, `not_verified` (live needs a verified account) or `no_gateway` (no active gateway connected). Null when your own collects.', [
           'chosen',
           'switch_off',
-          'plan',
           'not_verified',
           'no_country',
           'no_gateway',
@@ -764,9 +763,8 @@ export const dashboardDocs: DocsArea = {
             {
               allowed: bool('Whether your account may connect its own integrations in this mode.'),
               reason: nullable(
-                oneOf('Why not: `switch_off` (not switched on for your account), `plan` (your plan does not include it), `no_country` (choose your business country) or `not_verified` (live needs a verified account).', [
+                oneOf('Why not: `switch_off` (not switched on for your account), `no_country` (choose your business country) or `not_verified` (live needs a verified account).', [
                   'switch_off',
-                  'plan',
                   'not_verified',
                   'no_country',
                 ]),
@@ -778,15 +776,14 @@ export const dashboardDocs: DocsArea = {
             {
               allowed: bool('Whether your account may connect its own integrations in this mode.'),
               reason: nullable(
-                oneOf('Why not: `switch_off` (not switched on for your account), `plan` (your plan does not include it), `no_country` (choose your business country) or `not_verified` (live needs a verified account).', [
+                oneOf('Why not: `switch_off` (not switched on for your account), `no_country` (choose your business country) or `not_verified` (live needs a verified account).', [
                   'switch_off',
-                  'plan',
                   'not_verified',
                   'no_country',
                 ]),
               ),
             },
-            'Whether you can connect your own payment gateway (Premium, switched on per market), and why not.',
+            'Whether you can connect your own payment gateway (switched on by BitoCard for your account or market), and why not.',
           ),
           payment_collector: ref('PaymentCollector'),
         },

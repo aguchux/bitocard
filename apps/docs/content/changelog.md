@@ -14,6 +14,8 @@ Webhook payloads carry their own `api_version`; see [Webhooks → Versioning](/g
 
 ## November 2026
 
+- **No more plans.** BitoCard has no reseller plans: every reseller may use every feature and integration, within what is switched on for their account and market. Removed: `GET /v1/plans`, `GET/POST /v1/subscription`, `GET /v1/subscriptions` and `GET/POST /v1/stores/{store}/subscription` (unknown routes now), `plan` on `GET /v1/account`, `subscription` on the fee statement, and the `plan_restricted` and `plan_feature_required` errors. Stores have `white_label` (your brand only) to set yourself, and `ai_overage` is `pay` by default: past each store's free monthly AI replies, further replies are charged to your wallet. A chargeback is held from your wallet; you settle it with your customer.
+- **The sandbox has the whole catalogue.** Test mode lists, quotes and simulates every product BitoCard has, whatever is on sale in your country for live selling. Going live needs your identity check and BitoCard's activation of your account.
 - **eSIMs and virtual numbers removed.** BitoCard no longer sells eSIMs or virtual phone numbers. The `esim` and `virtual_numbers` categories and their products are gone from the catalogue, the Numbers and eSIMs endpoints (`/v1/numbers…`, `/v1/esims…`) answer as unknown routes, and the `number.renewed`, `number.expired`, `number.deleted`, `number.sms_received` and `esim.updated` events are no longer sent. Orders no longer deliver `virtual_number` or `esim`. Past orders of them have been removed.
 
 ## October 2026

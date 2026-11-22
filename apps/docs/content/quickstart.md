@@ -32,7 +32,6 @@ curl https://api.bitocard.com/v1/account \
 {
   "object": "account",
   "reseller": { "object": "reseller", "id": "8b1f…", "name": "Ada Digital", "country": "NG", "status": "pending" },
-  "plan": { "object": "plan", "code": "standard", "name": "Standard", "…": "…" },
   "authenticated_as": { "type": "api_key", "api_key_id": "3c9e…", "mode": "test", "scopes": ["catalogue:read", "…"] }
 }
 ```

@@ -15,7 +15,6 @@ export type ResellerEmailState = {
   publishedStores: number;
   listedProducts: number;
   liveApiKeys: number;
-  paidPlan: boolean;
   /** The reseller’s market, and whether admins gave it a WhatsApp group link. */
   market: string | null;
   whatsappGroup: boolean;
@@ -181,21 +180,7 @@ export const quickEmails: QuickEmail[] = [
     linkLabel: 'Create your API keys',
     suggested: state => (state.status === 'active' && state.liveApiKeys === 0 ? 'Live, but no live API keys.' : null),
   },
-  {
-    key: 'upgrade_plan',
-    kind: 'growth',
-    label: 'Upgrade plan',
-    description: 'Tells them what a paid plan adds: more stores, their own domain, chargeback protection and more.',
-    subject: 'Grow your business with a BitoCard plan',
-    heading: 'Grow with a BitoCard plan',
-    paragraphs: ({ firstName }) => [
-      `Hi ${firstName},`,
-      'Our paid plans add more for growing businesses: more stores, your own domain, chargeback protection, an AI support assistant and priority support. See what each plan includes and its price in your currency.',
-    ],
-    path: '/settings/plan',
-    linkLabel: 'Compare plans',
-    suggested: state => (state.status === 'active' && !state.paidPlan && state.publishedStores > 0 ? 'Live on the free plan.' : null),
-  },
+
   {
     key: 'join_whatsapp',
     kind: 'growth',

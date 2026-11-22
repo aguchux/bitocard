@@ -34,7 +34,7 @@ BitoCard uses standard HTTP status codes, every error has the same body, and its
 | `invalid_request_error` | 400, 402, 422 | The request cannot be done as asked: a bad or missing field, too little in the wallet. |
 | `idempotency_error` | 400, 409, 422 | A problem with the `Idempotency-Key`: missing, reused for another request, or still in progress. |
 | `authentication_error` | 401 | No valid API key or session. |
-| `permission_error` | 403 | Valid key, but not allowed: a missing scope, a plan restriction, an unverified business for live, or a dashboard-only endpoint. |
+| `permission_error` | 403 | Valid key, but not allowed: a missing scope, an account not yet active for live, or a dashboard-only endpoint. |
 | `not_found_error` | 404 | Nothing with that ID belongs to your account (and mode). |
 | `conflict_error` | 409 | The current state does not allow it: an expired or used quote, an order refunded twice, live-only actions in the sandbox. |
 | `rate_limit_error` | 429 | Too many requests. Wait for `Retry-After` seconds. |
@@ -49,7 +49,6 @@ BitoCard uses standard HTTP status codes, every error has the same body, and its
 | `quote_expired` | The quote is older than 10 minutes. | Create a new quote. |
 | `quote_used` | The quote already placed an order. | Fetch that order instead of ordering again. |
 | `reseller_not_verified` | Live mode before your business is verified. | Verify in SHQ, or use the sandbox. |
-| `plan_restricted` | Your plan switches this feature off. | Change plan in SHQ. |
 | `livemode_not_allowed` | A sandbox-only call (`…/simulate`) with a live key. | Use a test key. |
 | `idempotency_key_reused` | The same key with a different request. | Use a new key for a new request. |
 | `idempotency_in_progress` | The first request with this key is still running. | Retry shortly with the **same** key. |

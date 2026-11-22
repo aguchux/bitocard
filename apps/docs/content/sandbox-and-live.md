@@ -11,6 +11,7 @@ Every reseller has a **sandbox**: the same API, the same address, with simulated
 
 | Area | In the sandbox |
 | --- | --- |
+| Catalogue | Every product BitoCard has, in every category, whatever is switched on for live selling in your country, so you can test the whole catalogue. Live quotes and the live catalogue show only what is on sale in your market. |
 | Orders | Never call a supplier. Complete at once with `SANDBOX-` codes, unless you ask otherwise with `simulate`. |
 | Top-ups | No payment page is charged. Finish one with `POST /v1/wallet/top-ups/{id}/simulate`. |
 | Reserved bank accounts | Opened without a BVN. Pay into one with `POST /v1/wallet/reserved-accounts/{id}/simulate-deposit`. |
@@ -36,7 +37,7 @@ Pass `simulate` when placing a sandbox order to rehearse what your system must h
 
 ## Going live
 
-1. **Verify your business** in SHQ (an identity check of the owner). Live keys and live "Try it" are refused with `reseller_not_verified` until then.
+1. **Verify your business** in SHQ (the owner's identity check, and your business documents where you are a registered business). BitoCard then reviews your account and activates it. Live keys and live "Try it" are refused with `reseller_not_verified` until it is active; the sandbox works meanwhile.
 2. **Fund your live wallet** with a top-up, or a transfer into your reserved bank account where offered.
 3. **Create a live key** with only the scopes your system needs.
 4. **Create live webhook endpoints.** Sandbox endpoints never receive live events.
@@ -46,4 +47,4 @@ Pass `simulate` when placing a sandbox order to rehearse what your system must h
 
 - Fulfilment is real and can be **slower**: an order may stay `processing` while the supplier confirms. Handle it as described in [Orders](/guides/orders).
 - Some products need checks that the sandbox only imitates: the smartcard or meter number for pay-TV and bills is validated with the supplier, and `0000000000` is never recognised.
-- Live quotes in taxable categories include tax that BitoCard collects as the seller of record.
+- Live quotes in taxable categories include tax that BitoCard collects as the seller of record. Sandbox quotes include tax only where your country's rate is set.

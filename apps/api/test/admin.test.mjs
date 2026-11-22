@@ -95,7 +95,7 @@ describe('admin overview', () => {
 describe('activity log', () => {
   test('lists admin changes with who made them, newest first, filterable', async () => {
     const { resellerId } = await resellerClient(server);
-    await admin.patch(`/v1/admin/resellers/${resellerId}`, { plan: 'premium' });
+    await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'suspended' });
     const all = (await admin.get('/v1/admin/activity?limit=5')).json;
     assert.equal(all.data[0].action, 'reseller.updated');
     assert.match(all.data[0].actor.email, /@bitocard\.com$/);

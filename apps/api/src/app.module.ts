@@ -7,7 +7,7 @@ import { AuditModule } from './audit/audit.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CheckoutModule } from './checkout/checkout.module.js';
 import { CountriesModule } from './countries/countries.module.js';
-import { PlansModule } from './plans/plans.module.js';
+import { ResellersModule } from './resellers/resellers.module.js';
 import { ResellerEmailsModule } from './reseller-emails/reseller-emails.controller.js';
 import { AccountSwitchModule } from './account-switch/account-switch.controller.js';
 import { DomainsModule } from './domains/domains.module.js';
@@ -63,7 +63,7 @@ import type { DatabaseAdapter } from './database/prisma.service.js';
 import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { VpnApiModule, VpnModule } from './vpn/vpn.module.js';
-import { PlanAccessModule } from './plans/plan-access.js';
+import { ResellerLimitsModule } from './resellers/limits.js';
 import { ThemeModule } from './theme/theme.module.js';
 import { AppConfigModule } from './app-config/app-config.controller.js';
 
@@ -88,8 +88,8 @@ export class AppModule {
         AuditModule,
         CountriesModule,
         SettingsModule,
-        PlanAccessModule,
-        PlansModule,
+        ResellerLimitsModule,
+        ResellersModule,
         ResellerEmailsModule,
         AccountSwitchModule,
         DomainsModule,

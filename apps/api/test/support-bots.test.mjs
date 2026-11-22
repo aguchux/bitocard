@@ -87,15 +87,11 @@ describe('creating an assistant', () => {
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'support_bot.activated', targetId: made.json.id } }));
   });
 
-  test('BitoCard’s AI needs Premium and an offered model; own keys need a working key', async () => {
+  test('BitoCard’s AI needs an offered model, never a plan; own keys need a working key', async () => {
     const reseller = await resellerWithStore();
     assert.equal((await create(reseller, { funding: 'bitocard', model: 'claude-opus-5-5' })).json.error.code, 'ai_model_unavailable');
     const bot = (await create(reseller, { funding: 'bitocard' })).json;
     await reseller.browser.put(`/v1/support/bots/${bot.id}/knowledge`, { content: '# About\nWe sell gift cards.' });
-    const refused = await reseller.browser.post(`/v1/support/bots/${bot.id}/activate`);
-    assert.match(refused.json.error.message, /Premium/);
-    // The assistant is per store: its store's own plan includes BitoCard's AI.
-    await prisma.storeSubscription.create({ data: { storeId: bot.store_id, resellerId: reseller.resellerId, planCode: 'premium' } });
     assert.equal((await reseller.browser.post(`/v1/support/bots/${bot.id}/activate`)).json.status, 'active');
     await reseller.browser.delete('/v1/support/ai/keys/anthropic');
     const switched = await reseller.browser.patch(`/v1/support/bots/${bot.id}`, { funding: 'own' });

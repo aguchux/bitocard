@@ -14,10 +14,9 @@ import { linksFor } from '../integrations/links.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { connectable, connectableIntegrations, type ConnectableIntegration, type ConnectableKind } from './connectable.js';
-import { planIncludes, PlanAccessService } from '../plans/plan-access.js';
 
 /** Why a reseller cannot connect their own integrations yet (null: they can). */
-export type AccessReason = 'switch_off' | 'plan' | 'not_verified' | 'no_country' | null;
+export type AccessReason = 'switch_off' | 'not_verified' | 'no_country' | null;
 export type ConnectionDecision = 'approve' | 'reject' | 'suspend' | 'reinstate';
 /** Who collects a reseller's hosted-store customer payments. */
 export const paymentCollectors = ['own', 'bitocard'] as const;
@@ -25,9 +24,9 @@ export type PaymentCollector = (typeof paymentCollectors)[number];
 
 /** The switch and plan feature each kind of integration needs: own suppliers and own payment gateways are separate. */
 const gates = {
-  supplier: { switch: 'own_integrations', feature: 'own_integrations' },
-  payment_gateway: { switch: 'own_payment_gateways', feature: 'own_payment_gateways' },
-} as const satisfies Record<ConnectableKind, { switch: string; feature: string }>;
+  supplier: { switch: 'own_integrations' },
+  payment_gateway: { switch: 'own_payment_gateways' },
+} as const satisfies Record<ConnectableKind, { switch: string }>;
 
 const maxValueLength = 1000;
 const hintOf = (value: string) => (value.length > 8 ? `…${value.slice(-4)}` : '…');
@@ -60,21 +59,19 @@ export class ResellerIntegrationsService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly inbox: InboxService,
-    private readonly planAccess: PlanAccessService,
   ) {}
 
   /**
    * Whether the reseller may connect (and use) their own integrations of a kind in this mode: suppliers need the
-   * `own_integrations` switch and plan feature, payment gateways `own_payment_gateways` (Premium, switched on per market).
+   * `own_integrations` switch, payment gateways `own_payment_gateways` (each switched on by admins, globally, per market
+   * or per reseller).
    */
   async access(resellerId: string, mode: LedgerMode, kind: ConnectableKind = 'supplier'): Promise<{ allowed: boolean; reason: AccessReason }> {
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { plan: true } });
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const gate = gates[kind];
     const reason: AccessReason = !(await this.settings.isOn(gate.switch, resellerId))
       ? 'switch_off'
-      : !planIncludes(reseller, gate.feature)
-        ? 'plan'
-        : !reseller.country
+      : !reseller.country
           ? 'no_country'
           : mode === 'live' && reseller.status !== 'active'
             ? 'not_verified'
@@ -117,12 +114,6 @@ export class ResellerIntegrationsService {
     const existing = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode } } });
     if (existing?.status === 'suspended') {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'connection_suspended', 'BitoCard suspended this connection. Contact support to have it reinstated.');
-    }
-    // A new connection (not a change to one already counted) needs room in the plan's limit.
-    const counted: ConnectionStatus[] = ['pending_review', 'active', 'suspended'];
-    if (!existing || !counted.includes(existing.status)) {
-      const used = await this.prisma.resellerConnection.count({ where: { resellerId, mode, status: { in: counted } } });
-      await this.planAccess.requireRoom(resellerId, 'own_connections', used);
     }
     const saved = existing?.credentialsEncrypted ? (JSON.parse(this.encryption().decrypt(existing.credentialsEncrypted)) as Record<string, string>) : {};
     const values = prepare(integration, submitted, saved);
@@ -443,7 +434,6 @@ function accessDenied(reason: AccessReason, kind: ConnectableKind = 'supplier') 
   const what = kind === 'payment_gateway' ? 'payment gateway' : 'integrations';
   const messages: Record<Exclude<AccessReason, null>, string> = {
     switch_off: `Connecting your own ${what} is not switched on for your account or market. Contact BitoCard to ask for it.`,
-    plan: kind === 'payment_gateway' ? 'Your own payment gateway comes with Premium. Change plan to use it.' : 'Your plan does not include your own integrations. Change plan to use them.',
     not_verified: 'Your account goes live after the identity check; live integrations need a live account.',
     no_country: 'Choose your business country first.',
   };

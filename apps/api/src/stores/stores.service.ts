@@ -1,6 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
-import { setupFeeOf } from '../billing/setup-fee.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CountriesService } from '../countries/countries.service.js';
@@ -11,7 +10,7 @@ import { type LedgerMode, Prisma, type Reseller, type Store } from '../generated
 import { reservedSubdomains } from './reserved.js';
 import { StoreHostsService } from './store-hosts.service.js';
 import { designFor, storeTemplates, templateFor, type StoreTemplate } from './templates.js';
-import { planFeatureRequired, planIncludes, PlanAccessService } from '../plans/plan-access.js';
+import { ResellerLimitsService } from '../resellers/limits.js';
 
 export { reservedSubdomains };
 
@@ -65,6 +64,8 @@ export function presentStore(store: Store) {
     /** The account app's menu on desktop: `rail`, `bottom`, or null to follow BitoCard's default. */
     desktop_nav: store.desktopNav,
     ai_overage: store.aiOverage,
+    /** Your brand only: the store's pages leave BitoCard's name out. */
+    white_label: store.whiteLabel,
     /** Customers are asked for the identity check where BitoCard's market rules require it (true), or never. */
     customer_verification: store.customerVerification,
     published_at: store.publishedAt?.toISOString() ?? null,
@@ -81,6 +82,7 @@ export type StoreInput = {
   checkout_mode?: LedgerMode;
   desktop_nav?: 'rail' | 'bottom' | null;
   ai_overage?: 'stop' | 'pay';
+  white_label?: boolean;
   customer_verification?: boolean;
   template?: string;
   variant?: string;
@@ -119,7 +121,7 @@ export class StoresService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly hosts: StoreHostsService,
-    private readonly planAccess: PlanAccessService,
+    private readonly limits: ResellerLimitsService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -160,15 +162,13 @@ export class StoresService {
   }
 
   async create(resellerId: string, input: Required<Pick<StoreInput, 'name' | 'subdomain'>> & StoreInput) {
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { stores: true, plan: true } });
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { stores: true } });
     if (!reseller.country) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'Set your business country before creating a store.');
     }
-    // A second store needs a plan with several stores, up to the plan's limit; Udozo's sellers run as many as they like
-    // (docs/UDOZO_SPINOFF_PLAN.md, step 3).
+    // As many stores as admins allow the reseller (one unless raised); Udozo's sellers run as many as they like.
     const udozo = this.config.APP_PRODUCT === 'udozo';
-    if (!udozo && reseller.stores.length >= 1 && !planIncludes(reseller, 'multiple_stores')) throw planFeatureRequired('multiple_stores', reseller.plan.name);
-    if (!udozo) await this.planAccess.requireRoom(resellerId, 'stores', reseller.stores.length, { code: 'store_limit_reached', param: 'name' });
+    if (!udozo) await this.limits.requireStoreRoom(resellerId, reseller.stores.length);
     const design = await this.chooseDesign(resellerId, { template: input.template ?? (udozo ? 'resale_shop' : 'all_in_one'), variant: input.variant, theme: input.theme, focus: input.focus ?? null });
     const subdomain = await this.assertSubdomain(input.subdomain);
     try {
@@ -218,10 +218,6 @@ export class StoresService {
       if (this.config.APP_PRODUCT === 'udozo' && (await this.prisma.storeDomain.count({ where: { storeId: id, status: 'active' } })) === 0) {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'domain_required', 'Connect or buy a domain for this store first: a store takes live payments only on its own domain.', 'checkout_mode');
       }
-      // And the seller's one-time setup fee is paid (with a first Premium month, or on its own).
-      if (this.config.APP_PRODUCT === 'udozo' && (await setupFeeOf(this.prisma, resellerId)).due) {
-        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'setup_fee_unpaid', 'Pay your Seller HQ setup fee first: Settings > Plans.', 'checkout_mode');
-      }
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
       if (reseller.status !== 'active') {
         throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'reseller_not_verified', 'Your store can take real payments once your business is verified. Use test checkout until then.', 'checkout_mode');
@@ -262,6 +258,7 @@ export class StoresService {
           checkoutMode: input.checkout_mode,
           desktopNav: input.desktop_nav,
           aiOverage: input.ai_overage,
+          whiteLabel: input.white_label,
           customerVerification: input.customer_verification,
           ...(subdomain ? { hostStatus: 'pending' } : {}),
         },
@@ -314,8 +311,8 @@ export class StoresService {
       checkout_mode: store.checkoutMode,
       /** bitocard.com's own retail arm in this market (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`), never a reseller's. */
       house: store.reseller.house,
-      /** The store's plan has Your brand only: its pages leave BitoCard's name out. */
-      white_label: await this.planAccess.storeHas(store.id, 'white_label'),
+      /** The reseller chose Your brand only for this store: its pages leave BitoCard's name out. */
+      white_label: store.whiteLabel,
       app: { desktop_nav: await desktopNavFor(this.settings, store), install_prompt: await installPromptFor(this.settings, store) },
       domain: (await this.prisma.storeDomain.findFirst({ where: { storeId: store.id, status: 'active', primary: true }, select: { name: true } }))?.name ?? null,
     };

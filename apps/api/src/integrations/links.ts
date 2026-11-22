@@ -15,7 +15,7 @@ import { signerLinks } from '../crypto/custody/signer.js';
 export type IntegrationLink = { label: string; url: string };
 
 /** Integrations without an outside provider account: nothing to sign up for. */
-export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys', 'support_ai', 'mobile_app']);
+export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys', 'support_ai', 'reseller_limits', 'mobile_app']);
 
 const signUp = (url: string): IntegrationLink => ({ label: 'Sign up', url });
 const keys = (url: string, label = 'Get API keys'): IntegrationLink => ({ label, url });

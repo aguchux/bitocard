@@ -81,7 +81,7 @@ describe('the adapters', () => {
   });
 });
 
-describe('keys, plans, allowance and usage', () => {
+describe('keys, allowance and usage', () => {
   test('a reseller’s own key is checked with the provider, kept encrypted and shown only by its last four', async () => {
     const reseller = await resellerClient(server);
     const refused = await reseller.browser.put('/v1/support/ai/keys/openai', { api_key: 'bad-key-0000000000000000' });
@@ -92,7 +92,7 @@ describe('keys, plans, allowance and usage', () => {
     const row = await prisma.aiKey.findFirstOrThrow({ where: { resellerId: reseller.resellerId } });
     assert.ok(!row.keyEncrypted.includes('good-reseller'), 'encrypted at rest');
     const overview = (await reseller.browser.get('/v1/support/ai')).json;
-    assert.equal(overview.premium, false);
+    assert.equal(overview.premium, undefined, 'no plan stands in front of BitoCard’s AI');
     assert.equal(overview.providers.find(item => item.provider === 'openai').own_key.last4, '1234');
     assert.deepEqual(overview.providers.find(item => item.provider === 'anthropic').bitocard_models, ['claude-haiku-5-5']);
     assert.deepEqual(overview.providers.find(item => item.provider === 'deepseek').bitocard_models, [], 'only providers BitoCard has a key for');
@@ -102,15 +102,14 @@ describe('keys, plans, allowance and usage', () => {
     assert.equal(await prisma.aiKey.count({ where: { resellerId: reseller.resellerId } }), 0);
   });
 
-  test('BitoCard’s AI needs Premium, counts replies against the store’s allowance, and records cost', async () => {
+  test('every store has BitoCard’s AI: replies count against its allowance, and cost is recorded', async () => {
     const reseller = await resellerClient(server);
     await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
     const store = (await reseller.browser.post('/v1/stores', { name: 'AI Store', subdomain: `aistore${Date.now().toString(36)}` })).json;
+    assert.equal(store.ai_overage, 'pay', 'stores pay past the allowance unless they choose to stop');
+    assert.equal((await reseller.browser.patch(`/v1/stores/${store.id}`, { ai_overage: 'stop' })).status, 200);
     const call = { funding: 'bitocard', provider: 'anthropic', model: 'claude-haiku-5-5', resellerId: reseller.resellerId, storeId: store.id, botId: null, mode: 'live', kind: 'chat' };
     const asks = { system: 'Be helpful.', messages: [{ role: 'user', content: 'Hi' }], maxTokens: 100 };
-    await assert.rejects(service.reply(call, asks), error => error.code === 'ai_plan_required');
-    // The assistant is per store: the store's own plan includes it.
-    await prisma.storeSubscription.create({ data: { storeId: store.id, resellerId: reseller.resellerId, planCode: 'premium' } });
     await assert.rejects(service.reply({ ...call, model: 'claude-opus-5-5' }, asks), error => error.code === 'ai_model_unavailable');
     await service.reply(call, asks);
     await service.reply({ ...call, kind: 'test' }, asks);
@@ -132,7 +131,7 @@ describe('keys, plans, allowance and usage', () => {
     const reseller = await resellerClient(server);
     await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
     const store = (await reseller.browser.post('/v1/stores', { name: 'Paying Store', subdomain: `paying${Date.now().toString(36)}` })).json;
-    await prisma.storeSubscription.create({ data: { storeId: store.id, resellerId: reseller.resellerId, planCode: 'premium' } });
+    await reseller.browser.patch(`/v1/stores/${store.id}`, { ai_overage: 'stop' });
     const call = { funding: 'bitocard', provider: 'anthropic', model: 'claude-haiku-5-5', resellerId: reseller.resellerId, storeId: store.id, botId: null, mode: 'live', kind: 'chat' };
     const asks = { system: 'Be helpful.', messages: [{ role: 'user', content: 'Hi' }], maxTokens: 100 };
     await service.reply(call, asks);
@@ -145,7 +144,7 @@ describe('keys, plans, allowance and usage', () => {
     await service.reply(call, asks);
     const [line] = await prisma.invoiceLine.findMany({ where: { invoice: { resellerId: reseller.resellerId, storeId: store.id } } });
     assert.equal(line.kind, 'usage');
-    // 290 millionths of a dollar plus Premium's 20% is 348; in naira at BitoCard's rate, rounded up, owed (the wallet is empty).
+    // 290 millionths of a dollar plus the 10% usage margin is 319; in naira at BitoCard's rate, rounded up, owed (the wallet is empty).
     assert.ok(line.amountMinor > 0n && line.paidMinor === 0n, `${line.amountMinor} ${line.paidMinor}`);
     assert.equal((await reseller.browser.get('/v1/billing/credit')).json.owed[0].amount, Number(line.amountMinor));
   });

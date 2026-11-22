@@ -4,7 +4,7 @@ import type { AssistantContext } from "@bitocard/admin-ui/support";
 import { useStoresQuery, useSupportAiQuery } from "@bitocard/api-client/reseller";
 
 /**
- * What SHQ's assistant screens need: the reseller's stores, the models on BitoCard's AI (Premium) and the models on their
+ * What SHQ's assistant screens need: the reseller's stores, the models on BitoCard's AI and the models on their
  * own working keys. Null until both have loaded.
  */
 export function useAssistantContext(): AssistantContext | null {
@@ -17,7 +17,8 @@ export function useAssistantContext(): AssistantContext | null {
     base: "/v1/support/bots",
     admin: false,
     stores: stores.data.data.map(store => ({ id: store.id, name: store.name })),
-    ai: { premium: ai.data.premium, bitocard, own },
+    // Every store has BitoCard's AI (BitoCard has no plans): a free monthly allowance, then charged to the wallet.
+    ai: { premium: true, note: 'Every store gets a free monthly allowance; past it, replies are charged to your wallet.', bitocard, own },
     realm: "reseller",
     avatarPurpose: "bot_avatar",
   };

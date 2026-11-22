@@ -156,7 +156,7 @@ describe('your own integrations', () => {
     assert.equal((await admin.put('/v1/admin/integrations/reloadly/reseller-availability', { global: true, countries: [], approval: 'automatic' })).status, 200);
     assert.equal((await admin.put('/v1/admin/integrations/monnify/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 200);
     const { browser, resellerId } = await resellerClient(server);
-    await prisma.reseller.update({ where: { id: resellerId }, data: { status: 'active', planCode: 'premium' } });
+    await prisma.reseller.update({ where: { id: resellerId }, data: { status: 'active', maxStores: 10 } });
     assert.equal((await admin.put('/v1/admin/switches/own_integrations', { reseller_id: resellerId, enabled: true })).status, 200);
 
     const before = expect('GET /v1/integrations', 200, await browser.get('/v1/integrations'));

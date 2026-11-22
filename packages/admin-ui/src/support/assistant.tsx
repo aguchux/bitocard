@@ -51,7 +51,8 @@ const sourceLabels: Record<string, string> = {
 };
 
 /** What the AI agent step can offer: BitoCard's models (Premium) and the models on the reseller's own keys. */
-export type AiChoices = { premium: boolean; bitocard: Partial<Record<BotProvider, string[]>>; own: Partial<Record<BotProvider, string[]>> };
+/** `note`: what BitoCard's AI costs, in the product's words (else Premium's). */
+export type AiChoices = { premium: boolean; note?: string; bitocard: Partial<Record<BotProvider, string[]>>; own: Partial<Record<BotProvider, string[]>> };
 
 export type AssistantContext = {
   base: BotsBase;
@@ -157,7 +158,7 @@ export function AssistantProfileForm({
           <div className="grid gap-3 sm:grid-cols-2">
             <button type="button" onClick={() => pickFunding('bitocard')} disabled={!context.ai.premium} className={cn('rounded-2xl border p-4 text-left disabled:opacity-60', funding === 'bitocard' ? 'border-brand-400 bg-brand-50' : 'border-line')}>
               <p className="font-semibold text-ink">{`${productName()}’s AI`}</p>
-              <p className="text-sm text-muted">{context.ai.premium ? 'Included with Premium, within a monthly allowance.' : 'Needs the Premium plan.'}</p>
+              <p className="text-sm text-muted">{context.ai.note ?? (context.ai.premium ? 'Included with Premium, within a monthly allowance.' : 'Needs the Premium plan.')}</p>
             </button>
             <button type="button" onClick={() => pickFunding('own')} className={cn('rounded-2xl border p-4 text-left', funding === 'own' ? 'border-brand-400 bg-brand-50' : 'border-line')}>
               <p className="font-semibold text-ink">Your own AI key</p>

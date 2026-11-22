@@ -50,7 +50,7 @@ async function receiver() {
 async function reseller() {
   const owner = await resellerClient(server);
   // A second store needs a plan with several stores.
-  await prisma.reseller.update({ where: { id: owner.resellerId }, data: { status: 'active', planCode: 'premium' } });
+  await prisma.reseller.update({ where: { id: owner.resellerId }, data: { status: 'active', maxStores: 10 } });
   await wallets.adjust(null, { resellerId: owner.resellerId, mode: 'test', balance: 'funding', amount: 50_000_000, reason: 'Test funding' });
   const store = async name => {
     const created = await owner.browser.post('/v1/stores', { name, subdomain: `${name.toLowerCase()}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` });

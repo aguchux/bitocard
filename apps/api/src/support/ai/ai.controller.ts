@@ -21,7 +21,7 @@ class MonthDto {
 const providerPipe = new ParseEnumPipe(Object.fromEntries(aiProviders.map(item => [item, item])));
 const userOf = (caller: Caller) => (caller.kind === 'session' ? caller.userId : null);
 
-/** SHQ: the AI behind the reseller's support bots: BitoCard's (Premium) or their own keys, and this month's use. */
+/** SHQ: the AI behind the reseller's support bots: BitoCard's (every store, within its free allowance) or their own keys, and this month's use. */
 @ApiExcludeController()
 @SessionOnly()
 @Roles('admin')

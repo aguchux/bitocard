@@ -14,7 +14,6 @@ import { StoreHomeService } from './store-home.service.js';
 import { maxTrafficDays, StoreVisitsService } from './store-visits.service.js';
 import { templateKeys } from './templates.js';
 import { StoresService } from './stores.service.js';
-import { PlanAccessService } from '../plans/plan-access.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const lower = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -59,9 +58,13 @@ class StoreFieldsDto {
   @IsOptional() @ValidateIf((_dto, value) => value !== null) @IsIn(['rail', 'bottom'])
   desktop_nav?: 'rail' | 'bottom' | null;
 
-  @ApiPropertyOptional({ enum: ['stop', 'pay'], description: 'When the store has used its month’s AI replies on BitoCard’s AI: `stop` (people answer until next month, the default) or `pay` (each further reply billed as it goes, at cost plus BitoCard’s margin, on the store’s invoice).' })
+  @ApiPropertyOptional({ enum: ['stop', 'pay'], description: 'When the store has used its month’s free AI replies on BitoCard’s AI: `pay` (each further reply charged to your wallet as it goes, at cost plus BitoCard’s usage margin, on the store’s invoice; the default) or `stop` (people answer until next month).' })
   @IsOptional() @IsIn(['stop', 'pay'])
   ai_overage?: 'stop' | 'pay';
+
+  @ApiPropertyOptional({ description: 'Your brand only: the store’s pages leave BitoCard’s name out (`true`). The terms of sale still name the seller.' })
+  @IsOptional() @IsBoolean()
+  white_label?: boolean;
 
   @ApiPropertyOptional({ description: 'Ask your store’s customers for the identity check where BitoCard’s market rules require one (`true`, the default), or never (`false`: you take responsibility for knowing your customers). You can also turn it off for one customer in SHQ.' })
   @IsOptional() @IsBoolean()
@@ -142,7 +145,6 @@ export class StoresController {
     private readonly stores: StoresService,
     private readonly visits: StoreVisitsService,
     private readonly home: StoreHomeService,
-    private readonly planAccess: PlanAccessService,
   ) {}
 
   @ApiOperation({ summary: 'Get a store’s home page editor', description: 'The draft (else what is published, else the design’s starting page), what is published, and the sections the store’s template offers.' })
@@ -231,13 +233,12 @@ export class StoresController {
 
   @ApiOperation({
     summary: 'Store traffic',
-    description: 'Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies. Needs a plan with store traffic (`plan_feature_required` otherwise).',
+    description: 'Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies.',
   })
   @ApiQuery({ name: 'days', required: false, description: `How many days back, today included (1 to ${maxTrafficDays}; default 30).` })
   @Get(':id/traffic')
   async traffic(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Query('days') days?: string) {
     const store = await this.stores.get(resellerOf(caller), id);
-    await this.planAccess.requireForStore(store.id, 'store_traffic');
     return this.visits.traffic(store.id, Number(days ?? 30));
   }
 

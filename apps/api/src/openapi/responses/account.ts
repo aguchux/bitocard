@@ -1,13 +1,12 @@
 import { apiKeyScopes } from '../../api-keys/api-keys.service.js';
 import { productCategories } from '../../countries/countries.service.js';
-import { planFeatures } from '../../plans/plans.service.js';
 import { bitocardSwitchKeys, optionDefinitions, switchDefinitions } from '../../settings/settings.service.js';
 import { staffRoles } from '../../team/team.service.js';
 import { eventDocs } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, nullableStr, nullableTime, objectSchema, oneOf, ref, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
-const resellerStatus = oneOf('`pending` until the owner passes the identity check (and, where required, BitoCard approves the account), then `active`; `suspended` if BitoCard has suspended it.', ['pending', 'active', 'suspended']);
+const resellerStatus = oneOf('`pending` until the owner passes the identity check and BitoCard activates the account, then `active`; `suspended` if BitoCard has suspended it.', ['pending', 'active', 'suspended']);
 const roles = ['owner', ...staffRoles] as const;
 const scopes = array(oneOf('A scope.', apiKeyScopes), 'What the credentials may do.');
 const checkStatus = oneOf(
@@ -111,23 +110,6 @@ export const accountDocs: DocsArea = {
       {
         object: constant('account'),
         reseller: ref('Reseller'),
-        plan: shape(
-          {
-            object: constant('plan'),
-            code: str('Plan code, for example `standard` or `premium`.'),
-            name: str('Plan name.'),
-            price: shape(
-              {
-                amount: int('Monthly price in US cents, charged from your wallet in your currency. 0 for the free plan.'),
-                currency: constant('USD'),
-                interval: constant('month'),
-              },
-              'The plan’s price.',
-            ),
-            features: array(oneOf('A plan feature.', planFeatures), 'What the plan adds, for example `chargeback_protection`.'),
-          },
-          'Your plan.',
-        ),
         authenticated_as: {
           description: 'How this request was authenticated: an API key, a documentation "Try it" token, or a signed-in person (dashboard session).',
           oneOf: [
@@ -140,7 +122,7 @@ export const accountDocs: DocsArea = {
           ],
         },
       },
-      'The reseller account a request acts for, its plan, and how the request was authenticated.',
+      'The reseller account a request acts for, and how the request was authenticated.',
     ),
     ResellerVerification: objectSchema(
       'Reseller identity check',
@@ -234,12 +216,11 @@ export const accountDocs: DocsArea = {
     'PATCH /v1/reseller': { status: 200, description: 'The updated business details.', schema: 'Reseller', example: exampleReseller },
     'GET /v1/account': {
       status: 200,
-      description: 'The reseller account, its plan, and how the request was authenticated.',
+      description: 'The reseller account, and how the request was authenticated.',
       schema: 'Account',
       example: {
         object: 'account',
         reseller: exampleReseller,
-        plan: { object: 'plan', code: 'standard', name: 'Startup', price: { amount: 0, currency: 'USD', interval: 'month' }, features: [] },
         authenticated_as: { type: 'api_key', api_key_id: '6b1f2e3d-4c5a-4b6c-8d7e-9f0a1b2c3d4e', mode: 'test', scopes: ['catalogue:read', 'quotes:write', 'orders:read', 'orders:write', 'wallet:read'] },
       },
     },

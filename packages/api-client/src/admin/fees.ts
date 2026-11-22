@@ -3,14 +3,15 @@ import type { List } from './types';
 
 export type FeeKind = 'supplier_order' | 'gateway_payment';
 
-/** A fee rate. The most specific rule for a transaction wins (country, then category, then plan). */
+/** A fee rate. The most specific rule for a transaction wins (country, then category; on Udozo, then plan). */
 export type FeeRule = {
   object: 'fee_rule';
   id: string;
   kind: FeeKind;
   country_code: string | null;
   category: string | null;
-  plan_code: string | null;
+  /** Udozo only: BitoCard's rules have no plan. */
+  plan_code?: string | null;
   /** Parts per billion: 1 = 0.0000001%, 100,000,000 = 10%. */
   rate_ppb: number;
   rate_percent: string;

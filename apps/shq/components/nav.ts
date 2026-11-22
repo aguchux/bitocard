@@ -140,7 +140,6 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     items: [
       { label: "Business", href: "/settings", icon: Building },
       { label: "Identity check", href: "/settings/verification", icon: ShieldCheck },
-      { label: "Plan", href: "/settings/plan", icon: Sparkles },
       { label: "Preferences", href: "/settings/preferences", icon: Bell },
       { label: "Notifications", href: "/settings/notifications", icon: BellRing },
       { label: "Your profile", href: "/settings/profile", icon: UserCog },

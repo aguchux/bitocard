@@ -48,7 +48,7 @@ The secret is shown **once**. BitoCard keeps only a hash of it, so it cannot be 
 | `disputes:read` | Read disputes and their messages |
 | `disputes:write` | Open disputes, reply, escalate to BitoCard and resolve customer disputes |
 
-Each endpoint in the [API reference](/reference) shows the scope it needs. A key without it gets `403` with `code: not_permitted`; a scope switched off by your plan gets `code: plan_restricted`.
+Each endpoint in the [API reference](/reference) shows the scope it needs. A key without it gets `403` with `code: not_permitted`.
 
 ## Dashboard-only endpoints
 

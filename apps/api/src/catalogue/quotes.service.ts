@@ -1,4 +1,3 @@
-import { freePlanCode } from '../plans/features.js';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
 import { ApiError } from '../common/errors/api-error.js';
@@ -95,8 +94,6 @@ export class QuotesService {
    */
   async create(resellerId: string, mode: LedgerMode, input: QuoteInput, options: { ownSources?: boolean; storeId?: string | null } = {}) {
     const ctx = await this.pricing.context(resellerId, mode);
-    // BitoCard's fee on own-supplier offers follows the plan of the store it is for (an API key's, or the hosted store's).
-    if (options.storeId) ctx.planCode = (await this.prisma.storeSubscription.findUnique({ where: { storeId: options.storeId }, select: { planCode: true } }))?.planCode ?? freePlanCode;
     if (options.ownSources === false) ctx.own.clear();
     const product = await this.prisma.product.findUnique({ where: { id: input.product_id }, include: offersInclude });
     if (!product) throw invalid('No such product.', 'product_id', 'resource_missing');

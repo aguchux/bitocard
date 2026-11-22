@@ -1,0 +1,164 @@
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { ResellerStatus } from '../generated/prisma/client.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { ResellerLimitsService } from './limits.js';
+
+const missingReseller = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such reseller.');
+
+/** The admin view of resellers: their status, identity check, store ceiling and history. */
+@Injectable()
+export class AdminResellersService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly settings: SettingsService,
+    private readonly inbox: InboxService,
+    private readonly limits: ResellerLimitsService,
+  ) {}
+
+  async listResellers(filter: { status?: ResellerStatus; country?: string }) {
+    const resellers = await this.prisma.reseller.findMany({
+      // BitoCard's own store accounts are not resellers, and Afrippa's operator account is not BitoCard's.
+      where: { status: filter.status, country: filter.country?.toUpperCase(), house: false, platform: 'bitocard' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return { object: 'list' as const, data: resellers.map(r => ({ object: 'reseller' as const, id: r.id, name: r.name, country: r.country, status: r.status, verified_at: r.verifiedAt?.toISOString() ?? null, created_at: r.createdAt.toISOString() })) };
+  }
+
+  async resellerDetail(id: string) {
+    const reseller = await this.prisma.reseller.findUnique({
+      where: { id },
+      include: { members: { include: { user: true } }, stores: true },
+    });
+    if (!reseller || reseller.platform !== 'bitocard') throw missingReseller();
+    const waivedBy = reseller.identityWaivedBy ? await this.prisma.user.findUnique({ where: { id: reseller.identityWaivedBy }, select: { id: true, name: true } }) : null;
+    return {
+      object: 'reseller' as const,
+      id: reseller.id,
+      name: reseller.name,
+      country: reseller.country,
+      status: reseller.status,
+      verified_at: reseller.verifiedAt?.toISOString() ?? null,
+      verified_name: reseller.verifiedName,
+      /** The mobile number the owner gave when opening the account (E.164), never confirmed. Null when none was given. */
+      signup_phone: reseller.signupPhone,
+      /** An admin let the reseller go live without the identity check: who, when and why. Null when not waived. */
+      identity_waiver: reseller.identityWaivedAt
+        ? { waived_at: reseller.identityWaivedAt.toISOString(), waived_by: waivedBy ? { id: waivedBy.id, name: waivedBy.name } : null, reason: reseller.identityWaiverReason }
+        : null,
+      /** How many stores the reseller may run: their own ceiling (`max_stores`), else everyone's; null for no limit. */
+      max_stores: reseller.maxStores,
+      stores_allowed: await this.limits.storesAllowed(reseller.id),
+      /** `two_step`: the member's two-step sign-in method, or null when it is off. `phone`: their confirmed primary mobile number, or null. */
+      members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role, two_step: m.user.mfaMethod, phone: m.user.phoneVerifiedAt ? m.user.phone : null })),
+      stores: reseller.stores.map(s => ({ id: s.id, name: s.name, subdomain: s.subdomain, status: s.status })),
+      options: await this.settings.effectiveOptions(reseller.id),
+      features: await this.settings.switchesFor(reseller.id),
+      created_at: reseller.createdAt.toISOString(),
+    };
+  }
+
+  /** Admin: activate (after verification) or suspend. Suspension stops every API key at once. */
+  async updateReseller(actorId: string | null, id: string, input: { status?: ResellerStatus }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.platform !== 'bitocard') throw missingReseller();
+    // Going live needs the owner's identity check first, unless an admin waived it.
+    if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt && !before.identityWaivedAt) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet. Verify it, or waive the check first.", 'status');
+    }
+    const after = await this.prisma.reseller.update({ where: { id }, data: { status: input.status } });
+    await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
+    if (after.status === 'suspended' && before.status !== 'suspended') {
+      await this.inbox.reseller(id, 'account.suspended', {
+        subject: `suspended:${after.updatedAt.toISOString()}`,
+        title: 'Your account is suspended',
+        body: 'Live orders and your store are paused, and your API keys stop working. Contact support to find out why and what to do next.',
+        link: '/settings/business',
+      });
+    }
+    return this.resellerDetail(id);
+  }
+
+  /**
+   * Lifts a suspension (operations, audited with the reason): back to active when the owner's identity is verified or
+   * the check was waived, otherwise to pending (they finish the identity check before going live). The team is told.
+   */
+  async unsuspend(actorId: string | null, id: string, input: { reason: string }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
+    if (before.status !== 'suspended') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
+    const status: ResellerStatus = before.verifiedAt || before.identityWaivedAt ? 'active' : 'pending';
+    // Claimed on the status, so two admins lifting it at once record it once.
+    const claimed = await this.prisma.reseller.updateMany({ where: { id, status: 'suspended' }, data: { status } });
+    if (claimed.count === 0) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
+    const after = await this.prisma.reseller.findUniqueOrThrow({ where: { id } });
+    await this.audit.record({ actorId, action: 'reseller.unsuspended', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    await this.inbox.reseller(id, 'account.reinstated', {
+      subject: `reinstated:${after.updatedAt.toISOString()}`,
+      title: 'Your account is no longer suspended',
+      body: status === 'active' ? 'You can take live orders again, and your store and API keys work again.' : 'Finish the identity check to take live orders again.',
+      link: status === 'active' ? '/settings/business' : '/settings/verification',
+    });
+    return this.resellerDetail(id);
+  }
+
+  /**
+   * Lets a reseller go live without the owner's identity check (operations, audited with the reason), and activates
+   * them at once when asked. Live selling, top-ups and API keys follow the reseller's status as usual; payout bank
+   * accounts (named after the verified owner) and the startup allowance still need the check itself.
+   */
+  async waiveIdentity(actorId: string | null, id: string, input: { reason: string; activate?: boolean }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
+    if (before.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', "The owner's identity is already verified: there is nothing to waive.");
+    const activate = input.activate === true && before.status === 'pending';
+    const after = await this.prisma.reseller.update({
+      where: { id },
+      data: { identityWaivedAt: before.identityWaivedAt ?? new Date(), identityWaivedBy: actorId, identityWaiverReason: input.reason.trim(), status: activate ? 'active' : undefined },
+    });
+    await this.audit.record({ actorId, action: 'reseller.identity_waived', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    return this.resellerDetail(id);
+  }
+
+  /** Withdraws the waiver (audited). A reseller still unverified and active goes back to pending: they stop selling live. */
+  async restoreIdentityCheck(actorId: string | null, id: string, input: { reason: string }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
+    if (!before.identityWaivedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_waived', 'The identity check is not waived for this reseller.');
+    const after = await this.prisma.reseller.update({
+      where: { id },
+      data: { identityWaivedAt: null, identityWaivedBy: null, identityWaiverReason: null, status: !before.verifiedAt && before.status === 'active' ? 'pending' : undefined },
+    });
+    await this.audit.record({ actorId, action: 'reseller.identity_waiver_removed', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    return this.resellerDetail(id);
+  }
+
+  /** Sets how many stores the reseller may run (null: everyone's ceiling). Stores already open are never closed. */
+  async setStoreLimit(actorId: string | null, id: string, input: { max_stores: number | null; reason: string }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
+    const after = await this.prisma.reseller.update({ where: { id }, data: { maxStores: input.max_stores } });
+    await this.audit.record({
+      actorId,
+      action: 'reseller.store_limit_set',
+      targetType: 'reseller',
+      targetId: id,
+      before: { max_stores: before.maxStores },
+      after: { max_stores: after.maxStores, reason: input.reason.trim() },
+    });
+    return this.resellerDetail(id);
+  }
+
+  async history(id: string) {
+    const entries = await this.audit.list('reseller', id);
+    return {
+      object: 'list' as const,
+      data: entries.map(e => ({ object: 'audit_entry' as const, action: e.action, actor_id: e.actorId, before: e.before, after: e.after, created_at: e.createdAt.toISOString() })),
+    };
+  }
+}

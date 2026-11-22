@@ -2,7 +2,7 @@ import { bitocardApi } from '../base';
 
 export type IntegrationKind = 'supplier' | 'payment_gateway';
 export type ConnectionStatus = 'pending_review' | 'active' | 'rejected' | 'suspended' | 'disconnected';
-/** Why the account cannot connect its own integrations yet. */
+/** Why the account cannot connect its own integrations yet (`plan`: Udozo only). */
 export type IntegrationAccessReason = 'switch_off' | 'plan' | 'not_verified' | 'no_country' | null;
 
 export type IntegrationField = {

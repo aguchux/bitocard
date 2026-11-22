@@ -35,8 +35,6 @@ export type Caller =
       storeId: string | null;
       mode: ApiKeyMode;
       scopes: string[];
-      /** API features the reseller's plan switches off. */
-      planRestrictions: string[];
     };
 
 export type CallerRequest = Request & { caller?: Caller };

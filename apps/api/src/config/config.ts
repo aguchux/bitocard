@@ -283,7 +283,7 @@ export const configSchema = z.object({
   /** BitoCard's margin on cards customers sell, as a percentage of what Prestmit pays (0 to 50). Selling waits until it is set. */
   PRESTMIT_RESELLER_SPREAD_CAP_PERCENT: z.string().regex(/^(?:(?:[0-9]|[1-4][0-9])(?:\.[0-9]{1,2})?|50(?:\.0{1,2})?)$/, 'a percentage from 0 to 50, up to 2 decimals').optional(),
   PRESTMIT_SELL_MARGIN_PERCENT: z.string().regex(/^(?:(?:[0-9]|[1-4][0-9])(?:\.[0-9]{1,2})?|50(?:\.0{1,2})?)$/, 'a percentage from 0 to 50, up to 2 decimals').optional(),
-  /** AI providers for support bots on BitoCard's keys (Premium). Prices: "model input output cached" in US dollars per million tokens. */
+  /** AI providers for support bots on BitoCard's keys (every store, within its free allowance). Prices: "model input output cached" in US dollars per million tokens. */
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_API_URL: z.string().url().default('https://api.anthropic.com'),
   ANTHROPIC_PRICES: z.string().optional(),
@@ -295,8 +295,12 @@ export const configSchema = z.object({
   DEEPSEEK_PRICES: z.string().optional(),
   /** Models a bot may use on BitoCard's keys, as provider:model. */
   AI_BITOCARD_MODELS: z.string().default('anthropic:claude-haiku-5-5, anthropic:claude-sonnet-5-5, openai:gpt-5-mini, deepseek:deepseek-chat'),
-  /** Bot replies a month per store on BitoCard's keys (the Premium allowance). */
+  /** Bot replies a month per store on BitoCard's keys; past it, each reply is charged to the reseller's wallet. */
   AI_MONTHLY_REPLIES: z.coerce.number().int().min(0).max(1_000_000).default(2000),
+  /** How many stores a reseller may run unless an admin sets their own ceiling (`resellers.max_stores`). */
+  MAX_STORES_PER_RESELLER: z.coerce.number().int().min(1).max(1000).default(1),
+  /** BitoCard's margin, in percent over its cost, on usage charged as it happens (AI replies past the allowance, mobile money deposit fees). */
+  USAGE_MARGIN_PERCENT: z.coerce.number().min(0).max(200).default(10),
   /** Engineering escalations: the repository issues go to (owner/name), a fine-grained token with Issues read and write, and the webhook secret. */
   GITHUB_REPO: z.string().optional(),
   GITHUB_TOKEN: z.string().optional(),

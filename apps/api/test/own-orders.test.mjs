@@ -46,7 +46,7 @@ const runChecks = () => fetch(`${server.base}/v1/cron/orders`, { headers: { auth
 /** A verified Premium reseller with own integrations on and money in both wallets; connected to Reloadly unless told not to. */
 async function ownReseller({ connect = true } = {}) {
   const reseller = await resellerClient(server);
-  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', planCode: 'premium' } });
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', maxStores: 10 } });
   await admin.put('/v1/admin/switches/own_integrations', { reseller_id: reseller.resellerId, enabled: true });
   for (const mode of ['live', 'test']) await wallets.adjust(null, { resellerId: reseller.resellerId, mode, balance: 'funding', amount: 5_000_000, reason: 'Test funding' });
   if (connect) {

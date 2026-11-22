@@ -533,7 +533,7 @@ export class PaymentsService {
   /** Tells the customer their wallet was topped up (in their store's app). */
   /**
    * A store customer's live mobile money top-up: pawaPay's deposit fee, which BitoCard pays, is a usage line for the
-   * store's reseller at cost plus their plan's usage margin (owed past the credit limit if need be: the money is in).
+   * store's reseller at cost plus BitoCard's usage margin (owed past the credit limit if need be: the money is in).
    * BitoCard's own store bears it itself.
    */
   private async billDepositFee(payment: Payment, fee: bigint) {
@@ -542,7 +542,7 @@ export class PaymentsService {
     if (!seller || seller.house) return;
     const customer = await this.prisma.customer.findUnique({ where: { id: payment.customerId }, select: { storeId: true } });
     try {
-      const amount = await this.invoices.withMargin(fee, payment.resellerId, customer?.storeId);
+      const amount = this.invoices.withMargin(fee);
       await this.invoices.charge({
         resellerId: payment.resellerId,
         storeId: customer?.storeId ?? null,

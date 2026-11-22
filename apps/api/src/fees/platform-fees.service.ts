@@ -1,4 +1,3 @@
-import { freePlanCode } from '../plans/features.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -45,13 +44,12 @@ export function percentOf(ratePpb: number) {
   return fraction ? `${whole}.${fraction}` : String(whole);
 }
 
-const scopeKeyOf = (rule: { kind: FeeKind; countryCode?: string | null; category?: ProductCategory | null; planCode?: string | null }) =>
-  `${rule.kind}:${rule.countryCode ?? '*'}:${rule.category ?? '*'}:${rule.planCode ?? '*'}`;
+const scopeKeyOf = (rule: { kind: FeeKind; countryCode?: string | null; category?: ProductCategory | null }) => `${rule.kind}:${rule.countryCode ?? '*'}:${rule.category ?? '*'}`;
 
-/** How specific a rule is: country, then category, then plan. */
-const specificity = (rule: FeeRule) => (rule.countryCode ? 4 : 0) + (rule.category ? 2 : 0) + (rule.planCode ? 1 : 0);
+/** How specific a rule is: country, then category. */
+const specificity = (rule: FeeRule) => (rule.countryCode ? 2 : 0) + (rule.category ? 1 : 0);
 
-export type FeeScope = { kind: FeeKind; countryCode: string | null; category: ProductCategory | null; planCode: string | null };
+export type FeeScope = { kind: FeeKind; countryCode: string | null; category: ProductCategory | null };
 
 /** The most specific rule matching a transaction, from rules already loaded (pricing resolves many at once). */
 export function pickFeeRule(rules: FeeRule[], input: FeeScope) {
@@ -59,8 +57,7 @@ export function pickFeeRule(rules: FeeRule[], input: FeeScope) {
     rule =>
       rule.kind === input.kind &&
       (rule.countryCode === null || rule.countryCode === input.countryCode) &&
-      (rule.category === null || rule.category === input.category) &&
-      (rule.planCode === null || rule.planCode === input.planCode),
+      (rule.category === null || rule.category === input.category),
   );
   return matching.sort((a, b) => specificity(b) - specificity(a))[0] ?? null;
 }
@@ -101,13 +98,10 @@ export class PlatformFeesService {
   /** What a fee would be, without holding anything. */
   async quote(input: { resellerId: string; storeId?: string | null; kind: FeeKind; category?: ProductCategory | null; baseMinor: bigint; locked?: LockedFee }) {
     if (input.baseMinor < 0n) throw new Error('Fee base cannot be negative');
-    const { reseller: account, currency } = await this.wallets.currencyOf(input.resellerId);
-    // Fee rules follow the plan of the store the transaction is for (Startup without one), else the account's.
-    const planCode = input.storeId ? ((await this.prisma.storeSubscription.findUnique({ where: { storeId: input.storeId }, select: { planCode: true } }))?.planCode ?? freePlanCode) : account.planCode;
-    const reseller = { ...account, planCode };
+    const { reseller, currency } = await this.wallets.currencyOf(input.resellerId);
     const rule = input.locked
       ? { id: input.locked.ruleId, ratePpb: input.locked.ratePpb, minFeeMinor: input.locked.minFeeMinor }
-      : await this.ruleFor({ kind: input.kind, countryCode: reseller.country, category: input.category ?? null, planCode });
+      : await this.ruleFor({ kind: input.kind, countryCode: reseller.country, category: input.category ?? null });
     const ratePpb = rule?.ratePpb ?? 0;
     const exactNano = exactFeeNano(input.baseMinor, ratePpb);
     const minFee = rule?.minFeeMinor ?? null;
@@ -139,7 +133,6 @@ export class PlatformFeesService {
           reference,
           category: input.category ?? null,
           countryCode: quote.reseller.country,
-          planCode: quote.reseller.planCode,
           ruleId: quote.rule?.id ?? null,
           ratePpb: quote.ratePpb,
           baseMinor: input.baseMinor,
@@ -309,12 +302,11 @@ export class PlatformFeesService {
     return { object: 'list' as const, data: rows.slice(0, limit).map(presentCharge), has_more: rows.length > limit };
   }
 
-  /** One month's fees and subscription charges, for the reseller's statement. */
+  /** One month's fees, for the reseller's statement. */
   async statement(resellerId: string, mode: LedgerMode, month: string) {
     const { currency } = await this.wallets.currencyOf(resellerId);
     const range = monthRange(month);
     const charges = await this.prisma.feeCharge.findMany({ where: { resellerId, mode, currency, createdAt: range, status: { in: ['charged', 'refunded'] } } });
-    const plans = await this.prisma.hold.findMany({ where: { resellerId, mode, currency, status: 'captured', reference: { startsWith: 'plan:' }, resolvedAt: range } });
     const sum = (rows: FeeCharge[]) => rows.reduce((total, row) => total + (row.chargedMinor ?? 0n), 0n);
     const byKind = (['supplier_order', 'gateway_payment'] as const).map(kind => {
       const rows = charges.filter(row => row.kind === kind);
@@ -328,7 +320,6 @@ export class PlatformFeesService {
     });
     const charged = sum(charges);
     const refunded = sum(charges.filter(row => row.status === 'refunded'));
-    const subscription = plans.reduce((total, hold) => total + hold.amountMinor, 0n);
     const carry = await this.prisma.feeCarry.findUnique({ where: { resellerId_mode_currency: { resellerId, mode, currency } } });
     return {
       object: 'fee_statement' as const,
@@ -336,8 +327,7 @@ export class PlatformFeesService {
       mode,
       currency,
       fees: { transactions: charges.length, charged: minor(charged), refunded: minor(refunded), net: minor(charged - refunded), by_kind: byKind },
-      subscription: minor(subscription),
-      total: minor(charged - refunded + subscription),
+      total: minor(charged - refunded),
       /** The fraction of a minor unit accrued but not yet charged, in billionths (always below one unit). */
       carried_nano: (carry?.carryNano ?? 0n).toString(),
     };
@@ -352,7 +342,7 @@ export class PlatformFeesService {
     const data = [];
     for (const kind of ['supplier_order', 'gateway_payment'] as const) {
       for (const category of kind === 'gateway_payment' ? [null] : categories) {
-        const rule = await this.ruleFor({ kind, countryCode: reseller.country, category, planCode: reseller.planCode });
+        const rule = await this.ruleFor({ kind, countryCode: reseller.country, category });
         data.push({ object: 'fee_rate' as const, kind, category, rate_ppb: rule?.ratePpb ?? 0, rate_percent: percentOf(rule?.ratePpb ?? 0), min_fee: rule?.minFeeMinor === null || !rule ? null : minor(rule.minFeeMinor), currency });
       }
     }
@@ -366,13 +356,10 @@ export class PlatformFeesService {
     return { object: 'list' as const, data: rows.map(presentRule) };
   }
 
-  async setRule(adminId: string | null, input: { kind: FeeKind; country_code?: string | null; category?: ProductCategory | null; plan_code?: string | null; rate_ppb: number; min_fee_minor?: number | null }) {
+  async setRule(adminId: string | null, input: { kind: FeeKind; country_code?: string | null; category?: ProductCategory | null; rate_ppb: number; min_fee_minor?: number | null }) {
     const countryCode = input.country_code?.toUpperCase() ?? null;
     if (countryCode && !(await this.prisma.country.findUnique({ where: { code: countryCode } }))) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_unknown', 'No such country.', 'country_code');
-    }
-    if (input.plan_code && !(await this.prisma.plan.findUnique({ where: { code: input.plan_code } }))) {
-      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'plan_unknown', 'No such plan.', 'plan_code');
     }
     if (input.min_fee_minor && !countryCode) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'A minimum fee is in a currency, so the rule needs a country.', 'min_fee_minor');
@@ -380,7 +367,7 @@ export class PlatformFeesService {
     if (input.kind === 'gateway_payment' && input.category) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Gateway payment fees are not per category.', 'category');
     }
-    const scope = { kind: input.kind, countryCode, category: input.category ?? null, planCode: input.plan_code ?? null };
+    const scope = { kind: input.kind, countryCode, category: input.category ?? null };
     const scopeKey = scopeKeyOf(scope);
     const before = await this.prisma.feeRule.findUnique({ where: { scopeKey } });
     const data = { ...scope, ratePpb: input.rate_ppb, minFeeMinor: input.min_fee_minor ? BigInt(input.min_fee_minor) : null, updatedById: adminId };
@@ -397,14 +384,14 @@ export class PlatformFeesService {
   }
 
   /** Fee revenue between two dates, grouped, per currency (charged and refunded). */
-  async report(input: { from: Date; to: Date; mode: LedgerMode; groupBy: 'reseller' | 'kind' | 'category' | 'country' | 'plan' }) {
+  async report(input: { from: Date; to: Date; mode: LedgerMode; groupBy: 'reseller' | 'kind' | 'category' | 'country' }) {
     const rows = await this.prisma.feeCharge.findMany({
       where: { mode: input.mode, status: { in: ['charged', 'refunded'] }, settledAt: { gte: input.from, lt: input.to } },
       include: { reseller: { select: { name: true } } },
     });
     const groups = new Map<string, { key: string; label: string; currency: string; transactions: number; charged: bigint; refunded: bigint }>();
     for (const row of rows) {
-      const key = { reseller: row.resellerId, kind: row.kind, category: row.category ?? 'none', country: row.countryCode ?? 'none', plan: row.planCode ?? 'none' }[input.groupBy];
+      const key = { reseller: row.resellerId, kind: row.kind, category: row.category ?? 'none', country: row.countryCode ?? 'none' }[input.groupBy];
       const label = input.groupBy === 'reseller' ? row.reseller.name : key;
       const id = `${key}:${row.currency}`;
       const group = groups.get(id) ?? { key, label, currency: row.currency, transactions: 0, charged: 0n, refunded: 0n };
@@ -507,7 +494,6 @@ function presentRule(rule: FeeRule) {
     kind: rule.kind,
     country_code: rule.countryCode,
     category: rule.category,
-    plan_code: rule.planCode,
     rate_ppb: rule.ratePpb,
     rate_percent: percentOf(rule.ratePpb),
     min_fee_minor: rule.minFeeMinor === null ? null : minor(rule.minFeeMinor),

@@ -6,7 +6,6 @@ import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, 
 import { adminId } from '../countries/countries.controller.js';
 import { recordTypes, type RecordType } from './dns.js';
 import { DomainsService } from './domains.service.js';
-import { ProductOnly } from '../products/product.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -42,16 +41,6 @@ class PurchaseDomainDto extends ConnectDomainDto {
   expected_price: number;
 
   @ApiProperty({ type: ContactDto, description: 'The domain’s registrant: you or your business. It is registered in this name.' })
-  @ValidateNested() @Type(() => ContactDto)
-  contact: ContactDto;
-}
-
-class FreeDomainQueryDto {
-  @IsOptional() @Transform(trim) @IsString() @Length(2, 80)
-  q?: string;
-}
-
-class FreeDomainDto extends ConnectDomainDto {
   @ValidateNested() @Type(() => ContactDto)
   contact: ContactDto;
 }
@@ -119,29 +108,6 @@ class ReasonDto {
  * A store's own domains (SHQ only: buying spends from the wallet). Owners and admins manage them; the transfer code is
  * the owner's alone.
  */
-/**
- * Premium's free domain for a Udozo store (docs/UDOZO_SPINOFF_PLAN.md, step 3): what the store is owed, and buying it
- * with nothing taken from the wallet. Seller HQ only.
- */
-@ApiExcludeController()
-@SessionOnly()
-@Roles('admin')
-@Controller('stores/:store/free-domain')
-@ProductOnly('udozo')
-export class FreeDomainController {
-  constructor(private readonly domains: DomainsService) {}
-
-  /** `?q=`: also the search's offers, each with whether the free domain covers it. */
-  @Get()
-  status(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string, @Query() query: FreeDomainQueryDto) {
-    return this.domains.freeDomain(resellerOf(caller), store, query.q);
-  }
-
-  @Post()
-  purchase(@CurrentCaller() caller: Caller, @Param('store', ParseUUIDPipe) store: string, @Body() body: FreeDomainDto) {
-    return this.domains.purchaseFree(resellerOf(caller), store, { domain: body.domain, contact: contactOf(body.contact) });
-  }
-}
 
 @ApiTags('Stores')
 @SessionOnly()

@@ -147,19 +147,19 @@ export default function ResellerPage() {
                       value: operator ? (
                         <Select
                           aria-label="Plan"
-                          value={reseller.plan.code}
+                          value={reseller.plan?.code ?? ""}
                           disabled={updateState.isLoading}
                           onChange={event => update({ id: reseller.id, plan: event.target.value })}
                           className="max-w-48"
                         >
-                          {(plans.data?.data ?? [reseller.plan]).map(plan => (
+                          {(plans.data?.data ?? (reseller.plan ? [reseller.plan] : [])).map(plan => (
                             <option key={plan.code} value={plan.code}>
                               {plan.name}
                             </option>
                           ))}
                         </Select>
                       ) : (
-                        reseller.plan.name
+                        reseller.plan?.name ?? "—"
                       ),
                     },
                     { label: "Country", value: reseller.country ?? "—" },

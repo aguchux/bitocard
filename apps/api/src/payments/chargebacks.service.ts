@@ -10,7 +10,6 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { PaymentProviders } from './payment-providers.js';
 import { inPaymentCurrency } from './payments.service.js';
-import { planIncludes } from '../plans/plan-access.js';
 
 export const chargebackOutcomes = ['won', 'lost'] as const;
 export type ChargebackOutcome = (typeof chargebackOutcomes)[number];
@@ -72,8 +71,9 @@ export type ChargebackListener = {
 
 /**
  * Card payments the cardholder disputed with their bank (chargebacks), for payments into BitoCard's own gateway accounts: wallet
- * top-ups and store checkouts. The money is the reseller's responsibility (taken from their wallet) unless their plan
- * has `chargeback_protection`, when BitoCard bears it.
+ * top-ups and store checkouts. Two tiers: BitoCard settles the chargeback with the gateway and the reseller (it is taken from
+ * their wallet), and the reseller settles it with their customer (the dispute it opens for them). Chargebacks from
+ * before plans were removed may be `protected` (BitoCard bore them).
  *
  * - Opened: the disputed amount is held from the reseller's wallet at once (as much as it has; the rest is the
  *   shortfall), so it cannot be spent or withdrawn while the chargeback runs, and their withdrawals wait.
@@ -154,8 +154,9 @@ export class ChargebacksService {
     if (payment.connectionId) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'own_gateway_payment', 'This payment went to the reseller’s own gateway account: they handle its chargebacks with their gateway.', 'payment_id');
     }
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: payment.resellerId }, include: { plan: true } });
-    const isProtected = planIncludes(reseller, 'chargeback_protection');
+    // Two tiers: BitoCard settles the chargeback with the gateway and the reseller (it is held from their wallet), and the
+    // reseller settles it with their customer (the dispute it opens for them). Nobody is protected: there are no plans.
+    const isProtected = false;
     let chargeback: Chargeback;
     try {
       chargeback = await this.prisma.chargeback.create({

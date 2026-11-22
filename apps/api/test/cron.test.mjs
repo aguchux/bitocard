@@ -14,7 +14,7 @@ after(() => server?.close());
 const run = (job, secret = 'cron-secret') => fetch(`${server.base}/v1/cron/${job}`, { headers: secret ? { authorization: `Bearer ${secret}` } : {} });
 
 test('every job runs with the secret and reports what it did', async () => {
-  for (const job of ['exchange-rates', 'payments', 'earnings', 'plans']) {
+  for (const job of ['exchange-rates', 'payments', 'earnings', 'invoices']) {
     const res = await run(job);
     assert.equal(res.status, 200, job);
     assert.equal((await res.json()).job, job);
@@ -25,6 +25,7 @@ test('the secret is required and unknown jobs are not found', async () => {
   assert.equal((await run('earnings', null)).status, 401);
   assert.equal((await run('earnings', 'bc_live_' + 'x'.repeat(30))).status, 401);
   assert.equal((await run('nothing')).status, 404);
+  assert.equal((await run('plans')).status, 404, 'no plans to renew');
 });
 
 test('without a configured secret no job runs', async () => {

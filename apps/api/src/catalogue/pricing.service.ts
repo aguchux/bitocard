@@ -22,7 +22,6 @@ import { exactFeeNano, maxFeeMinor, pickFeeRule } from '../fees/platform-fees.se
 import { minor } from '../ledger/mode.js';
 import { stockSupplier } from '../suppliers/stock.adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
-import { planIncludes } from '../plans/plan-access.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;
@@ -76,7 +75,6 @@ export type PricingContext = {
    */
   sandbox: boolean;
   rates: Map<string, { pay: Decimal; receive: Decimal }>;
-  planCode: string;
   /** BitoCard's fee rules for own-supplier orders. */
   feeRules: FeeRule[];
   /** The reseller's own offers by product (active connections in this mode, not switched off). */
@@ -185,7 +183,7 @@ export class PricingService {
   ) {}
 
   async context(resellerId: string, mode: LedgerMode): Promise<PricingContext> {
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { plan: true, countryRef: { include: { categories: true } } } });
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { countryRef: { include: { categories: true } } } });
     if (!reseller.countryRef) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'Set your business country before using the catalogue.');
     }
@@ -203,14 +201,14 @@ export class PricingService {
       // The sandbox sells every category; tax flags stay the market's own.
       country: sandbox ? { ...reseller.countryRef, categories: sandboxCategories(reseller.countryRef.code, reseller.countryRef.categories) } : reseller.countryRef,
       currency: reseller.countryRef.currency,
-      international: planIncludes(reseller, 'international_selling'),
+      // Every reseller may sell other countries' products (BitoCard has no plans).
+      international: true,
       capBps: reseller.countryRef.markupCapPercent * 100,
       markups: await this.prisma.resellerMarkup.findMany({ where: { resellerId } }),
       rules: await this.prisma.pricingRule.findMany(),
       markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
       sandbox,
       rates: new Map(),
-      planCode: reseller.planCode,
       feeRules: await this.prisma.feeRule.findMany({ where: { kind: 'supplier_order' } }),
       own: ownByProduct,
     };
@@ -221,9 +219,6 @@ export class PricingService {
     if (!product.active) return unavailable('product_unavailable', 'This product is not available.');
     if (!ctx.country.categories.some(c => c.category === product.category && c.enabled)) {
       return unavailable('category_unavailable', 'This category is not available in your country yet.');
-    }
-    if (product.country !== ctx.country.code && !worldwideCategories.has(product.category) && !ctx.international) {
-      return unavailable('international_selling_required', 'Selling products for other countries needs the Premium plan.');
     }
     return null;
   }
@@ -413,7 +408,7 @@ export class PricingService {
    * products keep their face-value price; offers that would sell below cost plus fee are skipped.
    */
   async priceOwn(ctx: PricingContext, product: Product, faceValue: bigint): Promise<Priced | null> {
-    const feeRule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category, planCode: ctx.planCode });
+    const feeRule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category });
     const offers = (ctx.own.get(product.id) ?? []).filter(offer => this.servesHere(ctx, product, offer.supplierCode));
     if (!offers.length) return null;
     const face = await this.faceIn(ctx, product, faceValue);
@@ -567,7 +562,6 @@ export class PricingService {
       // Admin previews show what live selling would do.
       sandbox: false,
       rates: new Map(),
-      planCode: 'standard',
       feeRules: [],
       own: new Map(),
     };

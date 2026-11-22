@@ -19,7 +19,7 @@ The docs never use or ask for your API keys. Instead, BitoCard issues a **"Try i
 
 - It lasts **15 minutes** (a new one is fetched when needed) and only while your SHQ session lasts. Signing out of SHQ ends it at once.
 - It is kept in this browser tab's memory only: never stored, never written to the page's address, and never sent to the docs website.
-- It has the same scopes and plan rules as an API key. Staff whose role cannot create API keys always get a read-only token.
+- It has the same scopes as an API key. Staff whose role cannot create API keys always get a read-only token.
 
 ## Live mode is protected
 

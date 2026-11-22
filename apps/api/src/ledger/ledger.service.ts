@@ -44,7 +44,7 @@ const resellerKinds = new Set<AccountKind>([
   'reserve_fiat',
   'reserve_crypto',
   'reseller_crypto',
-  // Premium resellers' coins on their way out on chain.
+  // Resellers' coins on their way out on chain (retired with the exchange; kept as entries are never deleted).
   'reseller_crypto_withdrawing',
 ]);
 /** A store customer's own money and crypto: their wallets, P2P proceeds and what they have locked or an admin froze, never below zero. */

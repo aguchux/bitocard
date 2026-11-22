@@ -28,7 +28,7 @@ function ProviderCard({ provider }: { provider: SupportAi["providers"][number] }
     <Card className="space-y-4 p-5">
       <CardHeader title={provider.label} className="px-0 pt-0 pb-0" />
       <p className="text-sm text-muted">
-        {provider.bitocard_models.length ? `On BitoCard’s AI (Premium): ${provider.bitocard_models.join(", ")}.` : "Not offered on BitoCard’s AI: use your own key."}
+        {provider.bitocard_models.length ? `On BitoCard’s AI: ${provider.bitocard_models.join(", ")}.` : "Not offered on BitoCard’s AI: use your own key."}
       </p>
       {own ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas p-3 text-sm">
@@ -58,7 +58,7 @@ function ProviderCard({ provider }: { provider: SupportAi["providers"][number] }
   );
 }
 
-/** Past the month's allowance: people answer (stop), or each reply is billed as it goes on the store's invoice (pay). */
+/** Past the month's free allowance: each reply charged to the wallet on the store's invoice (pay, the default), or people answer (stop). */
 function OverageChoice({ storeId }: { storeId: string }) {
   const { membership } = useReseller();
   const store = useStoresQuery().data?.data.find(item => item.id === storeId);
@@ -73,8 +73,8 @@ function OverageChoice({ storeId }: { storeId: string }) {
         onChange={event => void update({ id: store.id, ai_overage: event.target.value as "stop" | "pay" })}
         className="w-auto text-xs"
       >
+        <option value="pay">Then charge my wallet</option>
         <option value="stop">Then people answer</option>
-        <option value="pay">Then pay as it goes</option>
       </Select>
       {state.error ? <span className="text-xs text-red-600">{errorMessage(state.error)}</span> : null}
     </span>
@@ -86,18 +86,12 @@ function Overview({ ai }: { ai: SupportAi }) {
   const stores = new Map(ai.allowance.stores.map(store => [store.store_id, store.store_name]));
   return (
     <div className="space-y-4">
-      {ai.premium ? (
-        <Notice tone="green" title="Premium: BitoCard’s AI is included">
-          {ai.allowance.replies_per_store === null
-            ? "Your plan has no monthly limit on assistant replies on BitoCard’s AI."
-            : `Each store gets ${ai.allowance.replies_per_store.toLocaleString("en-GB")} assistant replies a month on BitoCard’s AI on your plan. Past that, people answer until next month, or your own key takes over, unless you choose for a store to pay as it goes: each further reply at BitoCard’s cost plus your plan’s usage margin, on the store’s invoice.`}
-        </Notice>
-      ) : (
-        <Notice tone="blue" title="Use your own AI key, or Premium">
-          Add a key from Anthropic, OpenAI or DeepSeek below and your assistants run on it (you pay the provider). On Premium, BitoCard’s AI is included.
-        </Notice>
-      )}
-      {ai.premium && ai.allowance.stores.length ? (
+      <Notice tone="green" title="BitoCard’s AI is included for every store">
+        {ai.allowance.replies_per_store === null
+          ? "Your stores have no monthly limit on assistant replies on BitoCard’s AI."
+          : `Each store gets ${ai.allowance.replies_per_store.toLocaleString("en-GB")} assistant replies a month free on BitoCard’s AI. Past that, each further reply is charged to your wallet at BitoCard’s cost plus its usage margin, on the store’s invoice, unless you choose for a store to stop there (people answer until next month). Your own AI key, if you add one, has no BitoCard limit.`}
+      </Notice>
+      {ai.allowance.stores.length ? (
         <Card className="p-5">
           <CardHeader title="This month on BitoCard’s AI" className="px-0 pt-0 pb-3" />
           <ul className="space-y-1 text-sm">
@@ -137,14 +131,14 @@ function Overview({ ai }: { ai: SupportAi }) {
   );
 }
 
-/** The AI behind the reseller's support assistants: BitoCard's on Premium, or their own keys; and how much is used. */
+/** The AI behind the reseller's support assistants: BitoCard's (a free allowance per store) or their own keys; and how much is used. */
 export default function SupportAiPage() {
   const { membership } = useReseller();
   const allowed = can(membership, "admin");
   const query = useSupportAiQuery(undefined, { skip: !allowed });
   return (
     <ShqShell section="support" current="/support/ai" crumbs={[{ label: "Support", href: "/support" }, { label: "AI keys" }]}>
-      <PageHeader title="AI for your assistants" description="Your support assistants answer with Anthropic, OpenAI or DeepSeek: on your own key, or on BitoCard’s with Premium." />
+      <PageHeader title="AI for your assistants" description="Your support assistants answer with Anthropic, OpenAI or DeepSeek: on your own key, or on BitoCard’s, with a free allowance for every store." />
       {allowed ? (
         <QueryView query={query} loading={<Skeleton className="h-96 w-full" />}>
           {ai => <Overview ai={ai} />}

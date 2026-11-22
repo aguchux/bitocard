@@ -206,8 +206,8 @@ export class RepliesService {
       return { result: JSON.stringify(checkouts.map(checkout => ({ product: name(checkout.quoteId), status: checkout.status, ordered: `${checkout.createdAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`, order_page: `/account/orders/${checkout.id}` }))) };
     }
     if (call.name === 'my_account' && scope.requester === 'reseller') {
-      const reseller = await this.prisma.reseller.findUnique({ where: { id: scope.resellerId }, include: { plan: true, _count: { select: { stores: true } } } });
-      return { result: JSON.stringify(reseller ? { status: reseller.status, identity_checked: Boolean(reseller.verifiedAt), plan: reseller.plan.name, stores: reseller._count.stores, country: reseller.country } : {}) };
+      const reseller = await this.prisma.reseller.findUnique({ where: { id: scope.resellerId }, include: { _count: { select: { stores: true } } } });
+      return { result: JSON.stringify(reseller ? { status: reseller.status, identity_checked: Boolean(reseller.verifiedAt), stores: reseller._count.stores, country: reseller.country } : {}) };
     }
     if (call.name === 'create_ticket' && place.chatId) {
       const category = (ticketCategories as readonly string[]).includes(String(args.category)) ? (String(args.category) as TicketCategory) : 'other';

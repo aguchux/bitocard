@@ -1,4 +1,4 @@
-import { AlertTriangle, Banknote, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Banknote, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'reports' | 'support' | 'settings';
 
@@ -110,7 +110,6 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Markets', href: '/settings/markets', icon: Globe2 },
       { label: 'Integrations', href: '/settings/integrations', icon: PlugZap },
       { label: 'pawaPay coverage', href: '/settings/pawapay', icon: Smartphone },
-      { label: 'Plans', href: '/settings/plans', icon: Crown },
       { label: 'Platform fees', href: '/settings/fees', icon: Percent },
     ],
   },

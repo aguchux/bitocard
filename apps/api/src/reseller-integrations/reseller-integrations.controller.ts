@@ -124,7 +124,7 @@ export class ResellerIntegrationsController {
 
   @ApiOperation({
     summary: 'Choose who collects your customers’ payments',
-    description: 'Your own payment gateway (`own`, a Premium service where switched on for your market) or BitoCard’s (`bitocard`). With your own collecting, your store’s customers pay at checkout through it and the store wallet takes no top-ups.',
+    description: 'Your own payment gateway (`own`, where BitoCard has switched it on for your account or market) or BitoCard’s (`bitocard`). With your own collecting, your store’s customers pay at checkout through it and the store wallet takes no top-ups.',
   })
   @Roles('admin')
   @Put('payment-collector')

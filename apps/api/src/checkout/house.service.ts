@@ -11,8 +11,8 @@ export { houseRootId, houseStoreId };
  * BitoCard selling to retail customers on bitocard.com, through the same quotes, orders and ledger as any reseller.
  * Each market has its own house account (created with that market's first sale), the seller of record for that
  * market's products and for its customers' worldwide ones (`StoreSellers.sellerForProduct`); BitoCard's retail margin is
- * the account's earnings. House accounts are active, on Premium (they
- * sell across borders), never shown as resellers and never charged plans.
+ * the account's earnings. House accounts are active, sell across borders
+ * and are never shown as resellers.
  */
 @Injectable()
 export class HouseService {
@@ -38,7 +38,7 @@ export class HouseService {
     const existing = await this.prisma.reseller.findFirst({ where: { house: true, country: code } });
     if (existing) return existing;
     try {
-      return await this.prisma.reseller.create({ data: { name: 'BitoCard', country: code, status: 'active', planCode: 'enterprise', house: true, verifiedAt: new Date() } });
+      return await this.prisma.reseller.create({ data: { name: 'BitoCard', country: code, status: 'active', house: true, verifiedAt: new Date() } });
     } catch (error) {
       // Another request created it at the same moment.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.reseller.findFirstOrThrow({ where: { house: true, country: code } });
