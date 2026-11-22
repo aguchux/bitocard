@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useId } from "react";
+import { RichTextEditor } from "@bitocard/ui/rich-text";
 import type { FormState } from "@/lib/account-actions";
 import { closeTicket, openTicket, replyToTicket } from "@/lib/support-actions";
 import { ticketCategories } from "@/lib/support";
@@ -9,14 +10,15 @@ import { FormMessage, Submit, TextField } from "@/components/store/account-forms
 const empty: FormState = {};
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400";
 
-function MessageField({ label, name, state, hint }: { label: string; name: string; state: FormState; hint?: string }) {
+/** The message in rich text: bold, lists, quotes and links, sent as `name` (the words) and `name_html`. */
+function MessageField({ label, name, state, hint, resetKey }: { label: string; name: string; state: FormState; hint?: string; resetKey?: unknown }) {
   const id = useId();
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-semibold text-navy-900">
         {label}
       </label>
-      <textarea id={id} name={name} rows={5} required minLength={3} maxLength={5000} className={fieldClass} aria-invalid={state.field === name || undefined} />
+      <RichTextEditor id={id} label={label} name={name} resetKey={resetKey} invalid={state.field === name || state.field === `${name}_html`} placeholder="Write here…" />
       {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
@@ -56,7 +58,7 @@ export function TicketReplyForm({ id }: { id: string }) {
     <form action={action} className="space-y-3">
       <input type="hidden" name="id" value={id} />
       <FormMessage state={state} />
-      <MessageField label="Your reply" name="body" state={state} />
+      <MessageField label="Your reply" name="body" state={state} resetKey={state} />
       <Submit pending={pending}>Send</Submit>
     </form>
   );

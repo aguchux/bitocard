@@ -2,7 +2,8 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Field, Input, Notice, PageHeader, Select, Textarea, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
+import { Button, Card, Field, Input, Notice, PageHeader, Select, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
+import { RichTextEditor, type RichValue } from "@bitocard/ui/rich-text";
 import { type TicketCategory, type TicketRequester, ticketCategories, useOpenTicketMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -16,11 +17,11 @@ function NewTicketForm() {
   const [requester, setRequester] = useState<TicketRequester>("reseller");
   const [category, setCategory] = useState<TicketCategory>("technical");
   const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<RichValue>({ html: "", text: "" });
   const [orderId, setOrderId] = useState("");
   const [customerReference, setCustomerReference] = useState("");
   const orderOk = !orderId.trim() || uuid.test(orderId.trim());
-  const valid = subject.trim().length >= 3 && message.trim().length >= 3 && orderOk;
+  const valid = subject.trim().length >= 3 && message.text.length >= 3 && message.text.length <= 5000 && orderOk;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -29,7 +30,8 @@ function NewTicketForm() {
       requester,
       category,
       subject: subject.trim(),
-      message: message.trim(),
+      message: message.text,
+      message_html: message.html,
       ...(orderId.trim() ? { order_id: orderId.trim() } : {}),
       ...(requester === "customer" && customerReference.trim() ? { customer_reference: customerReference.trim() } : {}),
     })
@@ -66,7 +68,7 @@ function NewTicketForm() {
           <Input id={`${id}-subject`} maxLength={200} value={subject} onChange={event => setSubject(event.target.value)} />
         </Field>
         <Field label="Your question" htmlFor={`${id}-message`}>
-          <Textarea id={`${id}-message`} rows={6} maxLength={5000} value={message} onChange={event => setMessage(event.target.value)} />
+          <RichTextEditor id={`${id}-message`} label="Your question" placeholder="What you need, what you tried, any error you saw. Never send codes, PINs or passwords." onChange={setMessage} />
         </Field>
         <Field label="Order ID (optional)" htmlFor={`${id}-order`} error={orderOk ? undefined : "That is not an order ID."}>
           <Input id={`${id}-order`} autoComplete="off" value={orderId} onChange={event => setOrderId(event.target.value)} />

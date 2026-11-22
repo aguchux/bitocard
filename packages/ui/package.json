@@ -28,6 +28,7 @@
     "./offline-worker": "./src/offline-worker.ts",
     "./underline-tabs": "./src/underline-tabs.tsx",
     "./answer-html": "./src/answer-html.tsx",
+    "./rich-text": "./src/rich-text.tsx",
     "./avatar": "./src/avatar.tsx",
     "./money-input": "./src/money-input.tsx"
   },

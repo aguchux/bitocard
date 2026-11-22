@@ -18,7 +18,10 @@ export type TicketMessage = {
   author_avatar_url: string | null;
   /** `all`: the requester sees it too; `staff`: those answering only. */
   visibility: 'all' | 'staff';
+  /** The message as plain text. */
   body: string;
+  /** The message as rich text (clean HTML of a few tags), drawn instead of `body` when present. */
+  body_html?: string | null;
   /** A reply the store's assistant suggested, waiting for staff to send or discard. */
   draft?: boolean;
   created_at: string;
@@ -57,6 +60,8 @@ export type OpenTicketInput = {
   subject: string;
   category: TicketCategory;
   message: string;
+  /** The question as rich text, beside its plain words. */
+  message_html?: string;
   order_id?: string;
   customer_reference?: string;
 };
@@ -78,7 +83,7 @@ export const resellerSupportApi = bitocardApi.injectEndpoints({
       query: body => ({ url: '/v1/support/tickets', method: 'POST', body }),
       invalidatesTags: [{ type: 'SupportTicket', id: 'LIST' }],
     }),
-    replyTicket: build.mutation<Ticket, { id: string; body: string; visibility: 'all' | 'staff' }>({
+    replyTicket: build.mutation<Ticket, { id: string; body: string; body_html?: string; visibility: 'all' | 'staff' }>({
       query: ({ id, ...body }) => ({ url: `/v1/support/tickets/${id}/messages`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
     }),

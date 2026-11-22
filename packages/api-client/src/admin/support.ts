@@ -22,7 +22,7 @@ export const adminSupportApi = bitocardApi.injectEndpoints({
       providesTags: [{ type: 'SupportTicket', id: 'LIST' }],
     }),
     adminTicket: build.query<AdminTicket, string>({ query: id => `/v1/admin/support/tickets/${id}`, providesTags: (_result, _error, id) => [{ type: 'SupportTicket', id }] }),
-    replyAdminTicket: build.mutation<AdminTicket, { id: string; body: string; visibility: 'all' | 'staff' }>({
+    replyAdminTicket: build.mutation<AdminTicket, { id: string; body: string; body_html?: string; visibility: 'all' | 'staff' }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/support/tickets/${id}/messages`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
     }),

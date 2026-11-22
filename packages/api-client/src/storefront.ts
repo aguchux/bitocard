@@ -582,7 +582,7 @@ export type StoreTicket = {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
-  messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; author_avatar_url: string | null; visibility: 'all'; body: string; created_at: string }>;
+  messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; author_avatar_url: string | null; visibility: 'all'; body: string; body_html?: string | null; created_at: string }>;
 };
 
 /** The customer's (or visitor's) live chat with their store. */

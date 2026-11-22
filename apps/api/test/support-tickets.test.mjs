@@ -73,6 +73,36 @@ async function resellerStore() {
 const events = (resellerId, type) => prisma.event.findMany({ where: { resellerId, type }, orderBy: { createdAt: 'asc' } });
 
 describe('a customer’s ticket: the store answers, BitoCard helps when asked', () => {
+  test('rich text: cleaned to the allowed tags, its words worked out again, and drawn the same for every party', async () => {
+    const store = await resellerStore();
+    const shopper = await customer(store.subdomain);
+    const opened = await shopper.post('/v1/store/support/tickets', {
+      subject: 'Token rejected',
+      category: 'order',
+      message: 'ignored: worked out again from the HTML',
+      message_html: '<div><b>The meter</b> says <i>invalid</i>:<ul><li>Tried twice</li><li>Same error</li></ul><script>alert(1)</script><a href="javascript:x()">see</a></div>',
+    });
+    assert.equal(opened.status, 201, JSON.stringify(opened.json));
+    const [first] = opened.json.messages;
+    assert.equal(first.body_html, '<p><strong>The meter</strong> says <em>invalid</em>:</p><ul><li>Tried twice</li><li>Same error</li></ul><p>see</p>');
+    assert.equal(first.body, ['The meter says invalid:', '', '• Tried twice', '• Same error', '', 'see'].join('\n'));
+
+    const answered = await store.browser.post(`/v1/support/tickets/${opened.json.id}/messages`, { body: 'x', body_html: '<p>Open <a href="https://bitocard.com/help" onclick="x()">the help page</a>.</p>' });
+    check('POST /v1/support/tickets/{id}/messages', 201, answered.json);
+    assert.equal(answered.json.messages.at(-1).body_html, '<p>Open <a href="https://bitocard.com/help">the help page</a>.</p>');
+    assert.equal(answered.json.messages.at(-1).body, 'Open the help page (https://bitocard.com/help).');
+    const seen = (await shopper.get(`/v1/store/support/tickets/${opened.json.id}`)).json;
+    assert.equal(seen.messages.at(-1).body_html, answered.json.messages.at(-1).body_html);
+    const asAdmin = (await admin.get(`/v1/admin/support/tickets/${opened.json.id}`)).json;
+    assert.equal(asAdmin.messages[0].body_html, first.body_html);
+
+    // Plain text stays plain; HTML with no words is refused.
+    const plain = await shopper.post(`/v1/store/support/tickets/${opened.json.id}/messages`, { body: 'Thanks <3' });
+    assert.deepEqual([plain.json.messages.at(-1).body, plain.json.messages.at(-1).body_html], ['Thanks <3', null]);
+    const empty = await shopper.post(`/v1/store/support/tickets/${opened.json.id}/messages`, { body: 'x', body_html: '<p><b> </b><img src=x></p>' });
+    assert.deepEqual([empty.status, empty.json.error.code, empty.json.error.param], [400, 'parameter_missing', 'body_html']);
+  });
+
   test('opened on the store, answered with staff notes the customer never sees, turns taken, reopened, resolved', async () => {
     const store = await resellerStore();
     const shopper = await customer(store.subdomain);

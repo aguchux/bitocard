@@ -70,6 +70,9 @@ describe("support actions", () => {
     expect(await closeTicket({}, form({ id: "t1" }))).toEqual({ notice: "Closed. Reply any time to reopen it." });
     const urls = (fetch.mock.calls as unknown as Call[]).map(([url]) => url);
     expect(urls).toEqual(["http://api.test/v1/store/support/tickets/t1/messages", "http://api.test/v1/store/support/tickets/t1/close"]);
+    // A reply written as rich text goes with its words.
+    await replyToTicket({}, form({ id: "t1", body: "Hi Ada", body_html: "<p>Hi <strong>Ada</strong></p>" }));
+    expect(JSON.parse(String((fetch.mock.calls as unknown as Call[]).at(-1)?.[1]?.body))).toEqual({ body: "Hi Ada", body_html: "<p>Hi <strong>Ada</strong></p>" });
     expect(revalidatePath).toHaveBeenCalledWith("/account/support/t1");
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { type: "invalid_request_error", code: "parameter_invalid", message: "Too long", param: "body", request_id: "r" } }), { status: 400 })));
     expect(await replyToTicket({}, form({ id: "t1", body: "x" }))).toEqual({ error: "Too long", field: "body" });

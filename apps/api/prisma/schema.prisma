@@ -3684,7 +3684,10 @@ model SupportTicketMessage {
   /// all: the requester sees it too; staff: those answering only (the reseller and BitoCard on a customer's ticket,
   /// BitoCard only on a reseller's own).
   visibility      String        @default("all")
+  /// The message's words as plain text: for the assistant, notices and search (from `body_html` when there is one).
   body            String
+  /// The message as rich text, cleaned by `cleanRichText` (src/support/rich-text-core.ts); null for plain-text messages.
+  bodyHtml        String?       @map("body_html")
   /// An assistant's suggested reply waiting for staff to send, edit or discard (never shown to the requester).
   draft           Boolean       @default(false)
   createdAt       DateTime      @default(now()) @map("created_at")

@@ -1,7 +1,8 @@
 import { StoreScope } from '../stores/store-scope.js';
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, Length, ValidateIf } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateIf } from 'class-validator';
+import { messageBody } from './rich-text.js';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, storeScopeOf } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
@@ -57,6 +58,10 @@ class OpenTicketDto {
   @IsString() @Length(3, 5000)
   message: string;
 
+  @ApiPropertyOptional({ description: 'The same message as rich text: HTML with only `p`, `br`, `strong`, `em`, `u`, `s`, `ul`, `ol`, `li`, `blockquote`, `pre`, `code` and `a` (https:// or mailto:). Anything else is removed; when sent, `message` is worked out again from it.', maxLength: 20000 })
+  @IsOptional() @IsString() @MaxLength(20000)
+  message_html?: string;
+
   @ApiPropertyOptional({ description: 'The order it is about.' })
   @IsOptional() @IsUUID()
   order_id?: string;
@@ -71,6 +76,10 @@ class TicketMessageDto {
   @IsString() @Length(1, 5000)
   body: string;
 
+  @ApiPropertyOptional({ description: 'The same message as rich text: HTML with only `p`, `br`, `strong`, `em`, `u`, `s`, `ul`, `ol`, `li`, `blockquote`, `pre`, `code` and `a` (https:// or mailto:). Anything else is removed; when sent, `body` is worked out again from it.', maxLength: 20000 })
+  @IsOptional() @IsString() @MaxLength(20000)
+  body_html?: string;
+
   @ApiPropertyOptional({ enum: ticketVisibilities, default: 'all', description: '`all`: the requester sees it too. `staff`: on a customer’s ticket, you and BitoCard only.' })
   @IsOptional() @IsIn(ticketVisibilities)
   visibility?: TicketVisibility;
@@ -80,12 +89,20 @@ class EscalateTicketDto {
   @ApiProperty({ description: 'For BitoCard: what you found and what the customer needs. The customer does not see it.', minLength: 10, maxLength: 5000 })
   @IsString() @Length(10, 5000)
   note: string;
+
+  @ApiPropertyOptional({ description: 'The same message as rich text: HTML with only `p`, `br`, `strong`, `em`, `u`, `s`, `ul`, `ol`, `li`, `blockquote`, `pre`, `code` and `a` (https:// or mailto:). Anything else is removed; when sent, `note` is worked out again from it.', maxLength: 20000 })
+  @IsOptional() @IsString() @MaxLength(20000)
+  note_html?: string;
 }
 
 class ResolveTicketDto {
   @ApiPropertyOptional({ description: 'A last message to the requester.', maxLength: 5000 })
   @IsOptional() @IsString() @Length(1, 5000)
   note?: string;
+
+  @ApiPropertyOptional({ description: 'The same message as rich text: HTML with only `p`, `br`, `strong`, `em`, `u`, `s`, `ul`, `ol`, `li`, `blockquote`, `pre`, `code` and `a` (https:// or mailto:). Anything else is removed; when sent, `note` is worked out again from it.', maxLength: 20000 })
+  @IsOptional() @IsString() @MaxLength(20000)
+  note_html?: string;
 }
 
 class UpdateTicketDto {
@@ -108,6 +125,9 @@ class CustomerOpenTicketDto {
   @IsString() @Length(3, 5000)
   message: string;
 
+  @IsOptional() @IsString() @MaxLength(20000)
+  message_html?: string;
+
   @IsOptional() @IsUUID()
   checkout_id?: string;
 }
@@ -115,6 +135,9 @@ class CustomerOpenTicketDto {
 class CustomerMessageDto {
   @IsString() @Length(1, 5000)
   body: string;
+
+  @IsOptional() @IsString() @MaxLength(20000)
+  body_html?: string;
 }
 
 class CustomerFilterDto extends PageDto {
@@ -130,6 +153,9 @@ class AdminTicketFilterDto extends TicketFilterDto {
 class SendDraftDto {
   @IsOptional() @IsString() @Length(1, 5000)
   body?: string;
+
+  @IsOptional() @IsString() @MaxLength(20000)
+  body_html?: string;
 }
 
 class GithubIssueDto {
@@ -146,7 +172,16 @@ class GithubIssueDto {
 class ReturnTicketDto {
   @IsString() @Length(3, 5000)
   note: string;
+
+  @IsOptional() @IsString() @MaxLength(20000)
+  note_html?: string;
 }
+
+/** A last message when resolving, plain or rich; none when both are empty. */
+const optionalNote = (body: ResolveTicketDto) => (body.note?.trim() || body.note_html ? messageBody(body.note, body.note_html, 'note') : undefined);
+
+/** A draft sent as it is (nothing given) or with staff's changes. */
+const editedDraft = (body: SendDraftDto) => (body.body?.trim() || body.body_html ? messageBody(body.body, body.body_html, 'body') : undefined);
 
 /** Who wrote it: a person's name from their session; an API key writes as the store. */
 async function authorOf(prisma: PrismaService, caller: Caller, kind: 'reseller' | 'bitocard'): Promise<TicketAuthor> {
@@ -179,7 +214,7 @@ export class TicketsController {
   @Scopes('support:write')
   @Post()
   async open(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: OpenTicketDto) {
-    return this.tickets.openForReseller(resellerOf(caller), mode, await authorOf(this.prisma, caller, 'reseller'), body, caller.kind === 'session' ? 'form' : 'api');
+    return this.tickets.openForReseller(resellerOf(caller), mode, await authorOf(this.prisma, caller, 'reseller'), { ...body, message: messageBody(body.message, body.message_html, 'message') }, caller.kind === 'session' ? 'form' : 'api');
   }
 
   @ApiOperation({ summary: 'Get a support ticket', description: 'With its messages: on your customers’ tickets, staff notes included.' })
@@ -198,7 +233,7 @@ export class TicketsController {
   @Post(':id/messages')
   async reply(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: TicketMessageDto) {
     await this.scope.check(caller, 'ticket', id);
-    return this.tickets.replyAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
+    return this.tickets.replyAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), { visibility: body.visibility, body: messageBody(body.body, body.body_html, 'body') });
   }
 
   @ApiOperation({ summary: 'Pass a support ticket to BitoCard', description: 'Hand a customer’s ticket you cannot answer to BitoCard, with a note on what you found. BitoCard answers the customer and may send it back to you.' })
@@ -207,7 +242,7 @@ export class TicketsController {
   @HttpCode(HttpStatus.OK)
   async escalate(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: EscalateTicketDto) {
     await this.scope.check(caller, 'ticket', id);
-    return this.tickets.escalate(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
+    return this.tickets.escalate(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), { note: messageBody(body.note, body.note_html, 'note') });
   }
 
   @ApiOperation({ summary: 'Resolve a support ticket', description: 'Close a customer’s ticket you answered, or your own ticket once BitoCard has answered it, optionally with a last message. A requester’s reply reopens it.' })
@@ -216,7 +251,7 @@ export class TicketsController {
   @HttpCode(HttpStatus.OK)
   async resolve(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveTicketDto) {
     await this.scope.check(caller, 'ticket', id);
-    return this.tickets.resolveAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
+    return this.tickets.resolveAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), { note: optionalNote(body) });
   }
 
   @ApiOperation({ summary: 'Send an assistant’s draft', description: 'Send your support assistant’s suggested reply to the customer, as it is or with your changes (`body`).' })
@@ -225,7 +260,7 @@ export class TicketsController {
   @HttpCode(HttpStatus.OK)
   async sendDraft(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string, @Body() body: SendDraftDto) {
     await this.scope.check(caller, 'ticket', id);
-    return presentTicket(await this.tickets.sendDraft({ resellerId: resellerOf(caller), mode }, id, draft, await authorOf(this.prisma, caller, 'reseller'), body.body), 'reseller');
+    return presentTicket(await this.tickets.sendDraft({ resellerId: resellerOf(caller), mode }, id, draft, await authorOf(this.prisma, caller, 'reseller'), editedDraft(body)), 'reseller');
   }
 
   @ApiOperation({ summary: 'Discard an assistant’s draft', description: 'Remove your support assistant’s suggested reply without sending it.' })
@@ -261,7 +296,7 @@ export class CustomerTicketsController {
 
   @Post()
   open(@CurrentCustomer() caller: CustomerCaller, @Body() body: CustomerOpenTicketDto) {
-    return this.tickets.openForCustomer(caller.customer, body);
+    return this.tickets.openForCustomer(caller.customer, { ...body, message: messageBody(body.message, body.message_html, 'message') });
   }
 
   @Get(':id')
@@ -271,7 +306,7 @@ export class CustomerTicketsController {
 
   @Post(':id/messages')
   reply(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CustomerMessageDto) {
-    return this.tickets.replyAsCustomer(caller.customer, id, body.body);
+    return this.tickets.replyAsCustomer(caller.customer, id, messageBody(body.body, body.body_html, 'body'));
   }
 
   @Post(':id/close')
@@ -320,19 +355,19 @@ export class AdminTicketsController {
 
   @Post(':id/messages')
   async reply(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: TicketMessageDto) {
-    return this.tickets.replyAsAdmin(id, await authorOf(this.prisma, caller, 'bitocard'), body);
+    return this.tickets.replyAsAdmin(id, await authorOf(this.prisma, caller, 'bitocard'), { visibility: body.visibility, body: messageBody(body.body, body.body_html, 'body') });
   }
 
   @Post(':id/return')
   @HttpCode(HttpStatus.OK)
   async returnToReseller(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReturnTicketDto) {
-    return this.tickets.returnToReseller(adminId(caller), id, await authorOf(this.prisma, caller, 'bitocard'), body.note);
+    return this.tickets.returnToReseller(adminId(caller), id, await authorOf(this.prisma, caller, 'bitocard'), messageBody(body.note, body.note_html, 'note'));
   }
 
   @Post(':id/resolve')
   @HttpCode(HttpStatus.OK)
   async resolve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveTicketDto) {
-    return this.tickets.resolveAsAdmin(adminId(caller), id, await authorOf(this.prisma, caller, 'bitocard'), body);
+    return this.tickets.resolveAsAdmin(adminId(caller), id, await authorOf(this.prisma, caller, 'bitocard'), { note: optionalNote(body) });
   }
 
   @Patch(':id')
@@ -343,7 +378,7 @@ export class AdminTicketsController {
   @Post(':id/drafts/:draft/send')
   @HttpCode(HttpStatus.OK)
   async sendDraft(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string, @Body() body: SendDraftDto) {
-    return presentTicket(await this.tickets.sendDraft({}, id, draft, await authorOf(this.prisma, caller, 'bitocard'), body.body), 'admin');
+    return presentTicket(await this.tickets.sendDraft({}, id, draft, await authorOf(this.prisma, caller, 'bitocard'), editedDraft(body)), 'admin');
   }
 
   @Post(':id/drafts/:draft/discard')

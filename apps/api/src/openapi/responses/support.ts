@@ -12,7 +12,8 @@ const SupportTicketMessage = objectSchema('SupportTicketMessage', {
   author_name: nullableStr('The person’s (or assistant’s) name, when known.'),
   author_avatar_url: nullableStr('The support assistant’s picture (HTTPS) on its messages; null for people and assistants without one.'),
   visibility: oneOf('`all` (the requester sees it too) or `staff` (on a customer’s ticket, you and BitoCard only).', ticketVisibilities),
-  body: str('The message.'),
+  body: str('The message as plain text (worked out from `body_html` when it was written as rich text).'),
+  body_html: nullableStr('The message as rich text: clean HTML with only `p`, `br`, `strong`, `em`, `u`, `s`, `ul`, `ol`, `li`, `blockquote`, `pre`, `code` and `a` (https:// or mailto:). Null for plain-text messages; draw `body` then.'),
   draft: bool('A reply your support assistant suggested, waiting for you to send or discard (never shown to the customer).'),
   created_at: time('When it was written.'),
 });
@@ -39,6 +40,7 @@ const question = {
   author_avatar_url: null,
   visibility: 'all',
   body: 'I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.',
+  body_html: null,
   draft: false,
   created_at: '2026-10-19T09:12:00.000Z',
 };
@@ -50,6 +52,7 @@ const answer = {
   author_avatar_url: null,
   visibility: 'all',
   body: 'Sorry for the wait: your token is on the order page now.',
+  body_html: '<p>Sorry for the wait: your token is on <strong>the order page</strong> now.</p>',
   draft: false,
   created_at: '2026-10-19T09:40:00.000Z',
 };

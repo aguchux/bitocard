@@ -163,7 +163,7 @@ function TicketView({ ticket, userId }: { ticket: Ticket; userId: string | null 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card className="p-5 sm:p-6">
           <CardHeader title="Messages" className="px-0 pt-0 pb-4" />
-          <DisputeThread messages={ticket.messages.filter(message => !message.draft)} viewer="reseller" />
+          <DisputeThread fold messages={ticket.messages.filter(message => !message.draft)} viewer="reseller" />
           {drafts.length ? (
             <div className="mt-4">
               {sendState.error ? <Notice tone="red">{errorMessage(sendState.error)}</Notice> : null}
@@ -178,9 +178,10 @@ function TicketView({ ticket, userId }: { ticket: Ticket; userId: string | null 
           {canWrite ? (
             <div className="mt-5 border-t border-line pt-5">
               <DisputeReply
+                rich
                 staffOption={customer}
                 error={replyState.error ? errorMessage(replyState.error) : null}
-                onSend={async (body, visibility) => Boolean(await reply({ id: ticket.id, body, visibility: customer ? visibility : "all" }).unwrap().catch(() => null))}
+                onSend={async (body, visibility, html) => Boolean(await reply({ id: ticket.id, body, ...(html ? { body_html: html } : {}), visibility: customer ? visibility : "all" }).unwrap().catch(() => null))}
               />
             </div>
           ) : null}

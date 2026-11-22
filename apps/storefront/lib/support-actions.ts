@@ -15,6 +15,7 @@ export async function openTicket(_state: FormState, form: FormData): Promise<For
     subject: text(form, "subject"),
     category: text(form, "category") || "other",
     message: text(form, "message"),
+    ...(text(form, "message_html") ? { message_html: text(form, "message_html") } : {}),
     ...(checkoutId ? { checkout_id: checkoutId } : {}),
   });
   if (!result.ok) {
@@ -28,7 +29,7 @@ export async function openTicket(_state: FormState, form: FormData): Promise<For
 /** The customer replies: the store's turn again (a resolved ticket reopens). */
 export async function replyToTicket(_state: FormState, form: FormData): Promise<FormState> {
   const id = text(form, "id");
-  const result = await customerApi<StoreTicket>("POST", `/v1/store/support/tickets/${encodeURIComponent(id)}/messages`, { body: text(form, "body") });
+  const result = await customerApi<StoreTicket>("POST", `/v1/store/support/tickets/${encodeURIComponent(id)}/messages`, { body: text(form, "body"), ...(text(form, "body_html") ? { body_html: text(form, "body_html") } : {}) });
   if (!result.ok) return { error: result.message, field: result.param };
   revalidatePath(`/account/support/${id}`);
   return { notice: "Sent." };

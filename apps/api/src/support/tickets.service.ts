@@ -11,6 +11,7 @@ import type { Tx } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { EventsService } from '../webhooks/events.service.js';
 import type { EventType } from '../webhooks/events.js';
+import { bodyColumns, type MessageBody, textOf } from './rich-text.js';
 
 export const ticketCategories = ['order', 'payment', 'account', 'product', 'technical', 'other'] as const;
 export const ticketStatuses = ['open', 'pending', 'resolved'] as const;
@@ -68,6 +69,7 @@ function presentMessage(message: SupportTicketMessage, audience: Audience) {
     author_avatar_url: message.author === 'bot' ? message.authorAvatarUrl : null,
     visibility: message.visibility,
     body: message.body,
+    body_html: message.bodyHtml,
     ...(audience === 'customer' ? {} : { draft: message.draft }),
     created_at: message.createdAt.toISOString(),
   };
@@ -167,7 +169,7 @@ export class TicketsService {
   // -- Store customers ---------------------------------------------------------------------------------------------
 
   /** A customer asks their store (bitocard.com: BitoCard). Optionally about one of their orders. */
-  async openForCustomer(customer: CustomerWithStore, input: { subject: string; category: TicketCategory; message: string; checkout_id?: string }, source: TicketSource = 'form', author?: TicketAuthor) {
+  async openForCustomer(customer: CustomerWithStore, input: { subject: string; category: TicketCategory; message: MessageBody; checkout_id?: string }, source: TicketSource = 'form', author?: TicketAuthor) {
     const checkout = input.checkout_id ? await this.prisma.checkout.findUnique({ where: { id: input.checkout_id } }) : null;
     if (input.checkout_id && (!checkout || checkout.customerId !== customer.id)) throw invalid('parameter_invalid', 'Choose one of your orders.', 'checkout_id');
     const open = await this.prisma.supportTicket.count({ where: { customerId: customer.id, status: { not: 'resolved' } } });
@@ -219,7 +221,7 @@ export class TicketsService {
   }
 
   /** The customer replies: it is the store's (or BitoCard's) turn again, and a resolved ticket reopens. */
-  async replyAsCustomer(customer: CustomerWithStore, id: string, body: string) {
+  async replyAsCustomer(customer: CustomerWithStore, id: string, body: MessageBody) {
     const ticket = await this.load({ id, customerId: customer.id });
     if (!ticket) throw notFound();
     await this.requesterReplied(ticket, { kind: 'customer', id: customer.id, name: customer.name }, body);
@@ -246,7 +248,7 @@ export class TicketsService {
     resellerId: string,
     mode: LedgerMode,
     author: TicketAuthor,
-    input: { requester: 'reseller' | 'customer'; subject: string; category: TicketCategory; message: string; order_id?: string; customer_reference?: string },
+    input: { requester: 'reseller' | 'customer'; subject: string; category: TicketCategory; message: MessageBody; order_id?: string; customer_reference?: string },
     source: TicketSource,
   ) {
     const order = input.order_id ? await this.prisma.order.findFirst({ where: { id: input.order_id, resellerId, mode } }) : null;
@@ -300,7 +302,7 @@ export class TicketsService {
    * answer (`all`, the customer's turn next while the ticket is theirs) or add a note for their team and BitoCard
    * (`staff`).
    */
-  async replyAsReseller(resellerId: string, mode: LedgerMode, id: string, author: TicketAuthor, input: { body: string; visibility?: TicketVisibility }) {
+  async replyAsReseller(resellerId: string, mode: LedgerMode, id: string, author: TicketAuthor, input: { body: MessageBody; visibility?: TicketVisibility }) {
     const ticket = await this.owned(resellerId, mode, id);
     const visibility = input.visibility ?? 'all';
     if (ticket.requester === 'reseller') {
@@ -316,7 +318,7 @@ export class TicketsService {
   }
 
   /** The reseller passes a customer's ticket to BitoCard, with a note for BitoCard on what they found. */
-  async escalate(resellerId: string, mode: LedgerMode, id: string, author: TicketAuthor, input: { note: string }) {
+  async escalate(resellerId: string, mode: LedgerMode, id: string, author: TicketAuthor, input: { note: MessageBody }) {
     const ticket = await this.owned(resellerId, mode, id);
     if (ticket.requester !== 'customer' || ticket.queue !== 'reseller') throw conflict('ticket_not_yours', 'Only a customer’s ticket you are answering can be passed to BitoCard.');
     const claimed = await this.transition(
@@ -333,10 +335,10 @@ export class TicketsService {
   }
 
   /** The reseller resolves a ticket they answer, or their own ticket to BitoCard once they have their answer. */
-  async resolveAsReseller(resellerId: string, mode: LedgerMode, id: string, author: TicketAuthor, input: { note?: string }) {
+  async resolveAsReseller(resellerId: string, mode: LedgerMode, id: string, author: TicketAuthor, input: { note?: MessageBody }) {
     const ticket = await this.owned(resellerId, mode, id);
     if (ticket.requester === 'customer' && ticket.queue !== 'reseller') throw conflict('ticket_not_yours', 'BitoCard is answering this ticket: it resolves it.');
-    const message = input.note?.trim() ? { author, body: input.note, visibility: 'all' as const } : undefined;
+    const message = input.note && textOf(input.note).trim() ? { author, body: input.note, visibility: 'all' as const } : undefined;
     const claimed = await this.transition(id, { status: { not: 'resolved' } }, { status: 'resolved', resolvedAt: new Date() }, ['support_ticket.updated'], message);
     if (!claimed) throw conflict('ticket_resolved', 'This ticket is already resolved.');
     const after = (await this.load({ id }))!;
@@ -371,7 +373,7 @@ export class TicketsService {
   }
 
   /** BitoCard answers (`all`: the requester's turn next on its own queue) or adds a note only BitoCard and, on customers' tickets, the store see. */
-  async replyAsAdmin(id: string, author: TicketAuthor, input: { body: string; visibility?: TicketVisibility }, platform: TicketPlatform = 'bitocard') {
+  async replyAsAdmin(id: string, author: TicketAuthor, input: { body: MessageBody; visibility?: TicketVisibility }, platform: TicketPlatform = 'bitocard') {
     const ticket = await this.load({ id, ...adminScope(platform) });
     if (!ticket) throw notFound();
     if (ticket.status === 'resolved') throw conflict('ticket_resolved', 'This ticket is resolved. It reopens when the requester replies.');
@@ -387,7 +389,7 @@ export class TicketsService {
   }
 
   /** BitoCard sends a customer's ticket back to the store to answer, with a note on why. */
-  async returnToReseller(actorId: string | null, id: string, author: TicketAuthor, note: string) {
+  async returnToReseller(actorId: string | null, id: string, author: TicketAuthor, note: MessageBody) {
     const before = await this.load({ id, ...adminScope('bitocard') });
     if (!before) throw notFound();
     const seller = await this.prisma.reseller.findUnique({ where: { id: before.resellerId }, select: { house: true } });
@@ -396,14 +398,14 @@ export class TicketsService {
     if (!claimed) throw conflict('ticket_not_returnable', 'This ticket is no longer with BitoCard.');
     const after = (await this.load({ id }))!;
     await this.audit.record({ actorId, action: 'support_ticket.returned', targetType: 'support_ticket', targetId: id, before: presentTicketSummary(before, 'admin'), after: presentTicketSummary(after, 'admin') });
-    await this.tellReseller(after, 'support.ticket_updated', 'BitoCard sent a ticket back to you', `${ticketReference(after.number)}: ${note}`);
+    await this.tellReseller(after, 'support.ticket_updated', 'BitoCard sent a ticket back to you', `${ticketReference(after.number)}: ${textOf(note)}`);
     return presentTicket(after, 'admin');
   }
 
-  async resolveAsAdmin(actorId: string | null, id: string, author: TicketAuthor, input: { note?: string }, platform: TicketPlatform = 'bitocard') {
+  async resolveAsAdmin(actorId: string | null, id: string, author: TicketAuthor, input: { note?: MessageBody }, platform: TicketPlatform = 'bitocard') {
     const before = await this.load({ id, ...adminScope(platform) });
     if (!before) throw notFound();
-    const message = input.note?.trim() ? { author, body: input.note, visibility: 'all' as const } : undefined;
+    const message = input.note && textOf(input.note).trim() ? { author, body: input.note, visibility: 'all' as const } : undefined;
     const claimed = await this.transition(id, { status: { not: 'resolved' } }, { status: 'resolved', resolvedAt: new Date() }, ['support_ticket.updated'], message);
     if (!claimed) throw conflict('ticket_resolved', 'This ticket is already resolved.');
     const after = (await this.load({ id }))!;
@@ -466,7 +468,7 @@ export class TicketsService {
   // -- Shared ------------------------------------------------------------------------------------------------------
 
   /** The requester writes: whoever answers has the next turn, and a resolved ticket reopens. */
-  private async requesterReplied(ticket: SupportTicket, author: TicketAuthor, body: string) {
+  private async requesterReplied(ticket: SupportTicket, author: TicketAuthor, body: MessageBody) {
     const reopen = ticket.status !== 'open';
     const types: TicketEvent[] = [];
     if (ticket.requester === 'customer') types.push('support_ticket.message_received');
@@ -501,14 +503,15 @@ export class TicketsService {
   }
 
   /** Staff send an assistant's draft, as it is (the assistant's words) or edited (theirs), to the requester. */
-  async sendDraft(scope: { resellerId?: string; mode?: LedgerMode }, ticketId: string, draftId: string, author: TicketAuthor, edited?: string) {
+  async sendDraft(scope: { resellerId?: string; mode?: LedgerMode }, ticketId: string, draftId: string, author: TicketAuthor, edited?: MessageBody) {
     const ticket = await this.load({ id: ticketId, ...(scope.resellerId ? { resellerId: scope.resellerId, mode: scope.mode } : {}) });
     if (!ticket) throw notFound();
     const draft = ticket.messages.find(message => message.id === draftId && message.draft);
     if (!draft) throw notFound();
     if (ticket.status === 'resolved') throw conflict('ticket_resolved', 'This ticket is resolved.');
-    const body = edited?.trim() || draft.body;
-    const writer: TicketAuthor = edited?.trim() && edited.trim() !== draft.body ? author : { kind: 'bot', id: draft.authorId, name: draft.authorName, avatar: draft.authorAvatarUrl };
+    const changed = edited !== undefined && textOf(edited).trim() !== '' && (typeof edited !== 'string' || edited.trim() !== draft.body);
+    const body: MessageBody = changed ? edited : draft.bodyHtml ? { text: draft.body, html: draft.bodyHtml } : draft.body;
+    const writer: TicketAuthor = changed ? author : { kind: 'bot', id: draft.authorId, name: draft.authorName, avatar: draft.authorAvatarUrl };
     await this.prisma.supportTicketMessage.delete({ where: { id: draft.id } });
     const answering = (ticket.queue === 'reseller' && author.kind === 'reseller') || (ticket.queue === 'bitocard' && author.kind === 'bitocard');
     await this.staffReplied(ticket, writer, body, 'all', answering, author.kind === 'bitocard');
@@ -530,7 +533,7 @@ export class TicketsService {
    * changes nothing. BitoCard's messages reach the reseller as `support_ticket.message_received` (on their own tickets
    * only the answers, which are all they see).
    */
-  private async staffReplied(ticket: SupportTicket, author: TicketAuthor, body: string, visibility: TicketVisibility, answering: boolean, fromBitocard = false) {
+  private async staffReplied(ticket: SupportTicket, author: TicketAuthor, body: MessageBody, visibility: TicketVisibility, answering: boolean, fromBitocard = false) {
     const handover = visibility === 'all' && answering && ticket.status === 'open';
     const types: TicketEvent[] = [];
     if (fromBitocard && (visibility === 'all' || ticket.requester === 'customer')) types.push('support_ticket.message_received');
@@ -539,10 +542,10 @@ export class TicketsService {
   }
 
   /** A new ticket with its first message and its `support_ticket.created` event, in one transaction. */
-  private async create(data: Omit<Prisma.SupportTicketUncheckedCreateInput, 'subject'> & { subject: string }, author: TicketAuthor, message: string, visibility: TicketVisibility = 'all') {
+  private async create(data: Omit<Prisma.SupportTicketUncheckedCreateInput, 'subject'> & { subject: string }, author: TicketAuthor, message: MessageBody, visibility: TicketVisibility = 'all') {
     const created = await this.prisma.$transaction(async tx => {
       const ticket = await tx.supportTicket.create({ data: { ...data, subject: data.subject.trim().slice(0, 200) } });
-      await tx.supportTicketMessage.create({ data: { ticketId: ticket.id, author: author.kind, authorId: author.id, authorName: author.name, authorAvatarUrl: author.avatar ?? null, body: message.trim(), visibility } });
+      await tx.supportTicketMessage.create({ data: { ticketId: ticket.id, author: author.kind, authorId: author.id, authorName: author.name, authorAvatarUrl: author.avatar ?? null, ...bodyColumns(message), visibility } });
       await this.recordEvent(tx, ticket.id, 'support_ticket.created');
       return tx.supportTicket.findUniqueOrThrow({ where: { id: ticket.id }, include: { messages: { orderBy: { createdAt: 'asc' } } } });
     });
@@ -554,13 +557,13 @@ export class TicketsService {
    * A change, claimed on the ticket's current state (`where`) so it happens once, with its message and the reseller's
    * events, in one transaction. False when the ticket was not in that state.
    */
-  private async transition(id: string, where: Prisma.SupportTicketWhereInput, data: Prisma.SupportTicketUpdateManyMutationInput, types: TicketEvent[], message?: { author: TicketAuthor; body: string; visibility: TicketVisibility }) {
+  private async transition(id: string, where: Prisma.SupportTicketWhereInput, data: Prisma.SupportTicketUpdateManyMutationInput, types: TicketEvent[], message?: { author: TicketAuthor; body: MessageBody; visibility: TicketVisibility }) {
     const now = new Date();
     const done = await this.prisma.$transaction(async tx => {
       const claimed = await tx.supportTicket.updateMany({ where: { id, ...where }, data: { ...data, ...(message ? { lastMessageAt: now } : {}), updatedAt: now } });
       if (claimed.count === 0) return false;
       if (message) {
-        await tx.supportTicketMessage.create({ data: { ticketId: id, author: message.author.kind, authorId: message.author.id, authorName: message.author.name, authorAvatarUrl: message.author.avatar ?? null, body: message.body.trim(), visibility: message.visibility, createdAt: now } });
+        await tx.supportTicketMessage.create({ data: { ticketId: id, author: message.author.kind, authorId: message.author.id, authorName: message.author.name, authorAvatarUrl: message.author.avatar ?? null, ...bodyColumns(message.body), visibility: message.visibility, createdAt: now } });
       }
       for (const type of types) await this.recordEvent(tx, id, type);
       return true;
