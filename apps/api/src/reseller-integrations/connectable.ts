@@ -1,7 +1,7 @@
 import type { AppConfig } from '../config/config.js';
 import { isTestKey, type Environment } from '../integrations/endpoints.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
-import { africasTalkingCheck } from '../suppliers/africas-talking.adapter.js';
+import { africasTalkingCheck, africasTalkingDataCheck } from '../suppliers/africas-talking.adapter.js';
 import { RemitaAdapter } from '../suppliers/remita.adapter.js';
 
 export type ConnectableKind = 'supplier' | 'payment_gateway';
@@ -17,7 +17,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL' | 'PAYSTACK_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'AFRICAS_TALKING_DATA_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL' | 'PAYSTACK_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -146,6 +146,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     ],
     check: async (values, urls) => {
       await africasTalkingCheck(urls.AFRICAS_TALKING_API_URL, values.username, values.api_key);
+      if (values.data_product?.trim()) await africasTalkingDataCheck(urls.AFRICAS_TALKING_DATA_URL, values.username, values.api_key);
     },
     fromSettings: config => ({
       username: config.AFRICAS_TALKING_USERNAME,

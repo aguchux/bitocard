@@ -243,4 +243,18 @@ describe('Africa’s Talking connection', () => {
     const group = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'africas_talking');
     assert.deepEqual([group.section, group.adapter_ready ?? group.adapterReady ?? true], ['suppliers', true]);
   });
+
+  test('with a Mobile Data product set, Test connection also reads the Mobile Data wallet, and a refusal fails it', async () => {
+    const before = at.state.walletChecks ?? 0;
+    assert.equal((await admin.post('/v1/admin/integrations/africas_talking/test')).json.ok, true);
+    assert.equal(at.state.walletChecks, before + 1);
+    at.state.dataWallet = 'refused';
+    try {
+      const tested = await admin.post('/v1/admin/integrations/africas_talking/test');
+      assert.equal(tested.json.ok, false);
+      assert.match(tested.json.message, /Mobile Data/);
+    } finally {
+      at.state.dataWallet = undefined;
+    }
+  });
 });

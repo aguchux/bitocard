@@ -819,6 +819,10 @@ export async function fakeAfricasTalking() {
       if (accepted) state.transactions[transactionId] = 'Queued';
       return { status: 201, body: { entries: [{ phoneNumber: body.recipients[0].phoneNumber, provider: 'Safaricom', status: state.data, transactionId: accepted ? transactionId : 'None', value: 'KES 250.0000' }] } };
     }
+    if (method === 'GET' && path === '/query/wallet/balance') {
+      state.walletChecks = (state.walletChecks ?? 0) + 1;
+      return state.dataWallet === 'refused' ? { body: { status: 'Failed', errorMessage: 'Mobile Data is not enabled for this app' } } : { body: { status: 'Success', balance: 'KES 4800.0000' } };
+    }
     if (method === 'GET' && path === '/query/transaction/find') {
       const status = state.transactions[query.get('transactionId')];
       if (!status) return { body: { status: 'Failure', errorMessage: 'Transaction not found' } };

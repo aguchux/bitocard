@@ -396,6 +396,20 @@ export async function africasTalkingCheck(apiUrl: string, username: string | und
 }
 
 /**
+ * Test connection for Mobile Data: the Mobile Data wallet's balance (`bundles…/query/wallet/balance`), proving the
+ * same username and key reach the bundles API too. Africa's Talking has no plan list to read: the plans are set.
+ */
+export async function africasTalkingDataCheck(dataUrl: string, username: string | undefined, apiKey: string | undefined) {
+  const query = new URLSearchParams({ username: (username ?? '').trim() });
+  const reply = await providerRequest<{ status?: string; balance?: string; errorMessage?: string }>('africas_talking', `${dataUrl.replace(/\/+$/, '')}/query/wallet/balance?${query}`, {
+    headers: { apikey: (apiKey ?? '').trim() },
+  });
+  if (!reply || typeof reply !== 'object') throw new ProviderError('africas_talking', 'unexpected reply to the Mobile Data balance check', true);
+  if (reply.status && !/^success$/i.test(reply.status)) throw new ProviderError('africas_talking', `Mobile Data refused: ${reply.errorMessage ?? reply.status}`, true);
+  return reply.balance ?? null;
+}
+
+/**
  * Africa's Talking signs nothing: its status callbacks are authenticated by the secret token in the callback address
  * set in its dashboard (`/v1/webhooks/africas-talking?token=<AFRICAS_TALKING_CALLBACK_TOKEN>`).
  */
