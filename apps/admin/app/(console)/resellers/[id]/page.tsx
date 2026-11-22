@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { Ban, CheckCircle2, ReceiptText, RotateCcw, ShieldCheck, ShieldOff } from "lucide-react";
+import { Ban, CheckCircle2, ReceiptText, RotateCcw, ShieldCheck } from "lucide-react";
 import {
   ActionDialog,
   Button,
@@ -31,16 +31,15 @@ import { CancelCheck, cancellable } from "@/components/verification-list";
 import { ResellerWalletsCard } from "@/components/reseller-wallets";
 import { StartupAllowanceCard } from "@/components/startup-allowance";
 import { StoreLimit } from "@/components/store-limit";
+import { TestAccount } from "@/components/test-account";
 import {
   type ResellerStatus,
-  useRemoveResellerIdentityWaiverMutation,
   useUnsuspendResellerMutation,
   useResetMemberTwoStepMutation,
   useResellerHistoryQuery,
   useResellerQuery,
   useUpdateResellerMutation,
   useVerificationsInfiniteQuery,
-  useWaiveResellerIdentityMutation,
 } from "@bitocard/api-client/admin";
 
 const twoStepNames = { authenticator: "app", email: "email", sms: "SMS" } as const;
@@ -53,10 +52,6 @@ export default function ResellerPage() {
   const checks = useVerificationsInfiniteQuery({ reseller_id: id, subject: "reseller" });
   const [update, updateState] = useUpdateResellerMutation();
   const [action, setAction] = useState<ResellerStatus | null>(null);
-  const [waiver, setWaiver] = useState<"waive" | "remove" | null>(null);
-  const [activateNow, setActivateNow] = useState(true);
-  const [waive] = useWaiveResellerIdentityMutation();
-  const [removeWaiver] = useRemoveResellerIdentityWaiverMutation();
   const [unsuspend] = useUnsuspendResellerMutation();
   const [lifting, setLifting] = useState(false);
   const [resetting, setResetting] = useState<{ user_id: string; name: string } | null>(null);
@@ -65,7 +60,7 @@ export default function ResellerPage() {
 
   const latestCheck = checks.data?.pages[0]?.data[0];
   const verified = Boolean(reseller?.verified_at);
-  const waived = !verified && Boolean(reseller?.identity_waiver);
+  const testAccount = Boolean(reseller?.test_account);
 
   return (
     <AdminShell section="resellers" current="/resellers" crumbs={[{ label: "Resellers", href: "/resellers" }, { label: reseller?.name ?? "Reseller" }]}>
@@ -93,7 +88,7 @@ export default function ResellerPage() {
                       Unsuspend
                     </Button>
                   ) : reseller.status !== "active" ? (
-                    <Button icon={<CheckCircle2 className="size-4" aria-hidden />} onClick={() => setAction("active")} disabled={!verified && !waived}>
+                    <Button icon={<CheckCircle2 className="size-4" aria-hidden />} onClick={() => setAction("active")} disabled={!verified && !testAccount}>
                       Activate
                     </Button>
                   ) : null}
@@ -106,38 +101,7 @@ export default function ResellerPage() {
               ) : null
             }
           />
-          {waived && reseller.identity_waiver ? (
-            <Notice
-              tone="blue"
-              title="Identity check waived"
-              action={
-                operator ? (
-                  <Button variant="secondary" size="sm" icon={<ShieldCheck className="size-4" aria-hidden />} onClick={() => setWaiver("remove")}>
-                    Ask for the check again
-                  </Button>
-                ) : null
-              }
-            >
-              {reseller.identity_waiver.waived_by ? `${reseller.identity_waiver.waived_by.name} let` : "An admin let"} this reseller go live without the identity check on{" "}
-              {formatDate(reseller.identity_waiver.waived_at)}
-              {reseller.identity_waiver.reason ? `: “${reseller.identity_waiver.reason}”.` : "."} Payouts and the startup allowance still need the check.
-            </Notice>
-          ) : !verified && reseller.status !== "active" ? (
-            <Notice
-              tone="amber"
-              title="Identity not verified"
-              action={
-                operator ? (
-                  <Button variant="secondary" size="sm" icon={<ShieldOff className="size-4" aria-hidden />} onClick={() => setWaiver("waive")}>
-                    Don&apos;t ask for ID
-                  </Button>
-                ) : null
-              }
-            >
-              The owner has not passed the identity check, so this reseller cannot go live yet.
-              {latestCheck ? ` Latest check: ${humanise(latestCheck.status)}.` : " No check started."}
-            </Notice>
-          ) : null}
+          <TestAccount reseller={reseller} operator={operator} latestCheck={latestCheck?.status} />
 
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -299,45 +263,12 @@ export default function ResellerPage() {
             onClose={() => setLifting(false)}
             title={`Unsuspend ${reseller.name}?`}
             description={
-              verified || waived
+              verified || testAccount
                 ? "They are active again: live orders, their store and their API keys work again. Your reason is kept in the audit log and the team is told."
                 : "Their identity check is not done, so they go back to pending and finish it before taking live orders. Your reason is kept in the audit log and the team is told."
             }
             confirmLabel="Unsuspend"
             onConfirm={reason => unsuspend({ id: reseller.id, reason }).unwrap()}
-          />
-
-          <ActionDialog
-            open={waiver === "waive"}
-            onClose={() => setWaiver(null)}
-            title={`Let ${reseller.name} go live without ID?`}
-            description="They can be activated without the owner's identity check: live orders, top-ups and live API keys. Payouts to a bank account and the startup allowance still need the check. Your reason is kept in the audit log."
-            confirmLabel="Don't ask for ID"
-            onConfirm={reason => waive({ id: reseller.id, reason, activate: reseller.status === "pending" && activateNow }).unwrap()}
-          >
-            {reseller.status === "pending" ? (
-              <label className="flex items-start gap-3 text-sm">
-                <input type="checkbox" className="mt-0.5 size-4" checked={activateNow} onChange={event => setActivateNow(event.target.checked)} />
-                <span>
-                  <span className="block font-semibold text-ink">Activate them now</span>
-                  <span className="block text-muted">Otherwise use Activate when you are ready.</span>
-                </span>
-              </label>
-            ) : null}
-          </ActionDialog>
-
-          <ActionDialog
-            open={waiver === "remove"}
-            onClose={() => setWaiver(null)}
-            title="Ask for the identity check again?"
-            description={
-              reseller.status === "active"
-                ? "They go back to pending and stop selling live until the owner passes the identity check."
-                : "They cannot be activated until the owner passes the identity check."
-            }
-            confirmLabel="Ask for the check"
-            tone="danger"
-            onConfirm={reason => removeWaiver({ id: reseller.id, reason }).unwrap()}
           />
         </>
       )}

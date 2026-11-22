@@ -45,7 +45,7 @@ export class ResellerEmailsService {
     return {
       status: reseller.status,
       verified: Boolean(reseller.verifiedAt),
-      identityWaived: Boolean(reseller.identityWaivedAt),
+      testAccount: Boolean(reseller.testAccountAt),
       emailConfirmed: Boolean(owner?.emailVerifiedAt),
       mobileConfirmed: Boolean(owner?.phoneVerifiedAt) || Boolean(owner?.phones.length),
       stores,

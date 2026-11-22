@@ -452,11 +452,11 @@ model Reseller {
   verifiedAt                DateTime?                 @map("verified_at")
   /// The owner's name as verified, for matching payout bank accounts.
   verifiedName              String?                   @map("verified_name")
-  /// An admin let this reseller go live without the owner's identity check (audited). Payouts and the startup
-  /// allowance still need the check itself.
-  identityWaivedAt          DateTime?                 @map("identity_waived_at")
-  identityWaivedBy          String?                   @map("identity_waived_by") @db.Uuid
-  identityWaiverReason      String?                   @map("identity_waiver_reason")
+  /// An admin marked this a test account (audited): it may be activated without the owner's identity check, to try the
+  /// live flow. It never moves money out: payouts, the startup allowance and bank account numbers need the check itself.
+  testAccountAt             DateTime?                 @map("test_account_at")
+  testAccountBy             String?                   @map("test_account_by") @db.Uuid
+  testAccountReason         String?                   @map("test_account_reason")
   /// The owner's BVN was checked with Flutterwave and its name matched the verified owner (Nigeria; reserved accounts).
   bvnVerifiedAt             DateTime?                 @map("bvn_verified_at")
   /// KYB (BitoCard Verify): unregistered (a person trading) or a registered business; null until the owner chooses.

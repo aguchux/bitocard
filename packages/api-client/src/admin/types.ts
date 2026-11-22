@@ -136,7 +136,7 @@ export type PlanSettings = {
 };
 export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; available?: boolean; sort_order?: number; usage_margin_bps?: number };
 export type CreatePlanInput = { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean };
-export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; /** Udozo only: BitoCard has no plans. */ plan?: string; created_at: string };
+export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; /** BitoCard: marked a test account by an admin. */ test_account?: boolean; /** Udozo only: BitoCard has no plans. */ plan?: string; created_at: string };
 export type ResellerDetail = {
   object: 'reseller';
   id: string;
@@ -147,8 +147,10 @@ export type ResellerDetail = {
   verified_name: string | null;
   /** The mobile number the owner gave when opening the account (E.164), never confirmed; null when none. Missing on older API versions. */
   signup_phone?: string | null;
-  /** An admin let the reseller go live without the identity check: who, when and why. */
-  identity_waiver: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
+  /** Udozo only: an admin let the reseller go live without the identity check (BitoCard always requires it). */
+  identity_waiver?: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
+  /** BitoCard: an admin marked it a test account (activated without the identity check, never moving money out). */
+  test_account?: { marked_at: string; marked_by: { id: string; name: string } | null; reason: string | null } | null;
   /** Udozo only: BitoCard has no plans. */
   plan?: Plan;
   /** BitoCard: how many stores the reseller may run, their own ceiling (null: everyone's) and what applies now (null: no limit). */

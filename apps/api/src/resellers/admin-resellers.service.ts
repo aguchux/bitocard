@@ -27,7 +27,7 @@ export class AdminResellersService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return { object: 'list' as const, data: resellers.map(r => ({ object: 'reseller' as const, id: r.id, name: r.name, country: r.country, status: r.status, verified_at: r.verifiedAt?.toISOString() ?? null, created_at: r.createdAt.toISOString() })) };
+    return { object: 'list' as const, data: resellers.map(r => ({ object: 'reseller' as const, id: r.id, name: r.name, country: r.country, status: r.status, verified_at: r.verifiedAt?.toISOString() ?? null, test_account: Boolean(r.testAccountAt), created_at: r.createdAt.toISOString() })) };
   }
 
   async resellerDetail(id: string) {
@@ -36,7 +36,7 @@ export class AdminResellersService {
       include: { members: { include: { user: true } }, stores: true },
     });
     if (!reseller || reseller.platform !== 'bitocard') throw missingReseller();
-    const waivedBy = reseller.identityWaivedBy ? await this.prisma.user.findUnique({ where: { id: reseller.identityWaivedBy }, select: { id: true, name: true } }) : null;
+    const markedBy = reseller.testAccountBy ? await this.prisma.user.findUnique({ where: { id: reseller.testAccountBy }, select: { id: true, name: true } }) : null;
     return {
       object: 'reseller' as const,
       id: reseller.id,
@@ -47,9 +47,9 @@ export class AdminResellersService {
       verified_name: reseller.verifiedName,
       /** The mobile number the owner gave when opening the account (E.164), never confirmed. Null when none was given. */
       signup_phone: reseller.signupPhone,
-      /** An admin let the reseller go live without the identity check: who, when and why. Null when not waived. */
-      identity_waiver: reseller.identityWaivedAt
-        ? { waived_at: reseller.identityWaivedAt.toISOString(), waived_by: waivedBy ? { id: waivedBy.id, name: waivedBy.name } : null, reason: reseller.identityWaiverReason }
+      /** An admin marked it a test account (activated without the identity check, never moving money out): who, when and why. */
+      test_account: reseller.testAccountAt
+        ? { marked_at: reseller.testAccountAt.toISOString(), marked_by: markedBy ? { id: markedBy.id, name: markedBy.name } : null, reason: reseller.testAccountReason }
         : null,
       /** How many stores the reseller may run: their own ceiling (`max_stores`), else everyone's; null for no limit. */
       max_stores: reseller.maxStores,
@@ -67,9 +67,9 @@ export class AdminResellersService {
   async updateReseller(actorId: string | null, id: string, input: { status?: ResellerStatus }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
     if (!before || before.platform !== 'bitocard') throw missingReseller();
-    // Going live needs the owner's identity check first, unless an admin waived it.
-    if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt && !before.identityWaivedAt) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet. Verify it, or waive the check first.", 'status');
+    // Going live always needs the owner's identity check first; only a test account is activated without it.
+    if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt && !before.testAccountAt) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet: they pass the identity check before going live.", 'status');
     }
     const after = await this.prisma.reseller.update({ where: { id }, data: { status: input.status } });
     await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
@@ -86,13 +86,13 @@ export class AdminResellersService {
 
   /**
    * Lifts a suspension (operations, audited with the reason): back to active when the owner's identity is verified or
-   * the check was waived, otherwise to pending (they finish the identity check before going live). The team is told.
+   * it is a test account, otherwise to pending (they finish the identity check before going live). The team is told.
    */
   async unsuspend(actorId: string | null, id: string, input: { reason: string }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
     if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
     if (before.status !== 'suspended') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
-    const status: ResellerStatus = before.verifiedAt || before.identityWaivedAt ? 'active' : 'pending';
+    const status: ResellerStatus = before.verifiedAt || before.testAccountAt ? 'active' : 'pending';
     // Claimed on the status, so two admins lifting it at once record it once.
     const claimed = await this.prisma.reseller.updateMany({ where: { id, status: 'suspended' }, data: { status } });
     if (claimed.count === 0) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
@@ -108,35 +108,35 @@ export class AdminResellersService {
   }
 
   /**
-   * Lets a reseller go live without the owner's identity check (operations, audited with the reason), and activates
-   * them at once when asked. Live selling, top-ups and API keys follow the reseller's status as usual; payout bank
-   * accounts (named after the verified owner) and the startup allowance still need the check itself.
+   * Marks a test account (operations, audited with the reason): it may be activated without the owner's identity check,
+   * to try the live flow, and is activated at once when asked. It never moves money out: payouts, the startup allowance
+   * and bank account numbers still need the check itself. Every other reseller passes the check before going live.
    */
-  async waiveIdentity(actorId: string | null, id: string, input: { reason: string; activate?: boolean }) {
+  async markTestAccount(actorId: string | null, id: string, input: { reason: string; activate?: boolean }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
     if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
-    if (before.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', "The owner's identity is already verified: there is nothing to waive.");
     const activate = input.activate === true && before.status === 'pending';
     const after = await this.prisma.reseller.update({
       where: { id },
-      data: { identityWaivedAt: before.identityWaivedAt ?? new Date(), identityWaivedBy: actorId, identityWaiverReason: input.reason.trim(), status: activate ? 'active' : undefined },
+      data: { testAccountAt: before.testAccountAt ?? new Date(), testAccountBy: actorId, testAccountReason: input.reason.trim(), status: activate ? 'active' : undefined },
     });
-    await this.audit.record({ actorId, action: 'reseller.identity_waived', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    await this.audit.record({ actorId, action: 'reseller.test_account_marked', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
     return this.resellerDetail(id);
   }
 
-  /** Withdraws the waiver (audited). A reseller still unverified and active goes back to pending: they stop selling live. */
-  async restoreIdentityCheck(actorId: string | null, id: string, input: { reason: string }) {
+  /** No longer a test account (audited). One still unverified and active goes back to pending: it stops selling live. */
+  async unmarkTestAccount(actorId: string | null, id: string, input: { reason: string }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
     if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
-    if (!before.identityWaivedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_waived', 'The identity check is not waived for this reseller.');
+    if (!before.testAccountAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_test_account', 'This reseller is not a test account.');
     const after = await this.prisma.reseller.update({
       where: { id },
-      data: { identityWaivedAt: null, identityWaivedBy: null, identityWaiverReason: null, status: !before.verifiedAt && before.status === 'active' ? 'pending' : undefined },
+      data: { testAccountAt: null, testAccountBy: null, testAccountReason: null, status: !before.verifiedAt && before.status === 'active' ? 'pending' : undefined },
     });
-    await this.audit.record({ actorId, action: 'reseller.identity_waiver_removed', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    await this.audit.record({ actorId, action: 'reseller.test_account_unmarked', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
     return this.resellerDetail(id);
   }
+
 
   /** Sets how many stores the reseller may run (null: everyone's ceiling). Stores already open are never closed. */
   async setStoreLimit(actorId: string | null, id: string, input: { max_stores: number | null; reason: string }) {

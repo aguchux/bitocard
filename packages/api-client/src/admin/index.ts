@@ -125,17 +125,27 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/store-limit`, method: 'PUT', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, 'Activity'],
     }),
-    /** Operations: lets the reseller go live without the owner's identity check (activating at once if asked). Audited. */
+    /** Udozo operations: lets the reseller go live without the owner's identity check (activating at once if asked). Audited. */
     waiveResellerIdentity: build.mutation<ResellerDetail, { id: string; reason: string; activate?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/identity-waiver`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
     }),
-    /** Operations: asks for the identity check again; an unverified active reseller goes back to pending. Audited. */
+    /** Udozo operations: asks for the identity check again; an unverified active reseller goes back to pending. Audited. */
     removeResellerIdentityWaiver: build.mutation<ResellerDetail, { id: string; reason: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/identity-waiver/remove`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
     }),
-    /** Operations: lifts a suspension (active again when verified or waived, else pending). Audited with the reason. */
+    /** BitoCard operations: marks a test account, activated without the identity check but never moving money out. Audited. */
+    markResellerTestAccount: build.mutation<ResellerDetail, { id: string; reason: string; activate?: boolean }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/test-account`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+    /** BitoCard operations: no longer a test account; an unverified active one goes back to pending. Audited. */
+    unmarkResellerTestAccount: build.mutation<ResellerDetail, { id: string; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/test-account/remove`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+    /** Operations: lifts a suspension (active again when verified, waived or a test account, else pending). Audited with the reason. */
     unsuspendReseller: build.mutation<ResellerDetail, { id: string; reason: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/unsuspend`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
@@ -479,6 +489,8 @@ export const {
   useSetResellerStoreLimitMutation,
   useWaiveResellerIdentityMutation,
   useRemoveResellerIdentityWaiverMutation,
+  useMarkResellerTestAccountMutation,
+  useUnmarkResellerTestAccountMutation,
   useUnsuspendResellerMutation,
   useResetMemberTwoStepMutation,
   usePlansQuery,

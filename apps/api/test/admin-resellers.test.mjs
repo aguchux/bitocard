@@ -1,6 +1,7 @@
-// Admin management of resellers (status, the identity waiver, the store ceiling), and BitoCard without plans: every
+// Admin management of resellers (status, test accounts, the store ceiling), and BitoCard without plans: every
 // reseller may use every feature, within the markets' switches and the admins' ceilings.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
 
@@ -85,36 +86,42 @@ describe('admin: resellers', () => {
     assert.equal((await admin.get('/v1/admin/resellers/not-a-uuid')).status, 400);
   });
 
-  test('operations can waive the identity check to go live; payouts and the allowance still need it; withdrawing it stops live selling', async () => {
+  test('the identity check is never waived: only a test account goes live without it, and it never moves money out', async () => {
     const { browser, resellerId } = await resellerClient(server);
-    const short = await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver`, { reason: 'no' });
+    assert.equal((await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' })).json.error.code, 'verification_required', 'no check, no activation');
+    assert.equal((await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver`, { reason: 'Known partner, met in person' })).status, 404, 'the waiver is gone');
+    assert.equal((await browser.post('/v1/api-keys', { name: 'Sandbox', mode: 'test' })).status, 201, 'the sandbox needs no check');
+
+    const short = await admin.post(`/v1/admin/resellers/${resellerId}/test-account`, { reason: 'no' });
     assert.equal(short.status, 400, 'a reason is required');
     const support = await adminClient(server, ['support']);
-    assert.equal((await support.post(`/v1/admin/resellers/${resellerId}/identity-waiver`, { reason: 'Known partner, met in person' })).status, 403);
+    assert.equal((await support.post(`/v1/admin/resellers/${resellerId}/test-account`, { reason: 'Our own QA account' })).status, 403);
 
-    const waived = await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver`, { reason: 'Known partner, met in person', activate: true });
-    assert.equal(waived.status, 200, JSON.stringify(waived.json));
-    assert.deepEqual([waived.json.status, waived.json.verified_at, waived.json.identity_waiver.reason, typeof waived.json.identity_waiver.waived_by.name], ['active', null, 'Known partner, met in person', 'string']);
+    const marked = await admin.post(`/v1/admin/resellers/${resellerId}/test-account`, { reason: 'Our own QA account', activate: true });
+    assert.equal(marked.status, 200, JSON.stringify(marked.json));
+    assert.deepEqual([marked.json.status, marked.json.verified_at, marked.json.test_account.reason, typeof marked.json.test_account.marked_by.name], ['active', null, 'Our own QA account', 'string']);
+    assert.equal((await admin.get('/v1/admin/resellers')).json.data.find(item => item.id === resellerId).test_account, true);
     assert.equal((await browser.post('/v1/api-keys', { name: 'Live', mode: 'live' })).status, 201, 'live keys once active');
     const bank = await browser.post('/v1/bank-accounts', { bank_code: '058', account_number: '0123456789' });
-    assert.equal(bank.json.error.code, 'reseller_not_verified', 'payout accounts still need the identity check');
+    assert.equal(bank.json.error.code, 'reseller_not_verified', 'payouts still need the identity check');
     assert.equal((await adminClient(server, ['finance']).then(finance => finance.post(`/v1/admin/resellers/${resellerId}/startup-allowance`))).json.error.code, 'verification_required');
 
-    const removed = await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver/remove`, { reason: 'Partnership ended' });
-    assert.deepEqual([removed.json.status, removed.json.identity_waiver], ['pending', null], 'back to pending until verified');
+    const removed = await admin.post(`/v1/admin/resellers/${resellerId}/test-account/remove`, { reason: 'Testing finished' });
+    assert.deepEqual([removed.json.status, removed.json.test_account], ['pending', null], 'back to pending until verified');
     assert.equal((await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' })).json.error.code, 'verification_required');
-    assert.equal((await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver/remove`, { reason: 'Again please' })).json.error.code, 'not_waived');
+    assert.equal((await admin.post(`/v1/admin/resellers/${resellerId}/test-account/remove`, { reason: 'Again please' })).json.error.code, 'not_test_account');
 
-    // Waived without activating: Activate then works.
-    await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver`, { reason: 'Known partner, met in person' });
+    // Marked without activating: Activate then works.
+    await admin.post(`/v1/admin/resellers/${resellerId}/test-account`, { reason: 'Our own QA account' });
     assert.equal((await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' })).json.status, 'active');
-    const actions = (await admin.get(`/v1/admin/resellers/${resellerId}/history`)).json.data.map(entry => entry.action);
-    assert.deepEqual(actions.slice(0, 4), ['reseller.updated', 'reseller.identity_waived', 'reseller.identity_waiver_removed', 'reseller.identity_waived']);
-    assert.equal((await admin.get(`/v1/admin/resellers/${resellerId}/history`)).json.data[2].after.reason, 'Partnership ended');
+    const history = (await admin.get(`/v1/admin/resellers/${resellerId}/history`)).json.data;
+    assert.deepEqual(history.slice(0, 4).map(entry => entry.action), ['reseller.updated', 'reseller.test_account_marked', 'reseller.test_account_unmarked', 'reseller.test_account_marked']);
+    assert.equal(history[2].after.reason, 'Testing finished');
+  });
 
-    const { PrismaService } = await import('../dist/database/prisma.service.js');
-    await server.app.get(PrismaService).reseller.update({ where: { id: resellerId }, data: { verifiedAt: new Date() } });
-    assert.equal((await admin.post(`/v1/admin/resellers/${resellerId}/identity-waiver`, { reason: 'Known partner, met in person' })).json.error.code, 'already_verified');
+  test('resellers selling on an old waiver went back to pending', async () => {
+    const sql = readFileSync(new URL('../prisma/migrations/20270216000000_reseller_test_accounts/migration.sql', import.meta.url), 'utf8');
+    assert.match(sql, /SET "status" = 'pending'\s+WHERE "identity_waived_at" IS NOT NULL AND "verified_at" IS NULL AND "status" = 'active'/);
   });
 
   test('support admins can look but not change', async () => {

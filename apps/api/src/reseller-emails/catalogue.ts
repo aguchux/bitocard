@@ -8,7 +8,7 @@
 export type ResellerEmailState = {
   status: 'pending' | 'active' | 'suspended';
   verified: boolean;
-  identityWaived: boolean;
+  testAccount: boolean;
   emailConfirmed: boolean;
   mobileConfirmed: boolean;
   stores: number;
@@ -72,7 +72,7 @@ export const quickEmails: QuickEmail[] = [
     ],
     path: '/settings/verification',
     linkLabel: 'Start your identity check',
-    suggested: state => (!state.verified && !state.identityWaived ? 'The identity check is not done.' : null),
+    suggested: state => (!state.verified && !state.testAccount ? 'The identity check is not done.' : null),
   },
   {
     key: 'verify_email',

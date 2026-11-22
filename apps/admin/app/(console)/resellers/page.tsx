@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, DataTable, errorMessage, FilterSelect, formatDate, humanise, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
+import { Card, DataTable, errorMessage, FilterSelect, formatDate, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
 import { AdminShell } from "@bitocard/admin-ui/shell";
 import { type ResellerStatus, useCountriesQuery, useResellersQuery } from "@bitocard/api-client/admin";
 import { usePrefetchQuery } from "@bitocard/api-client";
@@ -55,7 +55,12 @@ export default function ResellersPage() {
           columns={[
             { key: "name", header: "Business", cell: reseller => <span className="font-semibold">{reseller.name}</span> },
             { key: "country", header: "Country", cell: reseller => reseller.country ?? "—" },
-            { key: "status", header: "Status", cell: reseller => <StatusBadge status={reseller.status} /> },
+            { key: "status", header: "Status", cell: reseller => (
+                <span className="inline-flex items-center gap-2">
+                  <StatusBadge status={reseller.status} />
+                  {reseller.test_account ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Test account</span> : null}
+                </span>
+              ) },
             { key: "joined", header: "Joined", cell: reseller => <span className="text-muted">{formatDate(reseller.created_at)}</span>, hideOnMobile: true },
           ]}
         />

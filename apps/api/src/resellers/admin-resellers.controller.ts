@@ -12,12 +12,12 @@ class UpdateResellerDto {
   @IsOptional() @IsIn(statuses) status?: ResellerStatus;
 }
 
-class WaiverReasonDto {
+class ReasonDto {
   /** Why (kept in the audit log and shown on the reseller's page). */
   @IsString() @Length(5, 500) reason: string;
 }
 
-class WaiveIdentityDto extends WaiverReasonDto {
+class TestAccountDto extends ReasonDto {
   /** Activate the reseller at once (when pending). */
   @IsOptional() @IsBoolean() activate?: boolean;
 }
@@ -59,31 +59,31 @@ export class AdminResellersController {
     return this.resellers.updateReseller(adminId(caller), id, body);
   }
 
-  /** Lets the reseller go live without the owner's identity check. Audited with the reason. */
+  /** Marks a test account: activated without the identity check, never moving money out. Audited with the reason. */
   @AdminRoles('operations')
   @StepUp()
-  @Post('resellers/:id/identity-waiver')
+  @Post('resellers/:id/test-account')
   @HttpCode(HttpStatus.OK)
-  waiveIdentity(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: WaiveIdentityDto) {
-    return this.resellers.waiveIdentity(adminId(caller), id, body);
+  markTestAccount(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: TestAccountDto) {
+    return this.resellers.markTestAccount(adminId(caller), id, body);
   }
 
-  /** Lifts a suspension: active again when verified (or waived), else pending. Audited with the reason. */
+  /** Lifts a suspension: active again when verified (or a test account), else pending. Audited with the reason. */
   @AdminRoles('operations')
   @StepUp()
   @Post('resellers/:id/unsuspend')
   @HttpCode(HttpStatus.OK)
-  unsuspend(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: WaiverReasonDto) {
+  unsuspend(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
     return this.resellers.unsuspend(adminId(caller), id, body);
   }
 
-  /** Asks for the identity check again; an unverified active reseller goes back to pending. Audited with the reason. */
+  /** No longer a test account; an unverified active one goes back to pending. Audited with the reason. */
   @AdminRoles('operations')
   @StepUp()
-  @Post('resellers/:id/identity-waiver/remove')
+  @Post('resellers/:id/test-account/remove')
   @HttpCode(HttpStatus.OK)
-  restoreIdentityCheck(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: WaiverReasonDto) {
-    return this.resellers.restoreIdentityCheck(adminId(caller), id, body);
+  unmarkTestAccount(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
+    return this.resellers.unmarkTestAccount(adminId(caller), id, body);
   }
 
   /** How many stores the reseller may run (null: everyone's ceiling). Audited with the reason. */
