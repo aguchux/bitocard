@@ -13,6 +13,8 @@ export default createNextConfig({
       { source: "/classifieds", destination: "/", permanent: false },
       { source: "/classifieds/:path*", destination: "/", permanent: false },
       { source: "/reports/resale", destination: "/reports", permanent: false },
+      // Ticket notices once linked to /support/tickets/<id>; the page is /support/<id>.
+      { source: "/support/tickets/:id", destination: "/support/:id", permanent: true },
       { source: "/support/assistants/who-answers", destination: "/support/assistants", permanent: false },
     ];
   },

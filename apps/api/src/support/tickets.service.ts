@@ -583,7 +583,7 @@ export class TicketsService {
   }
 
   private tellReseller(ticket: SupportTicket, type: 'support.ticket_created' | 'support.ticket_replied' | 'support.ticket_updated', title: string, body: string) {
-    return this.inbox.reseller(ticket.resellerId, type, { subject: `${ticket.id}:${Date.now()}`, title, body, link: `/support/tickets/${ticket.id}`, mode: ticket.mode });
+    return this.inbox.reseller(ticket.resellerId, type, { subject: `${ticket.id}:${Date.now()}`, title, body, link: `/support/${ticket.id}`, mode: ticket.mode });
   }
 
   private tellAdmins(ticket: SupportTicket, type: 'admin.support.ticket_created' | 'admin.support.ticket_replied', body: string) {
@@ -591,7 +591,7 @@ export class TicketsService {
       subject: `${ticket.id}:${Date.now()}`,
       title: type === 'admin.support.ticket_created' ? 'A support ticket needs an answer' : 'A support ticket has a reply',
       body,
-      link: `/support/tickets/${ticket.id}`,
+      link: `/support/${ticket.id}`,
       mode: ticket.mode,
     });
   }
@@ -612,7 +612,7 @@ export class TicketsService {
       subject: `${ticket.id}:${Date.now()}`,
       title: type === 'admin.afrippa.ticket_created' ? 'A trader needs help' : 'A trader replied to a ticket',
       body,
-      link: `/support/tickets/${ticket.id}`,
+      link: `/support/${ticket.id}`,
       mode: ticket.mode,
     });
   }

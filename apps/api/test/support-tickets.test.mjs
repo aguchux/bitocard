@@ -125,7 +125,9 @@ describe('a customer’s ticket: the store answers, BitoCard helps when asked', 
     check('POST /v1/support/tickets/{id}/escalate', 200, escalated.json);
     assert.deepEqual([escalated.json.queue, escalated.json.status, Boolean(escalated.json.escalated_at)], ['bitocard', 'open', true]);
     assert.equal((await store.browser.post(`/v1/support/tickets/${opened.id}/escalate`, { note: 'Again, please, it is urgent.' })).json.error.code, 'ticket_not_yours');
-    assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.support.ticket_created' } }));
+    // The admin app's ticket page is /support/<id> (a /support/tickets/<id> link was a 404).
+    const told = await prisma.notification.findFirst({ where: { type: 'admin.support.ticket_created', link: `/support/${opened.id}` } });
+    assert.ok(told, 'admins are told with a link to the ticket page');
 
     const queue = (await admin.get('/v1/admin/support/tickets')).json.data;
     assert.ok(queue.some(item => item.id === opened.id && item.reseller_id === store.resellerId));

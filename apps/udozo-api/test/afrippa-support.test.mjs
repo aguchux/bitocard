@@ -74,7 +74,7 @@ describe("Afrippa's help desk", () => {
 
     // Afrippa's admins: told, and it is in their queue.
     const told = (await support.get('/v1/afrippa/admin/notifications')).json.data;
-    assert.ok(told.some(item => item.title === 'A trader needs help' && item.link === `/support/tickets/${id}`));
+    assert.ok(told.some(item => item.title === 'A trader needs help' && item.link === `/support/${id}`));
     assert.ok((await support.get('/v1/afrippa/admin/support/tickets')).json.data.some(item => item.id === id));
 
     // BitoCard's admins: not in any queue, not found by id, not escalated to engineering.

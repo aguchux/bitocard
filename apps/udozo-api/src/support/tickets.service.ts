@@ -612,7 +612,7 @@ export class TicketsService {
       subject: `${ticket.id}:${Date.now()}`,
       title: type === 'admin.afrippa.ticket_created' ? 'A trader needs help' : 'A trader replied to a ticket',
       body,
-      link: `/support/tickets/${ticket.id}`,
+      link: `/support/${ticket.id}`,
       mode: ticket.mode,
     });
   }
