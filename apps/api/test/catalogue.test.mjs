@@ -171,7 +171,7 @@ describe('catalogue', () => {
 
     const mtn = json.data.find(p => p.name === 'MTN Nigeria');
     assert.deepEqual(mtn.denomination, { type: 'range', min: 5000, max: 5_000_000 });
-    assert.deepEqual(mtn.pricing.denominations[0], { face_value: 5000, wholesale: 5000, price: 5000 }, 'face value, no markup yet');
+    assert.deepEqual(mtn.pricing.denominations[0], { face_value: 5000, wholesale: 4925, price: 5000 }, 'face value, half the supplier’s 3% to the reseller');
     assert.equal(mtn.recipient_type, 'phone');
   });
 
@@ -240,7 +240,7 @@ describe('pricing', () => {
     await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 1000 });
     let price = await first(steam);
     assert.equal(price.price, Math.ceil(price.wholesale * 1.1), 'Steam has no supplier discount: a markup product, priced with the general markup');
-    assert.deepEqual(await first(mtn), { face_value: 5000, wholesale: 5000, price: 5000 }, 'airtime sells at face value: markups never apply');
+    assert.deepEqual(await first(mtn), { face_value: 5000, wholesale: 4925, price: 5000 }, 'airtime sells at face value: markups never apply');
 
     await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 2500 });
     price = await first(steam);
@@ -380,6 +380,29 @@ describe('pricing', () => {
     }
   });
 
+  test('discount products split the supplier’s discount with resellers as admins set it, half each by default', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const { browser } = await resellerClient(server);
+    const mtn = await productId('airtime:NG:mtn:topup');
+    const second = async () => (await browser.get(`/v1/catalogue/products/${mtn}`)).json.pricing.denominations[1];
+    // The supplier gives 3% on ₦50,000: with no split set, resellers get half (1.5%) and BitoCard keeps half.
+    assert.deepEqual(await second(), { face_value: 5_000_000, wholesale: 4_925_000, price: 5_000_000 }, 'half of the 3% by default');
+    const rule = (await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_share_bps: 6000 })).json;
+    try {
+      assert.equal(rule.reseller_share_bps, 6000);
+      assert.equal((await second()).wholesale, 4_910_000, '60% of the 3% to resellers: 1.8% off face value');
+      const admin = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${mtn}&country=NG&face_value=5000000`)).json;
+      assert.deepEqual([admin.offers[0].reseller_discount, admin.offers[0].bitocard_profit], [90_000, 60_000], 'BitoCard keeps the other 40%');
+      // A product rule setting only the markup keeps the category's split.
+      const own = (await finance.put('/v1/admin/pricing-rules', { product_id: mtn, kind: 'auto', margin_bps: 500 })).json;
+      assert.equal((await second()).wholesale, 4_910_000, 'the broader split still applies');
+      await finance.delete(`/v1/admin/pricing-rules/${own.id}`);
+      assert.equal((await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_share_bps: 10_001 })).status, 400);
+    } finally {
+      await finance.delete(`/v1/admin/pricing-rules/${rule.id}`);
+    }
+  });
+
   test('supplier and product rules override the general one; a fixed price fits single-value products only', async () => {
     const finance = await adminClient(server, ['finance']);
     const { browser } = await resellerClient(server);
@@ -425,7 +448,8 @@ describe('pricing', () => {
       const [liveRow, testRow] = await Promise.all([prisma.quote.findUnique({ where: { id: live.id } }), prisma.quote.findUnique({ where: { id: test.id } })]);
       assert.deepEqual([liveRow.supplierCode, liveRow.supplierCostMinor], ['vtpass', 354_600n], 'VTpass with the agreed 1.5% commission');
       assert.deepEqual([testRow.supplierCode, testRow.supplierCostMinor], ['quickteller', 349_200n]);
-      assert.equal(live.wholesale, test.wholesale, 'the reseller price does not depend on the route');
+      // Each route's own discount is split half and half: VTpass's 1.5% live, Quickteller's 3% in the sandbox.
+      assert.deepEqual([live.wholesale, test.wholesale], [357_300, 354_600], 'the reseller gets half the routed supplier’s discount');
     } finally {
       await prisma.supplierProduct.deleteMany({ where: { supplierCode: 'quickteller' } });
       await prisma.supplierMarket.deleteMany({ where: { supplierCode: 'quickteller' } });
@@ -453,7 +477,7 @@ describe('quotes', () => {
     const quote = created.json;
     assert.deepEqual(
       [quote.status, quote.currency, quote.quantity, quote.unit_wholesale, quote.wholesale, quote.price, quote.tax, quote.reseller_profit, quote.recipient.phone, quote.customer_reference],
-      ['open', 'NGN', 1, 100_000, 100_000, 100_000, null, 0, '+2348031234567', 'cust-42'],
+      ['open', 'NGN', 1, 98_500, 98_500, 100_000, null, 1_500, '+2348031234567', 'cust-42'],
     );
     const minutes = (new Date(quote.expires_at) - Date.now()) / 60_000;
     assert.ok(minutes > 9.9 && minutes <= 10);

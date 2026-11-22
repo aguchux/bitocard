@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes, StepUp, storeScopeOf } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -173,6 +173,9 @@ class AdminPreviewDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10_000)
   reseller_discount_bps?: number;
 
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10_000)
+  reseller_share_bps?: number;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
   fixed_price?: number;
 
@@ -202,6 +205,10 @@ class PricingRuleDto {
 
   @IsOptional() @IsInt() @Min(0) @Max(10_000)
   reseller_discount_bps?: number;
+
+  /** Discount: the resellers' part of the supplier's discount, out of 10,000 (5,000 is half); null to follow the default. */
+  @IsOptional() @ValidateIf((_object, value) => value !== null) @IsInt() @Min(0) @Max(10_000)
+  reseller_share_bps?: number | null;
 
   @IsOptional() @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
   fixed_price?: number;

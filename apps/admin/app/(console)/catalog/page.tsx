@@ -16,7 +16,6 @@ import {
   useProductsInfiniteQuery,
   useSetProductListingMutation,
   useSuppliersQuery,
-  useUpdateOfferMutation,
   useUpdateProductMutation,
 } from "@bitocard/api-client/admin";
 import { healthOf, SupplierHealth } from "./supplier-health";
@@ -48,37 +47,23 @@ function ProductImage({ product, editable }: { product: AdminProduct; editable: 
   );
 }
 
-function OfferRow({ offer, editable }: { offer: SupplierOffer; editable: boolean }) {
-  const [update, state] = useUpdateOfferMutation();
-  const [discount, setDiscount] = useState(String(offer.discount_bps));
-  const [priority, setPriority] = useState(String(offer.priority));
-  const changed = discount !== String(offer.discount_bps) || priority !== String(offer.priority);
+/**
+ * One supplier's offer, as synced: every offer a supplier lists is available, and BitoCard routes each order to the
+ * cheapest one automatically, so there is nothing to set here. Its price follows the pricing rules (Catalog > Pricing).
+ */
+function OfferRow({ offer }: { offer: SupplierOffer }) {
   return (
-    <li className="space-y-3 rounded-xl border border-line p-4">
+    <li className="space-y-1 rounded-xl border border-line p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold">
           {offer.supplier} <span className="font-mono text-xs text-muted">{offer.sku}</span>
         </p>
-        <span className="flex items-center gap-2 text-sm">
-          Available
-          <Toggle label={`${offer.supplier} available`} checked={offer.available} disabled={!editable} onChange={available => update({ id: offer.id, available })} />
-        </span>
+        <StatusBadge status={offer.available ? "active" : "disabled"} label={offer.available ? "Available" : "No longer listed"} />
       </div>
-      <p className="text-xs text-muted">{`Cost ${offer.cost_currency} × ${offer.cost_ratio}${offer.cost_fee_minor ? ` + ${offer.cost_fee_minor} fee` : ""} · synced ${formatRelative(offer.synced_at)}`}</p>
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <label className="text-sm">
-          <span className="mb-1 block font-medium">Agreed discount (basis points)</span>
-          <Input type="number" min={0} max={5000} value={discount} disabled={!editable} onChange={event => setDiscount(event.target.value)} />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block font-medium">Priority</span>
-          <Input type="number" min={0} max={1000} value={priority} disabled={!editable} onChange={event => setPriority(event.target.value)} />
-        </label>
-        <Button size="sm" disabled={!editable || !changed} loading={state.isLoading} onClick={() => update({ id: offer.id, discount_bps: Number(discount), priority: Number(priority) })}>
-          Save
-        </Button>
-      </div>
-      {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      <p className="text-xs text-muted">
+        {`Cost ${offer.cost_currency} × ${offer.cost_ratio}${offer.cost_fee_minor ? ` + ${offer.cost_fee_minor} fee` : ""}${offer.discount_bps ? ` · supplier commission ${offer.discount_bps / 100}%` : ""} · synced ${formatRelative(offer.synced_at)}`}
+      </p>
+      {offer.available ? null : <p className="text-xs text-muted">The supplier stopped listing it at its last sync; it comes back by itself if they list it again.</p>}
     </li>
   );
 }
@@ -155,7 +140,6 @@ function Products() {
   const [updateProduct, productState] = useUpdateProductMutation();
   const rows = products.data?.pages.flatMap(page => page.data);
   const operator = can(admin, "operations");
-  const offerEditor = can(admin, "operations", "finance");
   const current = open ? (rows?.find(row => row.id === open.id) ?? open) : null;
 
   const enabledSuppliers = suppliers.data?.data.filter(supplier => supplier.enabled) ?? [];
@@ -285,7 +269,7 @@ function Products() {
                     return available.length ? (
                       <span className="text-sm">{summariseOffers(available).join(", ")}</span>
                     ) : (
-                      <StatusBadge status="in_review" label="No offer" />
+                      <StatusBadge status="in_review" label="No supplier offer" />
                     );
                   },
                 },
@@ -337,10 +321,19 @@ function Products() {
             <ProductImage key={`${current.id}:${current.image_url ?? ""}`} product={current} editable={operator} />
             <ul className="space-y-3">
               {current.offers.map(offer => (
-                <OfferRow key={offer.id} offer={offer} editable={offerEditor} />
+                <OfferRow key={offer.id} offer={offer} />
               ))}
             </ul>
-            <p className="text-xs text-muted">BitoCard routes each order to the cheapest available offer; when two cost the same, the lower priority number wins. Discounts are what the supplier agreed to give BitoCard.</p>
+            {current.offers.some(offer => offer.available) ? (
+              <p className="text-xs text-muted">
+                BitoCard routes each order to the cheapest available offer automatically. Gift cards sell to resellers at BitoCard’s markup; airtime, data, bills and pay-TV at face value, the supplier’s
+                discount split between resellers and BitoCard (Catalog &gt; Pricing).
+              </p>
+            ) : (
+              <Notice tone="amber" title="No supplier offers this now">
+                No supplier lists this product at the moment, so it cannot be sold (resellers and bitocard.com do not show it). It sells again as soon as a supplier&apos;s next sync lists it.
+              </Notice>
+            )}
           </div>
         ) : null}
       </Dialog>

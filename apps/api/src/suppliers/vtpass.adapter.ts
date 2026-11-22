@@ -197,7 +197,12 @@ export class VtpassAdapter implements SupplierAdapter {
 
   private async services(serviceIDs: string[], category: 'pay_tv' | 'bills') {
     const items: CatalogueItem[] = [];
+    // Pay-TV and electricity take their commission from the same setting when one is set for the service (dstv 1.5;
+    // ikeja-electric 1); without one VTpass's cost is face value, less any commission recorded on the offer before.
+    const { commissions } = parseVtpassCommissions(this.commissions);
     for (const serviceID of serviceIDs) {
+      const commission = commissions.get(serviceID);
+      const costRatio = commission ? new Prisma.Decimal(1).minus(commission.div(100)).toString() : '1';
       const res = await this.variations(serviceID);
       const variations = res.content?.variations ?? res.content?.varations ?? [];
       const service = res.content?.ServiceName ?? serviceID;
@@ -210,9 +215,9 @@ export class VtpassAdapter implements SupplierAdapter {
           brand: serviceID,
           faceCurrency: 'NGN',
           costCurrency: 'NGN',
-          // VTpass charges face value and pays commission separately; the agreed commission is set by admins as a discount.
-          costRatio: '1',
+          costRatio,
           costFee: 0n,
+          commissionIncluded: Boolean(commission),
           meta: { serviceID, variationCode: variation.variation_code },
         };
         if (category === 'pay_tv') {

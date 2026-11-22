@@ -184,7 +184,7 @@ describe('live orders', () => {
     const order = (await browser.post('/v1/orders', { quote_id: q.id })).json;
     reloadly.state.orderReply = { status: 'SUCCESSFUL' };
     assert.equal(order.status, 'processing');
-    assert.equal((await wallet(browser)).reserved, 100_000);
+    assert.equal((await wallet(browser)).reserved, 98_500, 'the wholesale price: face value less half the supplier’s discount');
     const sent = reloadly.calls.findLast(c => c.url === '/topups/topups').body;
     assert.deepEqual([sent.operatorId, sent.amount, sent.useLocalAmount, sent.recipientPhone], [341, 1000, true, { countryCode: 'NG', number: '+2348031234567' }]);
 
@@ -377,7 +377,7 @@ describe('concurrent checks', () => {
     const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     assert.equal(row.status, 'processing', 'the new attempt is still in progress');
     assert.deepEqual([row.supplierTransactionId, row.nextCheckAt], ['new-attempt', null], 'nothing of the old attempt is written over it');
-    assert.equal((await wallet(browser)).reserved, 100_000, 'the money stays held for the new attempt');
+    assert.equal((await wallet(browser)).reserved, 98_500, 'the money stays held for the new attempt');
     await prisma.order.update({ where: { id: order.id }, data: { supplierReference: stale.supplierReference, supplierTransactionId: stale.supplierTransactionId } });
   });
 

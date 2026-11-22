@@ -1519,8 +1519,11 @@ model PricingRule {
   kind                String           @default("auto")
   /// Markup: BitoCard's markup on supplier cost (up to 200%).
   marginBps           Int              @map("margin_bps")
-  /// Discount: what the reseller gets off face value.
+  /// Discount (older rules): what the reseller gets off face value. `resellerShareBps` wins when set.
   resellerDiscountBps Int              @default(0) @map("reseller_discount_bps")
+  /// Discount: the resellers' part of the supplier's discount, out of 10,000 (BitoCard keeps the rest). Null follows
+  /// a broader rule's split, else half (`defaultResellerShareBps`).
+  resellerShareBps    Int?             @map("reseller_share_bps")
   fixedMinor          BigInt?          @map("fixed_minor")
   fixedCurrency       String?          @map("fixed_currency") @db.Char(3)
   updatedAt           DateTime         @updatedAt @map("updated_at")

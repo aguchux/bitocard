@@ -332,8 +332,11 @@ export class SuppliersService {
         const offer = offerData(item, ids.get(item.productKey)!);
         const old = bySku.get(item.sku);
         if (!old) fresh.push({ supplierCode, sku: item.sku, ...offer, available: true, syncedAt: now });
-        else if (offerChanged(old, offer)) changed.push(() => this.prisma.supplierProduct.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
-        else unchanged.push(old.id);
+        // A commission the supplier's settings already take off the cost replaces one recorded on the offer before, so
+        // it is never counted twice.
+        else if (offerChanged(old, offer) || (item.commissionIncluded && old.discountBps !== 0)) {
+          changed.push(() => this.prisma.supplierProduct.update({ where: { id: old.id }, data: { ...offer, ...(item.commissionIncluded ? { discountBps: 0 } : {}), available: true, syncedAt: now } }));
+        } else unchanged.push(old.id);
       }
       if (fresh.length) await this.prisma.supplierProduct.createMany({ data: fresh, skipDuplicates: true });
       await inGroups(changed);
@@ -497,13 +500,13 @@ export function noResellerShare(problem: { name: string; country: string; resell
   const percent = (bps: number) => `${(bps / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
   const why =
     problem.reseller_discount_bps === 0
-      ? 'no reseller discount share is set'
+      ? "resellers get none of the supplier's discount"
       : `the reseller share (${percent(problem.reseller_discount_bps)}) is not less than the supplier's discount (${percent(problem.supplier_discount_bps)})`;
   return new ApiError(
     HttpStatus.BAD_REQUEST,
     'invalid_request_error',
     'reseller_discount_missing',
-    `${problem.name} cannot be listed: in ${problem.country} ${why}, so resellers would make nothing. Set a reseller discount share below the supplier's discount in Catalog > Pricing rules.`,
+    `${problem.name} cannot be listed: in ${problem.country} ${why}, so resellers would make nothing. Give resellers part of the supplier's discount in Catalog > Pricing.`,
     'listed',
   );
 }

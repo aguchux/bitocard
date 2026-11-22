@@ -26,6 +26,8 @@ export type CatalogueItem = {
   /** Fixed fee per item, minor units of the cost currency. */
   costFee: bigint;
   meta?: Record<string, unknown>;
+  /** The cost already takes off the supplier's commission from its settings: any discount recorded on the offer is cleared. */
+  commissionIncluded?: boolean;
 };
 
 /** What to sync: one category, for one country (null for categories bought worldwide, such as gift cards). */

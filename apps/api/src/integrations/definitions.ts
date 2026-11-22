@@ -448,9 +448,9 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('VTPASS_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: VTpass’s sandbox (https://sandbox.vtpass.com/api) with sandbox keys, for Test connection only; VTpass is not used for live orders. Off: live.' }),
       field('VTPASS_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
       field('VTPASS_CONTACT_PHONE', 'Fallback phone number', { help: 'VTpass needs a phone number on every payment; used when the customer gave none.' }),
-      field('VTPASS_COMMISSIONS', 'Airtime and data commissions (%)', {
+      field('VTPASS_COMMISSIONS', 'Commissions (%)', {
         required: false,
-        help: 'The commission on your VTpass account per service (VTpass dashboard > Commissions), one per line or separated by semicolons: mtn 3; airtel 3.4; glo 4; etisalat 4; mtn-data 3; airtel-data 3; glo-data 4; glo-sme-data 4; etisalat-data 4 (etisalat is 9mobile). BitoCard’s cost is the amount less it; what each sale reports is kept for reconciliation. Services without one are not synced; syncing airtime and data refuses until one is set.',
+        help: 'The commission on your VTpass account per service (VTpass dashboard > Commissions), one per line or separated by semicolons: mtn 3; airtel 3.4; glo 4; etisalat 4; mtn-data 3; airtel-data 3; glo-data 4; glo-sme-data 4; etisalat-data 4 (etisalat is 9mobile), and pay-TV and electricity too (dstv 1.5; gotv 1.5; startimes 2; ikeja-electric 1). BitoCard’s cost is the amount less it, and that discount is split with resellers as Catalog > Pricing says; what each sale reports is kept for reconciliation. Airtime and data services without one are not synced (syncing them refuses until one is set); pay-TV and electricity without one cost face value.',
       }),
     ],
   },

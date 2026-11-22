@@ -77,7 +77,8 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
   const fixedMoney = /^[A-Z]{3}$/.test(fixedCurrency) ? fixedCurrency : "USD";
   const trial = {
     kind: choice === "inherit" ? undefined : choice,
-    reseller_discount_bps: choice === "discount" || choice === "auto" ? (percentToBps(discount) ?? undefined) : undefined,
+    // The resellers' part of the supplier's discount; blank follows the category or general split (half by default).
+    reseller_share_bps: choice === "discount" || choice === "auto" ? (percentToBps(discount) ?? undefined) : undefined,
     margin_bps: choice === "markup" || choice === "auto" ? (percentToBps(margin) ?? undefined) : undefined,
     fixed_price: choice === "fixed" ? (parseMoney(fixed, fixedMoney) ?? undefined) : undefined,
     fixed_currency: choice === "fixed" ? fixedCurrency : undefined,
@@ -181,8 +182,18 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
           </Select>
         </Field>
         {choice === "auto" || choice === "discount" ? (
-          <Field label="Reseller discount (% of face value)" htmlFor={`${id}-discount`} hint="Never more than the supplier gives BitoCard.">
-            <Input id={`${id}-discount`} inputMode="decimal" placeholder={data ? bpsToPercent(data.current.reseller_discount_bps) : ""} value={discount} onChange={event => setDiscount(event.target.value)} />
+          <Field
+            label="Resellers’ part of the supplier’s discount (%)"
+            htmlFor={`${id}-discount`}
+            hint="BitoCard keeps the rest. Leave blank to follow the category or general split (half each by default)."
+          >
+            <Input
+              id={`${id}-discount`}
+              inputMode="decimal"
+              placeholder={data ? bpsToPercent(data.current.reseller_share_bps ?? 5000) : ""}
+              value={discount}
+              onChange={event => setDiscount(event.target.value)}
+            />
           </Field>
         ) : null}
         {choice === "auto" || choice === "markup" ? (

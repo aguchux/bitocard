@@ -78,36 +78,39 @@ describe("BitoCard's store listing", () => {
   });
 });
 
-describe('discount products need a reseller share before listing', () => {
+describe('discount products give resellers part of the supplier discount', () => {
   const sandbox = { 'bitocard-mode': 'test' };
 
-  test('no share, or one the supplier discount does not cover, blocks listing for admins (named) and resellers', async () => {
+  test('half by default, so they list; a 0% share, or an older fixed share the supplier discount does not cover, blocks listing', async () => {
     const mtn = await prisma.product.findUniqueOrThrow({ where: { key: 'airtime:NG:mtn:topup' } });
-    const single = await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true });
-    assert.deepEqual([single.status, single.json.error.code, single.json.error.param], [400, 'reseller_discount_missing', 'listed']);
-    assert.match(single.json.error.message, /in NG no reseller discount share is set/);
-    assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: mtn.id } })).listed, false);
-
-    const bulk = await admin.post('/v1/admin/products/listing', { listed: true, filter: { category: 'airtime' } });
-    assert.equal(bulk.status, 200);
-    assert.ok(bulk.json.blocked.some(item => item.product_id === mtn.id && item.country === 'NG' && item.reseller_discount_bps === 0), 'named, so admins can set a share');
-    assert.equal(await prisma.product.count({ where: { category: 'airtime', listed: true } }), bulk.json.updated, 'the rest are listed');
-    await admin.post('/v1/admin/products/listing', { listed: false, filter: {} });
-
     const { browser } = await resellerClient(server);
-    const reseller = await browser.post('/v1/catalogue/listing', { listed: true, product_ids: [mtn.id] }, sandbox);
-    assert.deepEqual([reseller.status, reseller.json.error.code], [400, 'reseller_discount_missing']);
-    assert.doesNotMatch(reseller.json.error.message, /supplier/i, 'resellers are never told about the supplier');
-
-    // MTN's supplier gives 3%: a 4% share is not covered; a 1% share is.
     const finance = await adminClient(server, ['finance']);
-    const rule = (await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 400 })).json;
+    // No rule: the supplier's 3% is split half and half, so admins and resellers list it.
+    assert.equal((await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true })).status, 200);
+    assert.equal((await browser.post('/v1/catalogue/listing', { listed: true, product_ids: [mtn.id] }, sandbox)).status, 200);
+    await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: false });
+    await browser.post('/v1/catalogue/listing', { listed: false, product_ids: [mtn.id] }, sandbox);
+
+    // Admins give resellers none of it: listing is refused, named for admins, never naming the supplier to resellers.
+    const rule = (await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_share_bps: 0 })).json;
     try {
+      const single = await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true });
+      assert.deepEqual([single.status, single.json.error.code, single.json.error.param], [400, 'reseller_discount_missing', 'listed']);
+      assert.match(single.json.error.message, /in NG resellers get none of the supplier's discount/);
+      const bulk = await admin.post('/v1/admin/products/listing', { listed: true, filter: { category: 'airtime' } });
+      assert.equal(bulk.status, 200);
+      assert.ok(bulk.json.blocked.some(item => item.product_id === mtn.id && item.country === 'NG'), 'named, so admins can set a share');
+      await admin.post('/v1/admin/products/listing', { listed: false, filter: {} });
+      const reseller = await browser.post('/v1/catalogue/listing', { listed: true, product_ids: [mtn.id] }, sandbox);
+      assert.deepEqual([reseller.status, reseller.json.error.code], [400, 'reseller_discount_missing']);
+      assert.doesNotMatch(reseller.json.error.message, /supplier/i, 'resellers are never told about the supplier');
+
+      // An older rule's fixed share (no split): 4% is not covered by MTN's 3%; 1% is.
+      await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_share_bps: null, reseller_discount_bps: 400 });
       const uncovered = await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true });
       assert.match(uncovered.json.error.message, /the reseller share \(4%\) is not less than the supplier's discount \(3%\)/);
       await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 100 });
       assert.equal((await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true })).status, 200);
-      assert.equal((await browser.post('/v1/catalogue/listing', { listed: true, product_ids: [mtn.id] }, sandbox)).status, 200);
     } finally {
       await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: false });
       await finance.delete(`/v1/admin/pricing-rules/${rule.id}`);

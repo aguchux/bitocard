@@ -352,7 +352,7 @@ export type AdminProductFilter = { category?: ProductCategory; country?: string;
 export type AdminProductList = List<AdminProduct> & { total: number; listed: number };
 /**
  * How BitoCard prices: `auto` (discount where the supplier gives one, else markup; local airtime, data, bills and
- * pay-TV are always discount), `discount` (resellers get `reseller_discount_bps` off face value), `markup`
+ * pay-TV are always discount), `discount` (the supplier's discount split: `reseller_share_bps` of it to resellers, the rest BitoCard's), `markup`
  * (`margin_bps` on supplier cost) or `fixed` (a wholesale price, for single-value products).
  */
 export type PriceKind = 'auto' | 'discount' | 'markup' | 'fixed';
@@ -366,6 +366,8 @@ export type PricingRule = {
   kind: PriceKind;
   margin_bps: number;
   reseller_discount_bps: number;
+  /** Discount: the resellers' part of the supplier's discount, out of 10,000 (BitoCard keeps the rest); null when not set (half). */
+  reseller_share_bps: number | null;
   fixed_price: number | null;
   fixed_currency: string | null;
   updated_at: string;
@@ -378,6 +380,7 @@ export type PricingRuleInput = {
   kind: PriceKind;
   margin_bps?: number;
   reseller_discount_bps?: number;
+  reseller_share_bps?: number | null;
   fixed_price?: number;
   fixed_currency?: string;
 };
@@ -388,6 +391,8 @@ export type ResolvedPriceRule = {
   rule_id: string | null;
   margin_bps: number;
   reseller_discount_bps: number;
+  /** Discount: the resellers' part of the supplier's discount, out of 10,000 (BitoCard keeps the rest); null when not set (half). */
+  reseller_share_bps: number | null;
   fixed_price: number | null;
   fixed_currency: string | null;
 };
@@ -466,6 +471,7 @@ export type AdminPricePreviewArgs = {
   kind?: PriceKind;
   margin_bps?: number;
   reseller_discount_bps?: number;
+  reseller_share_bps?: number | null;
   fixed_price?: number;
   fixed_currency?: string;
 };

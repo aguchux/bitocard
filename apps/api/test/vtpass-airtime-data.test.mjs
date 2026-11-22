@@ -62,6 +62,34 @@ describe('commissions', () => {
   });
 });
 
+describe('pay-TV commissions from the setting', () => {
+  test('a service’s commission comes off the cost; without one, face value; a discount recorded on the offer is cleared', async () => {
+    const plain = new VtpassAdapter({ apiKey: 'vt-api', publicKey: 'vt-public', secretKey: 'vt-secret' }, vtpass.url, undefined, commissions);
+    const without = (await plain.catalogue({ country: 'NG', category: 'pay_tv' })).find(item => item.sku === 'dstv:dstv-padi');
+    assert.deepEqual([without.costRatio, without.commissionIncluded], ['1', false]);
+    const adapter = new VtpassAdapter({ apiKey: 'vt-api', publicKey: 'vt-public', secretKey: 'vt-secret' }, vtpass.url, undefined, `${commissions}; dstv 1.5`);
+    const padi = (await adapter.catalogue({ country: 'NG', category: 'pay_tv' })).find(item => item.sku === 'dstv:dstv-padi');
+    assert.deepEqual([padi.costRatio, padi.commissionIncluded], ['0.985', true]);
+
+    // Synced: the commission replaces a discount recorded on the offer before, never both.
+    assert.equal((await admin.put('/v1/admin/suppliers/vtpass/markets/NG/pay_tv', { enabled: true })).status, 200);
+    assert.equal((await admin.post('/v1/admin/suppliers/vtpass/sync')).status, 200);
+    const before = await offer('dstv:dstv-padi');
+    await prisma.supplierProduct.update({ where: { id: before.id }, data: { discountBps: 150 } });
+    await prisma.integrationSetting.upsert({
+      where: { platform_key: { platform: 'bitocard', key: 'VTPASS_COMMISSIONS' } },
+      create: { key: 'VTPASS_COMMISSIONS', value: `${commissions}; dstv 1.5`, encrypted: false },
+      update: { value: `${commissions}; dstv 1.5` },
+    });
+    const integrations = server.app.get((await import('../dist/integrations/integrations.service.js')).IntegrationsService);
+    integrations.loadedAt = 0;
+    await admin.get('/v1/admin/overview');
+    assert.equal((await admin.post('/v1/admin/suppliers/vtpass/sync')).status, 200);
+    const after = await offer('dstv:dstv-padi');
+    assert.deepEqual([after.costRatio.toString(), after.discountBps], ['0.985', 0]);
+  });
+});
+
 describe('the catalogue', () => {
   test('airtime is the shared any-amount product per network, at face value less the commission, within VTpass’s limits', async () => {
     const mtn = await offer('airtime:mtn');

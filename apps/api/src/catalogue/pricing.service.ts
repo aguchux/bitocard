@@ -41,6 +41,8 @@ export const rateCategories = new Set<ProductCategory>(['gift_cards']);
 export const isRated = (product: Pick<Product, 'category'>) => rateCategories.has(product.category);
 /** BitoCard's markup on a rated product when no rule for its category says otherwise, so it never sells at cost. */
 export const defaultRateMarginBps = 1_000;
+/** Discount products: the resellers' part of the supplier's discount when no rule says otherwise (half; BitoCard keeps the rest). */
+export const defaultResellerShareBps = 5_000;
 
 export type Offer = SupplierProduct & { supplier: Supplier };
 /** An offer from the reseller's own supplier account, with when the reseller wants it used. */
@@ -119,6 +121,8 @@ export type ResolvedRule = {
   kind: PriceKind;
   marginBps: number;
   resellerDiscountBps: number;
+  /** Discount: the resellers' part of the supplier's discount (out of 10,000); null when the rule does not split. */
+  resellerShareBps: number | null;
   fixedMinor: bigint | null;
   fixedCurrency: string | null;
   ruleId: string | null;
@@ -242,19 +246,40 @@ export class PricingService {
       const score = (rule.productId ? 8 : 0) + (rule.supplierCode ? 4 : 0) + (rule.category ? 2 : 0) + (rule.countryCode ? 1 : 0);
       if (score > bestScore) [best, bestScore] = [rule, score];
     }
-    if (!best && rated) return { kind: 'markup', marginBps: defaultRateMarginBps, resellerDiscountBps: 0, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
-    if (!best) return { kind: 'auto', marginBps: 0, resellerDiscountBps: 0, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
+    if (!best && rated) return { kind: 'markup', marginBps: defaultRateMarginBps, resellerDiscountBps: 0, resellerShareBps: null, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
+    // No rule at all: markup products at BitoCard's default markup, discount products split half and half.
+    if (!best) return { kind: 'auto', marginBps: defaultRateMarginBps, resellerDiscountBps: 0, resellerShareBps: null, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
     const level: Level = best.productId ? 'product' : best.supplierCode ? 'supplier' : best.category ? 'category' : best.countryCode ? 'country' : 'general';
     return {
       // A rated product is always marked up from cost, whatever kind an older rule was saved with.
       kind: rated ? 'markup' : (best.kind as PriceKind),
       marginBps: best.marginBps,
       resellerDiscountBps: best.resellerDiscountBps,
+      resellerShareBps: best.resellerShareBps ?? this.broaderShare(ctx, product, supplierCode, bestScore),
       fixedMinor: best.fixedMinor,
       fixedCurrency: best.fixedCurrency,
       ruleId: best.id,
       level,
     };
+  }
+
+  /**
+   * A discount rule without its own split follows the most specific broader rule that has one (a product rule setting
+   * only the markup keeps the category's split). Null when none does: half, or an older rule's fixed reseller discount.
+   */
+  private broaderShare(ctx: PricingContext, product: Product, supplierCode: string | null, below: number): number | null {
+    let share: number | null = null;
+    let shareScore = -1;
+    for (const rule of ctx.rules) {
+      if (rule.resellerShareBps === null) continue;
+      if (rule.productId && rule.productId !== product.id) continue;
+      if (rule.supplierCode && rule.supplierCode !== supplierCode) continue;
+      if (rule.category && rule.category !== product.category) continue;
+      if (rule.countryCode && rule.countryCode !== ctx.country.code) continue;
+      const score = (rule.productId ? 8 : 0) + (rule.supplierCode ? 4 : 0) + (rule.category ? 2 : 0) + (rule.countryCode ? 1 : 0);
+      if (score < below && score > shareScore) [share, shareScore] = [rule.resellerShareBps, score];
+    }
+    return share;
   }
 
   /** The reseller's settings for a product: each field from their product rule, else category rule, else general rule. */
@@ -338,11 +363,14 @@ export class PricingService {
     if (rule.kind === 'discount') {
       const floor = ownFee === null ? cost : cost + ownFee;
       if (floor > face) return null;
-      // BitoCard's own offers: the reseller's discount only while the supplier's covers it with some left for BitoCard;
-      // otherwise none. Never cut to what the supplier gives, which would show resellers the supplier's cost.
-      // Own supplier: their cost plus BitoCard's fee.
-      const share = shareBps(face, rule.resellerDiscountBps);
-      wholesale = ownFee === null ? (share < face - cost ? face - share : face) : floor;
+      // BitoCard's own offers: the supplier's discount is split between resellers and BitoCard as the admin set (half
+      // each unless a rule says otherwise). An older rule with only a fixed reseller discount gives it while the
+      // supplier's covers it with some left for BitoCard, else none. Own supplier: their cost plus BitoCard's fee.
+      if (ownFee !== null) wholesale = floor;
+      else if (rule.resellerShareBps === null && rule.resellerDiscountBps > 0) {
+        const share = shareBps(face, rule.resellerDiscountBps);
+        wholesale = share < face - cost ? face - share : face;
+      } else wholesale = face - ((face - cost) * BigInt(rule.resellerShareBps ?? defaultResellerShareBps)) / 10_000n;
       price = face - min(shareBps(face, terms.customerDiscountBps), face - wholesale);
     } else {
       // BitoCard's fixed price is its own decision per market, with no cap (a $2.50 number may sell to resellers at $15).
@@ -383,7 +411,9 @@ export class PricingService {
         throw error;
       });
       if (!priced) continue;
-      if (!best || priced.cost < best.cost || (priced.cost === best.cost && offer.priority < best.offer.priority)) best = priced;
+      // Routing is automatic: the cheapest offer wins; at the same cost, the one its supplier confirmed most recently, then
+      // the supplier's code, so the choice never depends on a setting.
+      if (!best || priced.cost < best.cost || (priced.cost === best.cost && tieBreak(offer, best.offer) < 0)) best = priced;
     }
     if (!best) throw unconverted ?? unavailable('product_unavailable', 'This product is not available right now.');
     return best;
@@ -725,6 +755,7 @@ export class PricingService {
     kind?: PriceKind;
     margin_bps?: number;
     reseller_discount_bps?: number;
+    reseller_share_bps?: number | null;
     fixed_price?: number;
     fixed_currency?: string;
   }) {
@@ -752,6 +783,7 @@ export class PricingService {
       kind,
       marginBps: input.margin_bps ?? existing?.marginBps ?? 0,
       resellerDiscountBps: input.reseller_discount_bps ?? existing?.resellerDiscountBps ?? 0,
+      resellerShareBps: input.reseller_share_bps !== undefined ? input.reseller_share_bps : (existing?.resellerShareBps ?? null),
       fixedMinor: kind === 'fixed' ? BigInt(input.fixed_price!) : null,
       fixedCurrency: kind === 'fixed' ? input.fixed_currency!.toUpperCase() : null,
     };
@@ -777,7 +809,7 @@ export class PricingService {
     countryCode: string,
     product: ProductWithOffers,
     faceValue: bigint | null,
-    trial: { kind?: PriceKind; margin_bps?: number; reseller_discount_bps?: number; fixed_price?: number; fixed_currency?: string } | null,
+    trial: { kind?: PriceKind; margin_bps?: number; reseller_discount_bps?: number; reseller_share_bps?: number; fixed_price?: number; fixed_currency?: string } | null,
   ) {
     const country = await this.prisma.country.findUnique({ where: { code: countryCode.toUpperCase() }, include: { categories: true } });
     if (!country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such market.', 'country');
@@ -793,6 +825,7 @@ export class PricingService {
         kind: trial.kind,
         marginBps: trial.margin_bps ?? 0,
         resellerDiscountBps: trial.reseller_discount_bps ?? 0,
+        resellerShareBps: trial.reseller_share_bps ?? null,
         fixedMinor: trial.kind === 'fixed' && trial.fixed_price ? BigInt(trial.fixed_price) : null,
         fixedCurrency: trial.kind === 'fixed' ? (trial.fixed_currency ?? country.currency).toUpperCase() : null,
         updatedAt: new Date(),
@@ -922,6 +955,12 @@ function faceChoices(product: ProductWithOffers) {
   return [...values].map(value => BigInt(value)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map(minor);
 }
 
+/** Between two offers of the same cost: the more recently synced first, then by supplier code. */
+function tieBreak(a: { syncedAt: Date; supplierCode: string }, b: { syncedAt: Date; supplierCode: string }) {
+  const fresher = b.syncedAt.getTime() - a.syncedAt.getTime();
+  return fresher !== 0 ? fresher : a.supplierCode.localeCompare(b.supplierCode);
+}
+
 function presentResolved(rule: ResolvedRule) {
   return {
     kind: rule.kind,
@@ -929,6 +968,8 @@ function presentResolved(rule: ResolvedRule) {
     rule_id: rule.ruleId,
     margin_bps: rule.marginBps,
     reseller_discount_bps: rule.resellerDiscountBps,
+    /** Discount: the resellers' part of the supplier's discount (out of 10,000); null when none is set (half). */
+    reseller_share_bps: rule.resellerShareBps,
     fixed_price: rule.fixedMinor === null ? null : Number(rule.fixedMinor),
     fixed_currency: rule.fixedCurrency,
   };
@@ -945,6 +986,7 @@ export function presentRule(rule: PricingRule) {
     kind: rule.kind as PriceKind,
     margin_bps: rule.marginBps,
     reseller_discount_bps: rule.resellerDiscountBps,
+    reseller_share_bps: rule.resellerShareBps,
     fixed_price: rule.fixedMinor === null ? null : Number(rule.fixedMinor),
     fixed_currency: rule.fixedCurrency,
     updated_at: rule.updatedAt.toISOString(),

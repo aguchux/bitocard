@@ -23,7 +23,7 @@ import {
 } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { parseMoney } from "@bitocard/api-client/money";
-import { describeRule, kindLabels } from "../pricing-labels";
+import { describeRule, kindLabels, splitText } from "../pricing-labels";
 import {
   type PriceKind,
   productCategories,
@@ -64,11 +64,11 @@ export default function PricingPage() {
   const [country, setCountry] = useState("");
   const [supplier, setSupplier] = useState("");
   const [kind, setKind] = useState<PriceKind>("auto");
-  const [discount, setDiscount] = useState("1");
-  const [margin, setMargin] = useState("3");
+  const [share, setShare] = useState("50");
+  const [margin, setMargin] = useState("10");
   const [fixed, setFixed] = useState("");
   const [fixedCurrency, setFixedCurrency] = useState("USD");
-  const discountBps = percentToBps(discount);
+  const shareBps = percentToBps(share);
   const marginBps = percentToBps(margin);
   // The sign and decimals follow the currency while it is a whole code; US dollars until then.
   const fixedMoney = /^[A-Z]{3}$/.test(fixedCurrency) ? fixedCurrency : "USD";
@@ -82,7 +82,7 @@ export default function PricingPage() {
     setAdding(true);
   };
   const save = () => {
-    if ((kind === "auto" || kind === "discount") && (discountBps === null || discountBps > 10_000)) throw new Error("Enter the reseller discount as a percentage of face value, at most 100.");
+    if ((kind === "auto" || kind === "discount") && (shareBps === null || shareBps > 10_000)) throw new Error("Enter the resellers’ part of the supplier’s discount, from 0 to 100%.");
     if ((kind === "auto" || kind === "markup") && (marginBps === null || marginBps > 20_000)) throw new Error("Enter BitoCard’s markup as a percentage of cost, at most 200.");
     if (kind === "fixed" && (!supplier || fixedMinor === null || fixedMinor <= 0)) throw new Error("A fixed price is set for a supplier here (or on one product); enter the price.");
     return setRule({
@@ -90,7 +90,7 @@ export default function PricingPage() {
       ...(country ? { country } : {}),
       ...(supplier ? { supplier_code: supplier } : {}),
       kind,
-      ...(kind === "auto" || kind === "discount" ? { reseller_discount_bps: discountBps! } : {}),
+      ...(kind === "auto" || kind === "discount" ? { reseller_share_bps: shareBps!, reseller_discount_bps: 0 } : {}),
       ...(kind === "auto" || kind === "markup" ? { margin_bps: marginBps! } : {}),
       ...(kind === "fixed" ? { fixed_price: fixedMinor!, fixed_currency: fixedCurrency } : {}),
     }).unwrap();
@@ -112,7 +112,11 @@ export default function PricingPage() {
       <PricingSchemes audience="admin" />
       {removeState.error ? <Notice tone="red">{errorMessage(removeState.error)}</Notice> : null}
       <Card>
-        <CardHeader title="Rules" description="Automatic means discount wherever the supplier gives one, markup otherwise. Local airtime, data, bills and pay-TV always sell at face value at most." className="pb-4" />
+        <CardHeader
+          title="Rules"
+          description="Gift cards sell at BitoCard’s markup (10% unless a rule says otherwise). Local airtime, data, bills and pay-TV sell at face value at most, the supplier’s discount split between resellers and BitoCard (half each unless a rule says otherwise)."
+          className="pb-4"
+        />
         <DataTable
           caption="Pricing rules"
           rows={data?.data}
@@ -200,8 +204,12 @@ export default function PricingPage() {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           {kind === "auto" || kind === "discount" ? (
-            <Field label="Reseller discount (% of face value)" htmlFor="rule-discount" hint="What resellers get off face value. Never more than the supplier gives BitoCard: BitoCard keeps the rest.">
-              <Input id="rule-discount" inputMode="decimal" value={discount} onChange={event => setDiscount(event.target.value)} />
+            <Field
+              label="Resellers’ part of the supplier’s discount (%)"
+              htmlFor="rule-discount"
+              hint={shareBps !== null && shareBps <= 10_000 ? `Split ${splitText(shareBps)}. A supplier giving 4% leaves resellers ${bpsToPercent(Math.round((400 * shareBps) / 10_000))}% off face value.` : "From 0 to 100."}
+            >
+              <Input id="rule-discount" inputMode="decimal" value={share} onChange={event => setShare(event.target.value)} />
             </Field>
           ) : null}
           {kind === "auto" || kind === "markup" ? (
