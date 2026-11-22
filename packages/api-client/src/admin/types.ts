@@ -147,6 +147,13 @@ export type ResellerDetail = {
   verified_name: string | null;
   /** The mobile number the owner gave when opening the account (E.164), never confirmed; null when none. Missing on older API versions. */
   signup_phone?: string | null;
+  /** BitoCard: sells as an individual or a business; a live account switched to business is paused until its KYB passes. */
+  account_type?: 'individual' | 'business';
+  paused_for_kyb?: boolean;
+  /** The profile the reseller keeps (never checked). */
+  business_profile?: { legal_name: string | null; address: string | null; phone: string | null; description: string | null };
+  /** The registered business as KYB verified it. */
+  verified_business?: { registered_name: string | null; registration_number: string | null; business_address: string | null; verified_at: string } | null;
   /** Udozo only: an admin let the reseller go live without the identity check (BitoCard always requires it). */
   identity_waiver?: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
   /** BitoCard: an admin marked it a test account (activated without the identity check, never moving money out). */

@@ -7,6 +7,7 @@ import { kycDeclineReasons } from "@bitocard/api-client/kyc";
 import { type Verification, useAccountVerificationQuery, useStartAccountVerificationMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { useReseller } from "@/components/reseller";
+import { AccountTypeCard, BusinessCheckCard } from "@/components/account-type";
 
 const reasons: Record<string, string> = {
   not_verified: "The check could not confirm your identity. Make sure your document is valid and clearly visible, then try again.",
@@ -105,11 +106,12 @@ function StartCheck({ check }: { check: Verification }) {
         <p className="font-semibold">What happens</p>
         {ours ? (
           <ul className="list-disc space-y-1 pl-5 text-muted">
-            <li>You go to BitoCard Verify (verify.bitocard.com) and say whether your business is registered.</li>
-            <li>
-              A registered business uploads its registration certificate, a proof of address from the last three months and a document naming its directors or owners. An unregistered business
-              checks only the owner.
-            </li>
+            <li>You go to BitoCard Verify (verify.bitocard.com).</li>
+            {check.account_type === "business" ? (
+              <li>As a business account, you give your registered business’s details and upload its registration certificate, a proof of address from the last three months and a document naming its directors or owners.</li>
+            ) : (
+              <li>As an individual, only you are checked. Selling as a registered business? Switch to a business account above first.</li>
+            )}
             <li>You photograph your ID, take a selfie and follow two short movements (the liveness check). Your face is compared with your ID: this uses biometric data, which is sensitive personal data.</li>
             <li>A person at BitoCard reviews everything; nothing is decided automatically. Your documents are stored encrypted and never made public.</li>
             <li>Once your registered business is verified, you can review your own customers’ ID checks.</li>
@@ -159,7 +161,9 @@ export default function VerificationPage() {
       <PageHeader title="Identity check" description="We verify the business owner (and, in some countries, the business) before the account can take live orders." />
       <QueryView query={verification} message={error => errorMessage(error, "Could not load your identity check.")} loading={<Skeleton className="h-64 w-full" />}>
         {data => (
-          <Card>
+          <div className="space-y-6">
+            <AccountTypeCard check={data} owner={owner} />
+            <Card>
             <CardHeader title="Status" actions={<StatusBadge status={data.verified ? "approved" : data.status} />} />
             <div className="space-y-5 p-5 sm:p-6">
               <Outcome check={data} />
@@ -170,7 +174,7 @@ export default function VerificationPage() {
                   ...(data.provider === "bitocard"
                     ? [
                         { label: "Checked by", value: "BitoCard Verify" },
-                        { label: "Check", value: data.kind === "kyb" ? "Business and owner" : "Owner’s identity" },
+                        { label: "Check", value: data.account_type === "business" ? "Business and owner" : "Owner’s identity" },
                         ...(data.kind === "kyb" ? [{ label: "Business", value: businessLabel(data.business_type ?? null, data.kyb_verified ?? false) }] : []),
                       ]
                     : []),
@@ -183,6 +187,8 @@ export default function VerificationPage() {
               ) : null}
             </div>
           </Card>
+            {data.account_type === "business" && data.verified && !(data.kyb_verified && data.business_type === "registered") ? <BusinessCheckCard check={data} owner={owner} /> : null}
+          </div>
         )}
       </QueryView>
     </ShqShell>

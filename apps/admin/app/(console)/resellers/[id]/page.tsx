@@ -123,6 +123,25 @@ export default function ResellerPage() {
                         "—"
                       ),
                     },
+                    ...(reseller.account_type
+                      ? [
+                          {
+                            label: "Sells as",
+                            value: (
+                              <span className="inline-flex flex-wrap items-center gap-2">
+                                {reseller.account_type === "business" ? "Business" : "Individual"}
+                                {reseller.account_type === "business" ? <Badge tone={reseller.verified_business ? "green" : "amber"}>{reseller.verified_business ? "Business verified" : "Business not verified"}</Badge> : null}
+                                {reseller.paused_for_kyb ? <Badge tone="amber">Paused for business check</Badge> : null}
+                              </span>
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(reseller.business_profile?.legal_name ? [{ label: "Legal name", value: reseller.business_profile.legal_name }] : []),
+                    ...(reseller.business_profile?.address ? [{ label: "Address", value: reseller.business_profile.address }] : []),
+                    ...(reseller.business_profile?.phone ? [{ label: "Business telephone", value: <PhoneContact phone={reseller.business_profile.phone.replace(/[^\d+]/g, "")} /> }] : []),
+                    ...(reseller.business_profile?.description ? [{ label: "What it does", value: <span className="whitespace-pre-line">{reseller.business_profile.description}</span> }] : []),
+                    ...(reseller.verified_business ? [{ label: "Verified business", value: `${reseller.verified_business.registered_name ?? "—"} · ${reseller.verified_business.registration_number ?? "—"}` }] : []),
                     { label: "Reseller ID", value: <code className="font-mono text-xs">{reseller.id}</code> },
                   ]}
                 />

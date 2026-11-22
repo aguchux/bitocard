@@ -63,11 +63,12 @@ export function presentCustomerVerification(record: IdentityVerification) {
   };
 }
 
-function presentResellerVerification(
-  record: IdentityVerification | null,
-  reseller: { status: string; verifiedAt: Date | null; businessType?: string | null; kybVerifiedAt?: Date | null },
-  provider: 'bitocard' | 'didit',
-) {
+type ResellerCheckState = { status: string; verifiedAt: Date | null; businessType?: string | null; kybVerifiedAt?: Date | null; accountType?: string; kybPausedAt?: Date | null };
+
+/** Whether the reseller's registered business has passed KYB. */
+export const businessVerified = (reseller: { businessType?: string | null; kybVerifiedAt?: Date | null }) => reseller.businessType === 'registered' && Boolean(reseller.kybVerifiedAt);
+
+function presentResellerVerification(record: IdentityVerification | null, reseller: ResellerCheckState, provider: 'bitocard' | 'didit', business: IdentityVerification | null = null) {
   return {
     object: 'reseller_verification' as const,
     /** Who checks: BitoCard Verify (African countries: the business's KYB) or Didit. */
@@ -82,6 +83,16 @@ function presentResellerVerification(
     url: record?.status === 'in_progress' ? record.url : null,
     reason: record ? publicReason(record) : null,
     started_at: record?.createdAt.toISOString() ?? null,
+    /** How the reseller sells: as an `individual` (the owner's check) or a `business` (also KYB of the registered business). */
+    account_type: reseller.accountType === 'business' ? ('business' as const) : ('individual' as const),
+    /** A business account paused until its business passes KYB (it was live as an individual). */
+    paused_for_kyb: Boolean(reseller.kybPausedAt),
+    /** The business account's own KYB, run after the owner's identity was approved; null until one starts. */
+    business_check: business
+      ? { status: business.status, reason: publicReason(business), started_at: business.createdAt.toISOString(), decided_at: business.decidedAt?.toISOString() ?? null }
+      : null,
+    /** Where the owner continues the business check, right after starting it. */
+    business_url: null as string | null,
   };
 }
 
@@ -173,7 +184,80 @@ export class IdentityService {
   async resellerVerification(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const record = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
-    return presentResellerVerification(this.withoutSpentLink(record), reseller, await this.providerFor(reseller.country));
+    return presentResellerVerification(this.withoutSpentLink(record), reseller, await this.providerFor(reseller.country), await this.latestBusinessCheck(resellerId));
+  }
+
+  private latestBusinessCheck(resellerId: string) {
+    return this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'business' }, orderBy: { createdAt: 'desc' } });
+  }
+
+  /** What the Verify case asks about the business: a business account's registered details (prefilled from its profile). */
+  private businessPreset(reseller: { accountType: string; legalName: string | null; addressLine: string | null; city: string | null; state: string | null; postalCode: string | null }) {
+    if (reseller.accountType !== 'business') return { type: 'unregistered' as const };
+    const address = [reseller.addressLine, reseller.city, reseller.state, reseller.postalCode].filter(Boolean).join(', ');
+    return { type: 'registered' as const, registeredName: reseller.legalName, businessAddress: address || null };
+  }
+
+  /**
+   * A business account's KYB once the owner's identity is approved: only the registered business and its documents are
+   * asked (BitoCard Verify, whatever the market's provider), reviewed by BitoCard. Approved, the account sells as a
+   * business; an account paused for it goes live again.
+   */
+  async startBusinessCheck(resellerId: string, userId: string, consent: boolean, restart = false) {
+    if (!consent) throw consentRequired();
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    if (reseller.accountType !== 'business') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'account_type_individual', 'Switch to a business account first.');
+    if (!reseller.verifiedAt) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', 'Finish your identity check first: as a business account, it checks your business too.');
+    }
+    if (businessVerified(reseller)) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', 'Your business is already verified.');
+    let latest = await this.latestBusinessCheck(resellerId);
+    if (latest?.status === 'in_review') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_in_review', 'Your business check is being reviewed. We will email you the outcome.');
+    if (restart && latest?.status === 'in_progress') {
+      await this.close(latest, 'restarted', userId);
+      latest = null;
+    }
+    const provider = await this.providerFor(reseller.country);
+    const owner = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
+    if (latest?.status === 'in_progress') {
+      const fresh = await this.freshLink(latest);
+      return { ...presentResellerVerification(this.withoutSpentLink(owner), reseller, provider, fresh), business_url: fresh.url };
+    }
+    const caseId = this.verify.newCaseId();
+    const created = await this.prisma.identityVerification.create({
+      data: {
+        subject: 'reseller',
+        resellerId,
+        mode: 'live',
+        method: 'business',
+        provider: verifyProvider,
+        providerReference: caseId,
+        country: reseller.country ?? 'NG',
+        consentAt: new Date(),
+        expectedName: reseller.verifiedName,
+        requestedById: userId,
+      },
+    });
+    const url = await this.verify.open(created, { kind: 'kyb', returnUrl: `${this.config.DASHBOARD_URL}/settings/verification`, ownerVerified: true, business: this.businessPreset(reseller) });
+    const record = await this.prisma.identityVerification.update({ where: { id: created.id }, data: { url } });
+    return { ...presentResellerVerification(this.withoutSpentLink(owner), reseller, provider, record), business_url: url };
+  }
+
+  /** Closes a business check still being filled in (the account went back to selling as an individual). */
+  async closeBusinessCheck(resellerId: string, actorId: string) {
+    const latest = await this.latestBusinessCheck(resellerId);
+    if (latest?.status === 'in_progress') await this.close(latest, 'restarted', actorId);
+  }
+
+  /** Whether any of the owner's checks is waiting for a reviewer's decision. */
+  async ownerCheckInReview(resellerId: string) {
+    return Boolean(await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: { in: ['document', 'business'] }, status: 'in_review' }, select: { id: true } }));
+  }
+
+  /** The owner's first check still being filled in on BitoCard Verify (its case follows the account type). */
+  async openOwnerCase(resellerId: string) {
+    const open = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document', status: 'in_progress', provider: verifyProvider }, orderBy: { createdAt: 'desc' } });
+    return open?.providerReference ?? null;
   }
 
   /** The business owner's check. Returns the Didit page to send them to; an unfinished session is reused for a day. */
@@ -208,7 +292,7 @@ export class IdentityService {
           requestedById: userId,
         },
       });
-      const url = await this.verify.open(created, { kind: 'kyb', returnUrl: `${this.config.DASHBOARD_URL}/verification` });
+      const url = await this.verify.open(created, { kind: 'kyb', returnUrl: `${this.config.DASHBOARD_URL}/verification`, business: this.businessPreset(reseller) });
       return presentResellerVerification(await this.prisma.identityVerification.update({ where: { id: created.id }, data: { url } }), reseller, provider);
     }
     if (latest?.status === 'in_progress' && latest.url && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentResellerVerification(latest, reseller, provider);
@@ -518,9 +602,17 @@ export class IdentityService {
       await this.audit.record({ actorId, action: `verification.${status}`, targetType: 'reseller', targetId: record.resellerId, before: { verification_id: record.id, status: record.status }, after: { status, reason } });
     }
     if (record.subject === 'reseller') {
-      const what = ownerBvn ? 'BVN check' : 'identity check';
+      const ownerBusiness = record.method === 'business';
+      const what = ownerBvn ? 'BVN check' : ownerBusiness ? 'business check' : 'identity check';
       const outcomes: Record<string, { title: string; body: string }> = {
-        approved: { title: `Your ${what} was approved`, body: ownerBvn ? 'You can open your reserved bank accounts now.' : 'BitoCard will review your account and activate it for live selling. Your sandbox works meanwhile.' },
+        approved: {
+          title: `Your ${what} was approved`,
+          body: ownerBvn
+            ? 'You can open your reserved bank accounts now.'
+            : ownerBusiness
+              ? 'Your business is verified: you now sell as a business.'
+              : 'BitoCard will review your account and activate it for live selling. Your sandbox works meanwhile.',
+        },
         declined: { title: `Your ${what} was declined`, body: reason === 'name_mismatch' ? 'The name on the record did not match your verified name.' : 'Start a new check from the verification page.' },
         in_review: { title: `Your ${what} is being reviewed`, body: 'BitoCard is reviewing it; we will tell you the outcome.' },
         expired:
@@ -535,7 +627,7 @@ export class IdentityService {
         await this.inbox.reseller(record.resellerId, 'verification.updated', {
           subject: `${record.id}:${status}`,
           ...outcome,
-          link: ownerBvn ? '/wallet/reserved-accounts' : '/verification',
+          link: ownerBvn ? '/wallet/reserved-accounts' : ownerBusiness ? '/settings/verification' : '/verification',
           mode: record.mode,
         });
       }

@@ -125,6 +125,8 @@ async function complete(person, { kyb = null, idNumber = `A${Math.floor(Math.ran
 async function verifiedReseller(type) {
   const reseller = await resellerClient(server, { country: 'NG' });
   await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
+  // A registered business sells as a business account.
+  if (type === 'registered') assert.equal((await reseller.browser.put('/v1/reseller/account-type', { account_type: 'business' })).status, 200);
   const started = await reseller.browser.post('/v1/account/verification', { consent: true });
   assert.equal(started.status, 201, JSON.stringify(started.json));
   const person = await applicant(started.json.url);
@@ -186,9 +188,10 @@ describe('a registered business’s KYB', () => {
   test('one-use link, checked and stripped files, encrypted private storage, admin review that verifies the business', async () => {
     const reseller = await resellerClient(server, { country: 'NG' });
     await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
+    assert.equal((await reseller.browser.put('/v1/reseller/account-type', { account_type: 'business' })).status, 200);
     const started = await reseller.browser.post('/v1/account/verification', { consent: true });
     assert.equal(started.status, 201, JSON.stringify(started.json));
-    assert.deepEqual([started.json.provider, started.json.kind, started.json.status], ['bitocard', 'kyb', 'in_progress']);
+    assert.deepEqual([started.json.provider, started.json.kind, started.json.status, started.json.account_type], ['bitocard', 'kyb', 'in_progress', 'business']);
     assert.match(started.json.url, /^https:\/\/verify\.example\/s#t=bkh_/);
 
     const person = await applicant(started.json.url);
@@ -207,6 +210,8 @@ describe('a registered business’s KYB', () => {
     const early = await person.post('submit');
     assert.deepEqual([early.status, early.json.error.code], [400, 'case_incomplete']);
     assert.equal((await person.put('business', { business_type: 'registered' })).json.error.code, 'parameter_missing');
+    assert.deepEqual(person.case.business_types, ['registered'], 'a business account checks its registered business');
+    assert.equal((await person.put('business', { business_type: 'unregistered' })).json.error.code, 'business_type_not_allowed');
 
     // Files are checked from their bytes.
     await person.put('consent', { consent: true });

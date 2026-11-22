@@ -37,7 +37,18 @@ export class VerifyLinks {
   }
 
   /** Opens the case behind a new identity check (its id is the check's provider reference) and returns its link. */
-  async open(verification: IdentityVerification, input: { kind: 'kyc' | 'kyb'; storeId?: string | null; returnUrl?: string | null }) {
+  async open(
+    verification: IdentityVerification,
+    input: {
+      kind: 'kyc' | 'kyb';
+      storeId?: string | null;
+      returnUrl?: string | null;
+      /** The owner's identity is already approved: only the business is asked. */
+      ownerVerified?: boolean;
+      /** A reseller's business as its account type says: unregistered (an individual) or registered (prefilled). */
+      business?: { type: 'registered' | 'unregistered'; registeredName?: string | null; businessAddress?: string | null };
+    },
+  ) {
     await this.prisma.kycCase.create({
       data: {
         id: verification.providerReference,
@@ -52,6 +63,10 @@ export class VerifyLinks {
         returnUrl: input.returnUrl ?? null,
         livenessSteps: [],
         resubmitItems: [],
+        ownerVerified: input.ownerVerified ?? false,
+        businessType: input.kind === 'kyb' && input.business?.type === 'unregistered' ? 'unregistered' : null,
+        registeredName: input.business?.type === 'registered' ? (input.business.registeredName ?? null) : null,
+        businessAddress: input.business?.type === 'registered' ? (input.business.businessAddress ?? null) : null,
       },
     });
     return this.link(verification.providerReference, kycPlatform(verification.resellerId));

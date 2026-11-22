@@ -468,6 +468,19 @@ model Reseller {
   /// When BitoCard approved the business's KYB (registered businesses: documents checked). Registered, KYB-verified,
   /// active resellers review their own customers' identity checks.
   kybVerifiedAt             DateTime?                 @map("kyb_verified_at")
+  /// Sells as an `individual` (the owner's own check) or a `business` (also KYB of the registered business).
+  accountType               String                    @default("individual") @map("account_type")
+  /// The business profile the reseller keeps (not checked; the KYB-verified details are `registered*` above).
+  legalName                 String?                   @map("legal_name")
+  addressLine               String?                   @map("address_line")
+  city                      String?
+  state                     String?
+  postalCode                String?                   @map("postal_code")
+  /// A contact number, never confirmed.
+  businessPhone             String?                   @map("business_phone")
+  businessDescription       String?                   @map("business_description")
+  /// An active account switched to business is paused (pending) until the business passes KYB, or switches back.
+  kybPausedAt               DateTime?                 @map("kyb_paused_at")
   createdAt                 DateTime                  @default(now()) @map("created_at")
   updatedAt                 DateTime                  @updatedAt @map("updated_at")
   members                   ResellerMember[]
@@ -1933,6 +1946,8 @@ enum VerificationSubject {
 enum VerificationMethod {
   document
   bvn
+  /// A business account's KYB after the owner's identity was approved: the business and its documents only.
+  business
 }
 
 enum VerificationStatus {
@@ -3428,6 +3443,8 @@ model KycCase {
   /// When the documents are deleted (retention), null while it is open.
   purgeAfter         DateTime?             @map("purge_after")
   purgedAt           DateTime?             @map("purged_at")
+  /// The owner's identity was already approved: only the business and its documents are asked.
+  ownerVerified      Boolean               @default(false) @map("owner_verified")
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
   verification       IdentityVerification  @relation(fields: [verificationId], references: [id], onDelete: Restrict)

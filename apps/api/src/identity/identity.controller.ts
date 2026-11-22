@@ -104,6 +104,17 @@ export class ResellerVerificationController {
   start(@CurrentCaller() caller: Caller, @Body() body: ConsentDto) {
     return this.identity.startResellerVerification(resellerOf(caller), personOf(caller), body.consent, body.restart === true);
   }
+
+  @ApiOperation({
+    summary: 'Start the business check',
+    description:
+      'Business owner only, for a business account whose owner’s identity is verified: the registered business and its documents (KYB) on BitoCard Verify. Returns the link as `business_url`; an unfinished check continues.',
+  })
+  @Roles()
+  @Post('business')
+  startBusiness(@CurrentCaller() caller: Caller, @Body() body: ConsentDto) {
+    return this.identity.startBusinessCheck(resellerOf(caller), personOf(caller), body.consent, body.restart === true);
+  }
 }
 
 class BvnCheckDto {

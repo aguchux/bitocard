@@ -6,6 +6,7 @@ import { AppLink } from "@bitocard/admin-ui/shell";
 import { type ResellerRef, usePublicCountriesQuery, usePublicCountryQuery, useUpdateBusinessMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { BusinessProfileCard } from "@/components/business-profile";
 
 const statusHelp: Record<ResellerRef["status"], { tone: "amber" | "green" | "red"; title: string; text: string }> = {
   pending: {
@@ -110,7 +111,7 @@ export default function BusinessSettingsPage() {
           <form onSubmit={save} className="space-y-4">
             {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
             {saved ? <Notice tone="green">{saved}</Notice> : null}
-            <Field label="Business name" htmlFor="business-name" hint="2 to 100 characters.">
+            <Field label="Trading name" htmlFor="business-name" hint="The name customers and BitoCard know you by. 2 to 100 characters.">
               <Input id="business-name" value={name} onChange={event => setName(event.target.value)} maxLength={100} disabled={!manage} required autoComplete="organization" />
             </Field>
             {manage ? (
@@ -134,6 +135,8 @@ export default function BusinessSettingsPage() {
           )}
         </div>
       </Card>
+
+      <BusinessProfileCard manage={manage} />
     </ShqShell>
   );
 }

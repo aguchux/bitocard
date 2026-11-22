@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { SettingsModule } from '../settings/settings.module.js';
 import { AdminVerificationsController, ResellerBvnController, CustomerVerificationController, IdentityWebhooksController, ResellerVerificationController } from './identity.controller.js';
 import { IdentityService } from './identity.service.js';
+import { BusinessAccountController, BusinessAccountService } from './business-account.js';
 import {
   AdminKycController,
   AfrippaAdminKycController,
@@ -21,6 +22,7 @@ import { KycStorage } from '../kyc/storage.js';
   imports: [SettingsModule],
   controllers: [
     ResellerVerificationController,
+    BusinessAccountController,
     ResellerBvnController,
     CustomerVerificationController,
     AdminVerificationsController,
@@ -33,7 +35,7 @@ import { KycStorage } from '../kyc/storage.js';
     AfrippaKycCaseController,
     AfrippaAdminKycController,
   ],
-  providers: [IdentityService, VerifyLinks, KycStorage, KycService, KycSessionGuard, AfrippaKycSessionGuard],
+  providers: [IdentityService, BusinessAccountService, VerifyLinks, KycStorage, KycService, KycSessionGuard, AfrippaKycSessionGuard],
   exports: [IdentityService, KycService],
 })
 export class IdentityModule {}

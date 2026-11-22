@@ -133,6 +133,8 @@ export class KycService {
     const items: string[] = ['consent'];
     if (c.kind === 'kyb') items.push('business');
     if (c.kind === 'kyb' && c.businessType === 'registered') items.push(...businessKinds);
+    // The owner's identity is already approved: a business account's KYB asks only for the business.
+    if (c.ownerVerified) return items;
     items.push('identity', 'id_front');
     if (c.idType && idTypeFor(c.country, c.idType)?.back) items.push('id_back');
     items.push('selfie', 'liveness');
@@ -191,7 +193,12 @@ export class KycService {
       status: c.status,
       consented: Boolean(c.consentAt),
       business_type: c.businessType,
-      business: c.kind === 'kyb' && c.businessType === 'registered' ? { registered_name: c.registeredName, registration_number: c.registrationNumber, business_address: c.businessAddress } : null,
+      /** The kinds of business this check may be: a reseller's follows its account type (individual or business). */
+      business_types: c.kind === 'kyb' ? await this.businessTypesFor(c) : [],
+      /** The owner's identity is already approved: only the business is asked. */
+      owner_verified: c.ownerVerified,
+      // A business account's details prefilled from its profile show before the applicant confirms them.
+      business: c.kind === 'kyb' && (c.businessType === 'registered' || (!c.businessType && (c.registeredName || c.businessAddress))) ? { registered_name: c.registeredName, registration_number: c.registrationNumber, business_address: c.businessAddress } : null,
       identity: c.idType ? { id_type: c.idType, id_number_hint: number ? `••••${number.slice(-4)}` : null, full_name: c.fullName, date_of_birth: c.dateOfBirth } : null,
       id_types: idTypesFor(c.country),
       documents: c.documents.map(document => ({ kind: document.kind, content_type: document.contentType, size: document.size, uploaded_at: document.createdAt.toISOString() })),
@@ -228,9 +235,42 @@ export class KycService {
     return this.applicantCase(caseId);
   }
 
+  /** A reseller's check follows its account type: an individual is unregistered, a business registered. */
+  private async businessTypesFor(c: KycCase): Promise<Array<'unregistered' | 'registered'>> {
+    if (c.ownerVerified) return ['registered'];
+    if (c.subject !== 'reseller') return ['unregistered', 'registered'];
+    const reseller = await this.prisma.reseller.findUnique({ where: { id: c.resellerId }, select: { accountType: true } });
+    return reseller?.accountType === 'business' ? ['registered'] : ['unregistered'];
+  }
+
+  /**
+   * The account type changed while the owner's check is still being filled in: its business follows (a registered
+   * business prefilled from the profile; an individual's business documents removed). Nothing changes once it was sent.
+   */
+  async presetBusiness(caseId: string, preset: { type: 'registered' | 'unregistered'; registeredName?: string | null; businessAddress?: string | null }) {
+    const c = await this.prisma.kycCase.findUnique({ where: { id: caseId }, include: { documents: true } });
+    if (!c || c.kind !== 'kyb' || (c.status !== 'draft' && c.status !== 'resubmit')) return;
+    if (preset.type === 'unregistered') {
+      await this.prisma.kycCase.update({ where: { id: c.id }, data: { businessType: 'unregistered', registeredName: null, registrationNumber: null, businessAddress: null } });
+      await this.removeDocuments(c, c.documents.filter(document => (businessKinds as string[]).includes(document.kind)));
+      return;
+    }
+    await this.prisma.kycCase.update({
+      where: { id: c.id },
+      data: { businessType: null, registeredName: c.registeredName ?? preset.registeredName ?? null, businessAddress: c.businessAddress ?? preset.businessAddress ?? null },
+    });
+  }
+
   async business(caseId: string, input: { business_type: 'unregistered' | 'registered'; registered_name?: string; registration_number?: string; business_address?: string }) {
     const c = await this.editable(caseId, 'business');
     if (c.kind !== 'kyb') throw invalid('parameter_invalid', 'Only a business check has business details.', 'business_type');
+    if (!(await this.businessTypesFor(c)).includes(input.business_type)) {
+      throw invalid(
+        'business_type_not_allowed',
+        input.business_type === 'registered' ? 'Your account sells as an individual: switch it to a business in SHQ first.' : 'Your account sells as a business: give your registered business’s details.',
+        'business_type',
+      );
+    }
     const registered = input.business_type === 'registered';
     if (registered) {
       for (const [field, value] of [['registered_name', input.registered_name], ['registration_number', input.registration_number], ['business_address', input.business_address]] as const) {
@@ -291,12 +331,14 @@ export class KycService {
     const c = await this.editable(caseId, itemOf(kind));
     const frame = livenessKind.exec(kind);
     const business = (businessKinds as string[]).includes(kind);
-    const allowed =
-      kind === 'id_front' ||
-      kind === 'selfie' ||
-      (kind === 'id_back' && Boolean(c.idType && idTypeFor(c.country, c.idType)?.back)) ||
-      (business && c.kind === 'kyb' && c.businessType === 'registered') ||
-      (frame !== null && Number(frame[1]) < c.livenessSteps.length && Number(frame[2]) < framesPerStep);
+    // A business account's check of its business takes only the business documents.
+    const allowed = c.ownerVerified
+      ? business && c.businessType === 'registered'
+      : kind === 'id_front' ||
+        kind === 'selfie' ||
+        (kind === 'id_back' && Boolean(c.idType && idTypeFor(c.country, c.idType)?.back)) ||
+        (business && c.kind === 'kyb' && c.businessType === 'registered') ||
+        (frame !== null && Number(frame[1]) < c.livenessSteps.length && Number(frame[2]) < framesPerStep);
     if (!allowed) throw invalid('document_kind_invalid', 'This document is not part of your check.', 'kind');
     const checked = checkDocument(file.buffer, file.mimetype, business);
     if ('problem' in checked) throw invalid(checked.problem.includes('4 MB') ? 'file_too_large' : 'file_type_invalid', checked.problem, 'file');
@@ -326,8 +368,8 @@ export class KycService {
   /** Who reviews a case: a registered, KYB-verified, active reseller for its own customers; BitoCard otherwise. */
   private async reviewerFor(c: KycCase): Promise<'admin' | 'reseller'> {
     if (c.subject !== 'customer' || kycPlatform(c.resellerId) === 'afrippa') return 'admin';
-    const seller = await this.prisma.reseller.findUnique({ where: { id: c.resellerId }, select: { businessType: true, kybVerifiedAt: true, status: true, house: true } });
-    return seller && !seller.house && seller.businessType === 'registered' && seller.kybVerifiedAt && seller.status === 'active' ? 'reseller' : 'admin';
+    const seller = await this.prisma.reseller.findUnique({ where: { id: c.resellerId }, select: { accountType: true, businessType: true, kybVerifiedAt: true, status: true, house: true } });
+    return seller && !seller.house && seller.accountType === 'business' && seller.businessType === 'registered' && seller.kybVerifiedAt && seller.status === 'active' ? 'reseller' : 'admin';
   }
 
   async submit(caseId: string) {
@@ -378,7 +420,7 @@ export class KycService {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const reason = reseller.house
       ? 'not_registered'
-      : reseller.businessType !== 'registered'
+      : reseller.accountType !== 'business' || reseller.businessType !== 'registered'
         ? 'not_registered'
         : !reseller.kybVerifiedAt
           ? 'kyb_not_verified'
@@ -446,6 +488,8 @@ export class KycService {
       store: platform === 'afrippa' ? null : store && !reseller.house ? store : store ? { ...store, name: 'bitocard.com' } : null,
       reseller: { id: reseller.id, name: platform === 'afrippa' ? 'Afrippa' : reseller.house ? 'BitoCard' : reseller.name },
       business_type: c.businessType,
+      /** The owner's identity was approved before: this check is of the business only. */
+      owner_verified: c.ownerVerified,
       business: c.businessType === 'registered' ? { registered_name: c.registeredName, registration_number: c.registrationNumber, business_address: c.businessAddress } : null,
       identity: c.idType ? { id_type: c.idType, id_type_label: type?.label ?? c.idType, id_number: this.idNumber(c), full_name: c.fullName, date_of_birth: c.dateOfBirth } : null,
       documents: c.documents.map(document => ({ id: document.id, kind: document.kind, content_type: document.contentType, size: document.size, uploaded_at: document.createdAt.toISOString(), url: `${base}/documents/${document.id}` })),
@@ -568,6 +612,14 @@ export class KycService {
             ? { businessType: 'registered', registeredName: c.registeredName, registrationNumber: c.registrationNumber, businessAddress: c.businessAddress, kybVerifiedAt: now }
             : { businessType: 'unregistered', registeredName: null, registrationNumber: null, businessAddress: null, kybVerifiedAt: null },
       });
+      // A business account paused for its KYB goes live again (it was live before), unless suspended meanwhile.
+      if (c.businessType === 'registered') {
+        const resumed = await this.prisma.reseller.updateMany({ where: { id: c.resellerId, kybPausedAt: { not: null }, status: 'pending' }, data: { status: 'active', kybPausedAt: null } });
+        if (resumed.count) {
+          await this.audit.record({ actorId: reviewer.userId, action: 'reseller.kyb_resumed', targetType: 'reseller', targetId: c.resellerId, before: { status: 'pending' }, after: { status: 'active' } });
+          await this.inbox.reseller(c.resellerId, 'account.reinstated', { subject: `kyb:${c.id}`, title: 'Your business account is live', body: 'Your business passed its check: live selling is back on.', link: '/settings' });
+        }
+      }
     }
     const [firstName, ...rest] = name.split(/\s+/);
     const verification = await this.prisma.identityVerification.findUniqueOrThrow({ where: { id: c.verificationId } });

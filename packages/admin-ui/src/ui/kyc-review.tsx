@@ -270,6 +270,8 @@ export function KycCaseView({ kase, fetchDocument, caseLink }: { kase: KycReview
                   ...(kase.verified_name ? [{ label: 'Verified name', value: kase.verified_name }] : []),
                 ]}
               />
+            ) : kase.owner_verified ? (
+              <p className="text-sm text-muted">The owner’s identity was verified on an earlier check: this business account’s check covers its business only. Approve with the owner’s verified name.</p>
             ) : (
               <p className="text-sm text-muted">No ID details yet.</p>
             )}

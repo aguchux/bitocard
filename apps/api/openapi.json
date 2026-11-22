@@ -22089,7 +22089,11 @@
                   "status": "approved",
                   "url": null,
                   "reason": null,
-                  "started_at": "2026-10-02T13:50:00.000Z"
+                  "started_at": "2026-10-02T13:50:00.000Z",
+                  "account_type": "business",
+                  "paused_for_kyb": false,
+                  "business_check": null,
+                  "business_url": null
                 }
               }
             }
@@ -22194,7 +22198,11 @@
                   "status": "in_progress",
                   "url": "https://verify.bitocard.com/s#t=bkh_3f9a1c2e",
                   "reason": null,
-                  "started_at": "2026-10-06T10:00:00.000Z"
+                  "started_at": "2026-10-06T10:00:00.000Z",
+                  "account_type": "individual",
+                  "paused_for_kyb": false,
+                  "business_check": null,
+                  "business_url": null
                 }
               }
             }
@@ -22279,6 +22287,142 @@
           }
         ],
         "summary": "Start the identity check",
+        "tags": [
+          "Account"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": []
+      }
+    },
+    "/v1/account/verification/business": {
+      "post": {
+        "description": "Business owner only, for a business account whose owner’s identity is verified: the registered business and its documents (KYB) on BitoCard Verify. Returns the link as `business_url`; an unfinished check continues.",
+        "operationId": "ResellerVerificationController_startBusiness",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The check, with the business check started (or continued) and its link as `business_url`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResellerVerification"
+                },
+                "example": {
+                  "object": "reseller_verification",
+                  "provider": "bitocard",
+                  "kind": "kyb",
+                  "business_type": "unregistered",
+                  "kyb_verified": false,
+                  "reseller_status": "pending",
+                  "verified": true,
+                  "verified_at": "2026-10-02T14:05:00.000Z",
+                  "status": "approved",
+                  "url": null,
+                  "reason": null,
+                  "started_at": "2026-10-02T13:50:00.000Z",
+                  "account_type": "business",
+                  "paused_for_kyb": true,
+                  "business_check": {
+                    "status": "in_progress",
+                    "reason": null,
+                    "started_at": "2026-11-22T10:00:00.000Z",
+                    "decided_at": null
+                  },
+                  "business_url": "https://verify.bitocard.com/s#t=bkh_9c2e7a1f"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start the business check",
         "tags": [
           "Account"
         ],
@@ -36567,7 +36711,11 @@
           "status",
           "url",
           "reason",
-          "started_at"
+          "started_at",
+          "account_type",
+          "paused_for_kyb",
+          "business_check",
+          "business_url"
         ],
         "additionalProperties": false,
         "properties": {
@@ -36669,6 +36817,84 @@
             ],
             "description": "When the latest check started; null if none has.",
             "format": "date-time"
+          },
+          "account_type": {
+            "type": "string",
+            "description": "How the reseller sells: `individual` (the owner’s identity) or `business` (also KYB of the registered business).",
+            "enum": [
+              "individual",
+              "business"
+            ]
+          },
+          "paused_for_kyb": {
+            "type": "boolean",
+            "description": "A live account switched to business, paused until its business passes KYB."
+          },
+          "business_check": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "A business account’s KYB after the owner’s identity was approved: the registered business and its documents only.",
+                "required": [
+                  "status",
+                  "reason",
+                  "started_at",
+                  "decided_at"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "`not_started`, `in_progress` (waiting for the person to finish at `url`), `in_review` (BitoCard is reviewing it), `approved`, `declined` or `expired` (not finished within 7 days).",
+                    "enum": [
+                      "not_started",
+                      "in_progress",
+                      "in_review",
+                      "approved",
+                      "declined",
+                      "expired"
+                    ]
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Why the check did not pass: `name_mismatch` (the record has a different name), `bvn_consent_declined`, `not_verified` (declined for another reason) or `expired`. Null otherwise.",
+                    "enum": [
+                      "name_mismatch",
+                      "bvn_consent_declined",
+                      "not_verified",
+                      "expired",
+                      null
+                    ]
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "description": "When it started.",
+                    "format": "date-time"
+                  },
+                  "decided_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "When it was decided.",
+                    "format": "date-time"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "business_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the owner continues the business check, right after starting it; null otherwise."
           }
         }
       },

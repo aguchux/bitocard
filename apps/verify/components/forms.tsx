@@ -93,7 +93,10 @@ const businessTypes: Array<{ value: KycBusinessType; title: string; text: string
 /** KYB: registered or not; a registered business gives its name, number and address (its documents follow). */
 export function BusinessStep({ kase, onSaved }: { kase: KycCase; onSaved: (kase: KycCase) => void }) {
   const id = useId();
-  const [type, setType] = useState<KycBusinessType | null>(kase.business_type);
+  // A reseller's check follows its account type: only that kind of business is offered.
+  const offered = businessTypes.filter(option => !kase.business_types?.length || kase.business_types.includes(option.value));
+  const only = offered.length === 1 ? offered[0].value : null;
+  const [type, setType] = useState<KycBusinessType | null>(kase.business_type ?? only);
   const [name, setName] = useState(kase.business?.registered_name ?? "");
   const [number, setNumber] = useState(kase.business?.registration_number ?? "");
   const [address, setAddress] = useState(kase.business?.business_address ?? "");
@@ -111,9 +114,10 @@ export function BusinessStep({ kase, onSaved }: { kase: KycCase; onSaved: (kase:
         void save(registered ? { business_type: type, registered_name: name.trim(), registration_number: number.trim(), business_address: address.trim() } : { business_type: type });
       }}
     >
-      <fieldset className="grid gap-3">
+      {only === "registered" ? <p className="text-sm text-muted">Your account sells as a registered business. Give its details exactly as on its registration certificate.</p> : null}
+      <fieldset className={only ? "hidden" : "grid gap-3"}>
         <legend className="mb-2 text-sm font-semibold">Is your business registered?</legend>
-        {businessTypes.map(option => (
+        {offered.map(option => (
           <label key={option.value} className={`flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-4 ${type === option.value ? "border-brand-500 ring-2 ring-brand-100" : "border-line"}`}>
             <input type="radio" name="business_type" value={option.value} checked={type === option.value} onChange={() => setType(option.value)} className="mt-1 size-5 shrink-0 accent-brand-500" />
             <span>

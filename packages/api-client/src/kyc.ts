@@ -70,6 +70,10 @@ export type KycCase = {
   status: KycStatus;
   consented: boolean;
   business_type: KycBusinessType | null;
+  /** What this check may be: a reseller's follows its account type (individual: unregistered; business: registered). Missing on older APIs. */
+  business_types?: KycBusinessType[];
+  /** The owner's identity was approved before: only the business is asked. */
+  owner_verified?: boolean;
   business: KycBusiness | null;
   identity: { id_type: string; id_number_hint: string; full_name: string; date_of_birth: string } | null;
   id_types: KycIdType[];
@@ -105,6 +109,8 @@ export type KycReviewCase = {
   store: { id: string; name: string; subdomain: string } | null;
   reseller: { id: string; name: string };
   business_type: KycBusinessType | null;
+  /** The owner's identity was approved before: this is a business account's check of its business only. */
+  owner_verified?: boolean;
   business: KycBusiness | null;
   identity: { id_type: string; id_type_label: string; id_number: string; full_name: string; date_of_birth: string } | null;
   documents: KycReviewDocument[];

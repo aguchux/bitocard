@@ -47,6 +47,20 @@ export class AdminResellersService {
       verified_name: reseller.verifiedName,
       /** The mobile number the owner gave when opening the account (E.164), never confirmed. Null when none was given. */
       signup_phone: reseller.signupPhone,
+      /** Sells as an `individual` or a `business`, with the profile the reseller keeps (never checked). */
+      account_type: reseller.accountType === 'business' ? ('business' as const) : ('individual' as const),
+      paused_for_kyb: reseller.kybPausedAt !== null,
+      business_profile: {
+        legal_name: reseller.legalName,
+        address: [reseller.addressLine, reseller.city, reseller.state, reseller.postalCode].filter(Boolean).join(', ') || null,
+        phone: reseller.businessPhone,
+        description: reseller.businessDescription,
+      },
+      /** The registered business as KYB verified it; null until then. */
+      verified_business:
+        reseller.businessType === 'registered' && reseller.kybVerifiedAt
+          ? { registered_name: reseller.registeredName, registration_number: reseller.registrationNumber, business_address: reseller.businessAddress, verified_at: reseller.kybVerifiedAt.toISOString() }
+          : null,
       /** An admin marked it a test account (activated without the identity check, never moving money out): who, when and why. */
       test_account: reseller.testAccountAt
         ? { marked_at: reseller.testAccountAt.toISOString(), marked_by: markedBy ? { id: markedBy.id, name: markedBy.name } : null, reason: reseller.testAccountReason }

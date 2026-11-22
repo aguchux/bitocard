@@ -3,7 +3,7 @@ import { productCategories } from '../../countries/countries.service.js';
 import { bitocardSwitchKeys, optionDefinitions, switchDefinitions } from '../../settings/settings.service.js';
 import { staffRoles } from '../../team/team.service.js';
 import { eventDocs } from '../../webhooks/openapi.js';
-import { array, bool, constant, int, list, nullableStr, nullableTime, objectSchema, oneOf, ref, shape, str, time, uuid } from '../schema.js';
+import { array, bool, constant, int, list, nullable, nullableStr, nullableTime, objectSchema, oneOf, ref, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 const resellerStatus = oneOf('`pending` until the owner passes the identity check and BitoCard activates the account, then `active`; `suspended` if BitoCard has suspended it.', ['pending', 'active', 'suspended']);
@@ -139,6 +139,15 @@ export const accountDocs: DocsArea = {
         url: nullableStr('The page where the owner photographs an ID document and takes a selfie, while the check is `in_progress`; otherwise null.'),
         reason: checkReason,
         started_at: nullableTime('When the latest check started; null if none has.'),
+        account_type: oneOf('How the reseller sells: `individual` (the owner’s identity) or `business` (also KYB of the registered business).', ['individual', 'business']),
+        paused_for_kyb: bool('A live account switched to business, paused until its business passes KYB.'),
+        business_check: nullable(
+          shape(
+            { status: checkStatus, reason: checkReason, started_at: time('When it started.'), decided_at: nullableTime('When it was decided.') },
+            'A business account’s KYB after the owner’s identity was approved: the registered business and its documents only.',
+          ),
+        ),
+        business_url: nullableStr('Where the owner continues the business check, right after starting it; null otherwise.'),
       },
       'The business owner’s identity check (ID document and face check), needed before the account goes live.',
     ),
@@ -228,13 +237,36 @@ export const accountDocs: DocsArea = {
       status: 200,
       description: 'The owner’s identity check.',
       schema: 'ResellerVerification',
-      example: { object: 'reseller_verification', provider: 'bitocard', kind: 'kyb', business_type: 'registered', kyb_verified: true, reseller_status: 'active', verified: true, verified_at: '2026-10-02T14:05:00.000Z', status: 'approved', url: null, reason: null, started_at: '2026-10-02T13:50:00.000Z' },
+      example: { object: 'reseller_verification', provider: 'bitocard', kind: 'kyb', business_type: 'registered', kyb_verified: true, reseller_status: 'active', verified: true, verified_at: '2026-10-02T14:05:00.000Z', status: 'approved', url: null, reason: null, started_at: '2026-10-02T13:50:00.000Z', account_type: 'business', paused_for_kyb: false, business_check: null, business_url: null },
     },
     'POST /v1/account/verification': {
       status: 201,
       description: 'The check, with the page to send the owner to. An unfinished check started in the last day is returned again instead of a new one.',
       schema: 'ResellerVerification',
-      example: { object: 'reseller_verification', provider: 'bitocard', kind: 'kyb', business_type: null, kyb_verified: false, reseller_status: 'pending', verified: false, verified_at: null, status: 'in_progress', url: 'https://verify.bitocard.com/s#t=bkh_3f9a1c2e', reason: null, started_at: '2026-10-06T10:00:00.000Z' },
+      example: { object: 'reseller_verification', provider: 'bitocard', kind: 'kyb', business_type: null, kyb_verified: false, reseller_status: 'pending', verified: false, verified_at: null, status: 'in_progress', url: 'https://verify.bitocard.com/s#t=bkh_3f9a1c2e', reason: null, started_at: '2026-10-06T10:00:00.000Z', account_type: 'individual', paused_for_kyb: false, business_check: null, business_url: null },
+    },
+    'POST /v1/account/verification/business': {
+      status: 201,
+      description: 'The check, with the business check started (or continued) and its link as `business_url`.',
+      schema: 'ResellerVerification',
+      example: {
+        object: 'reseller_verification',
+        provider: 'bitocard',
+        kind: 'kyb',
+        business_type: 'unregistered',
+        kyb_verified: false,
+        reseller_status: 'pending',
+        verified: true,
+        verified_at: '2026-10-02T14:05:00.000Z',
+        status: 'approved',
+        url: null,
+        reason: null,
+        started_at: '2026-10-02T13:50:00.000Z',
+        account_type: 'business',
+        paused_for_kyb: true,
+        business_check: { status: 'in_progress', reason: null, started_at: '2026-11-22T10:00:00.000Z', decided_at: null },
+        business_url: 'https://verify.bitocard.com/s#t=bkh_9c2e7a1f',
+      },
     },
     'GET /v1/account/bvn': {
       status: 200,
