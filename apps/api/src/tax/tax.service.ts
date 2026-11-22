@@ -51,6 +51,8 @@ export class TaxService {
    */
   async calculate(countryCode: string, amount: bigint, mode: LedgerMode) {
     const rate = await this.prisma.taxRate.findUnique({ where: { countryCode } });
+    // The sandbox prices without tax where none is set, so testing never waits on tax advice.
+    if (!rate && mode === 'test') return computeTax({ name: 'Tax', rateBps: 0, pricesIncludeTax: false }, amount);
     if (!rate || (mode === 'live' && !rate.confirmed)) {
       const country = await this.prisma.country.findUnique({ where: { code: countryCode }, select: { name: true } });
       const name = country?.name ?? countryCode;

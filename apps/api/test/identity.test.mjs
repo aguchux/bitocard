@@ -75,7 +75,7 @@ describe('reseller identity checks', () => {
     assert.equal(didit.state.created.at(-1).workflow_id, 'wf-test');
   });
 
-  test('an approved check verifies the owner and takes the account live, once', async () => {
+  test('an approved check verifies the owner once; the account stays pending until an admin activates it', async () => {
     const { browser, resellerId, email: owner } = await resellerClient(server);
     const started = await startReseller(browser);
     const session = sessionOf(started.url);
@@ -88,12 +88,19 @@ describe('reseller identity checks', () => {
     await finishReseller(session, 'Approved');
     await finishReseller(session, 'Approved');
     const status = (await browser.get('/v1/account/verification')).json;
-    assert.deepEqual([status.status, status.verified, status.reseller_status], ['approved', true, 'active']);
+    assert.deepEqual([status.status, status.verified, status.reseller_status], ['approved', true, 'pending'], 'passing the check never takes the account live');
     const reseller = await prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     assert.equal(reseller.verifiedName, 'Ada Obi');
     assert.match(email.outbox.filter(m => m.to === owner).at(-1).subject, /identity is verified/);
     assert.equal((await browser.post('/v1/account/verification', { consent: true })).json.error.code, 'already_verified');
-    assert.equal((await browser.post('/v1/api-keys', { name: 'Live', mode: 'live' })).status, 201, 'live keys once verified');
+    assert.notEqual((await browser.post('/v1/api-keys', { name: 'Live', mode: 'live' })).status, 201, 'no live keys before activation');
+    assert.equal((await browser.post('/v1/api-keys', { name: 'Sandbox', mode: 'test' })).status, 201, 'the sandbox works meanwhile');
+    const notices = (await admin.get('/v1/admin/notifications')).json.data;
+    assert.ok(notices.some(item => item.type === 'admin.reseller.ready_to_activate' && item.link === `/resellers/${resellerId}`), 'admins are told it is ready to activate');
+    const activated = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' });
+    assert.equal(activated.json.status, 'active');
+    assert.equal((await browser.get('/v1/account/verification')).json.reseller_status, 'active');
+    assert.equal((await browser.post('/v1/api-keys', { name: 'Live', mode: 'live' })).status, 201, 'live keys once activated');
 
     const stored = await prisma.identityVerification.findFirstOrThrow({ where: { resellerId } });
     assert.ok(!JSON.stringify(stored).includes('A12345678'), 'document numbers are never kept');
@@ -110,18 +117,11 @@ describe('reseller identity checks', () => {
     assert.deepEqual(await (await diditWebhook({ webhook_type: 'data.updated', session_id: 'x' })).json(), { received: true });
   });
 
-  test('with manual approval switched on, a verified reseller waits for an admin', async () => {
-    await admin.put('/v1/admin/switches/manual_reseller_approval', { country_code: 'GH', enabled: true });
-    try {
-      const { browser, resellerId } = await resellerClient(server, { country: 'GH' });
-      await finishReseller(sessionOf((await startReseller(browser)).url), 'Approved');
-      const status = (await browser.get('/v1/account/verification')).json;
-      assert.deepEqual([status.verified, status.reseller_status], [true, 'pending']);
-      const activated = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' });
-      assert.equal(activated.json.status, 'active');
-    } finally {
-      await admin.put('/v1/admin/switches/manual_reseller_approval', { country_code: 'GH', enabled: null });
-    }
+  test('an admin cannot activate a reseller whose identity is not verified', async () => {
+    const { resellerId } = await resellerClient(server, { country: 'GH' });
+    const refused = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' });
+    assert.notEqual(refused.status, 200, JSON.stringify(refused.json));
+    assert.equal((await prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } })).status, 'pending');
   });
 
   test('declined checks can be retried; checks in review are decided by an admin', async () => {
@@ -149,7 +149,7 @@ describe('reseller identity checks', () => {
     const decided = await admin.post(`/v1/admin/verifications/${queue[0].id}/decide`, { decision: 'approved', reason: 'Document checked in the Didit console', verified_name: 'Ada Obi' });
     assert.equal(decided.json.status, 'approved');
     status = (await browser.get('/v1/account/verification')).json;
-    assert.deepEqual([status.status, status.reseller_status], ['approved', 'active']);
+    assert.deepEqual([status.status, status.reseller_status], ['approved', 'pending'], 'approving the check is not activating the account');
     assert.equal((await admin.post(`/v1/admin/verifications/${queue[0].id}/decide`, { decision: 'declined', reason: 'Changed my mind' })).json.error.code, 'verification_not_in_review');
   });
 

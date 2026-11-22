@@ -293,7 +293,7 @@ Rules resolve like feature switches: **reseller, then country, then global**. At
 
 ### Identity checks (Decided, starting values admins can change)
 
-- A reseller whose owner passes Didit goes live automatically; admins can require manual approval per country or globally (`manual_reseller_approval`). Admins can never activate an unverified reseller.
+- A reseller whose owner passes the identity check (KYC, and KYB for a business) is verified but stays pending: an admin activates every reseller before it can sell live (22 November 2026, the owner's decision; admins are told, `admin.reseller.ready_to_activate`). Admins can never activate an unverified reseller. The sandbox needs neither: it shows and simulates the whole catalogue.
 - Customers of resellers' own systems are the reseller's responsibility; BitoCard offers an optional customer check API (BVN in Nigeria, Didit elsewhere). Hosted storefronts enforce it where the category and country require it.
 - A BVN check passes only when the name on the BVN record matches the customer's first and last names.
 - Live payout accounts must be in the verified owner's or the business's name.

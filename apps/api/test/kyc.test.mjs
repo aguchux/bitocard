@@ -131,6 +131,8 @@ async function verifiedReseller(type) {
   const done = await complete(person, { kyb: type });
   const approved = await admin.post(`/v1/admin/kyc/cases/${done.id}/approve`, { verified_name: 'Ada Obi' });
   assert.equal(approved.status, 200, JSON.stringify(approved.json));
+  // Approving the KYB verifies the business; an admin then activates it for live selling.
+  assert.equal((await admin.patch(`/v1/admin/resellers/${reseller.resellerId}`, { status: 'active' })).status, 200);
   const store = await reseller.browser.post('/v1/stores', { name: `Ada ${type}`, subdomain: `ada${type.slice(0, 3)}${Date.now().toString(36)}` });
   assert.equal((await reseller.browser.post(`/v1/stores/${store.json.id}/publish`)).status, 200);
   assert.equal((await reseller.browser.patch(`/v1/stores/${store.json.id}`, { checkout_mode: 'live' })).status, 200);
@@ -246,7 +248,7 @@ describe('a registered business’s KYB', () => {
     const approved = await admin.post(`/v1/admin/kyc/cases/${listed.id}/approve`, { verified_name: 'Ada Obi' });
     assert.equal(approved.status, 200, JSON.stringify(approved.json));
     const after = await prisma.reseller.findUniqueOrThrow({ where: { id: reseller.resellerId } });
-    assert.deepEqual([after.businessType, after.registeredName, after.registrationNumber, Boolean(after.kybVerifiedAt), after.verifiedName, after.status], ['registered', 'Ada Digital Ltd', 'RC123456', true, 'Ada Obi', 'active']);
+    assert.deepEqual([after.businessType, after.registeredName, after.registrationNumber, Boolean(after.kybVerifiedAt), after.verifiedName, after.status], ['registered', 'Ada Digital Ltd', 'RC123456', true, 'Ada Obi', 'pending'], 'verified, waiting for an admin to activate it');
     const status = (await reseller.browser.get('/v1/account/verification')).json;
     assert.deepEqual([status.verified, status.kyb_verified, status.business_type], [true, true, 'registered']);
     assert.equal((await admin.post(`/v1/admin/kyc/cases/${listed.id}/approve`, { verified_name: 'Ada Obi' })).json.error.code, 'case_not_reviewable', 'decided once');

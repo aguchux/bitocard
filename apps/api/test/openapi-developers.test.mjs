@@ -136,7 +136,7 @@ describe('account endpoints', () => {
     });
     assert.equal(signed.status, 200);
     const verified = await expect('GET /v1/account/verification', 200, browser.get('/v1/account/verification'));
-    assert.deepEqual([verified.status, verified.verified, verified.reseller_status], ['approved', true, 'active']);
+    assert.deepEqual([verified.status, verified.verified, verified.reseller_status], ['approved', true, 'pending']);
 
     await expect('GET /v1/account/bvn', 200, browser.get('/v1/account/bvn'));
     flutterwave.state.bvns['22222222222'] = 'ADA OBI';
@@ -148,7 +148,7 @@ describe('account endpoints', () => {
     assert.equal((await expect('GET /v1/account/bvn', 200, browser.get('/v1/account/bvn'))).verified, true);
 
     const account = await expect('GET /v1/account', 200, browser.get('/v1/account'));
-    assert.equal(account.reseller.status, 'active');
+    assert.equal(account.reseller.status, 'pending', 'an admin activates verified resellers');
   });
 
   test('countries and settings match their documented responses', async () => {

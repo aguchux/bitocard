@@ -7,7 +7,7 @@ import { houseStoreId } from '../checkout/house-ids.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { FxService } from '../fx/fx.service.js';
-import { type Brand, type LedgerMode, Prisma, type Product, type ProductCategory } from '../generated/prisma/client.js';
+import { type Brand, type LedgerMode, Prisma, type Product, ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -223,13 +223,17 @@ export class StorefrontService {
     // A reseller's store sells only what its template allows: its categories, or its one product.
     const template = store ? templateFor(store.template) : null;
     const allowed = template?.categories ? new Set(template.categories) : null;
-    const categories = new Set(enabled.map(row => row.category).filter(category => !allowed || allowed.has(category)));
-    const worldwide = [...categories].filter(category => worldwideCategories.has(category));
-    const fromBitocard: Prisma.ProductWhereInput = { supplierProducts: { some: { available: true, supplier: { enabled: true } } } };
     // A market's own country store is BitoCard's own retail arm (never a reseller's), so it shares root's catalogue:
     // only BitoCard's suppliers and the global admin-listed set, never a reseller's own offers or `reseller_listings`
     // (nobody can ever populate those for a house account — there is no SHQ dashboard behind one).
     const ownStore = store && !store.house ? store : null;
+    // A reseller's sandbox store shows everything they listed that BitoCard has, switched on for live selling or not:
+    // nothing it sells reaches a supplier (orders are simulated), so the whole catalogue can be tried before going live.
+    const sandbox = ownStore?.mode === 'test';
+    const onSale = sandbox ? Object.values(ProductCategory) : enabled.map(row => row.category);
+    const categories = new Set(onSale.filter(category => !allowed || allowed.has(category)));
+    const worldwide = [...categories].filter(category => worldwideCategories.has(category));
+    const fromBitocard: Prisma.ProductWhereInput = { supplierProducts: { some: sandbox ? { available: true } : { available: true, supplier: { enabled: true } } } };
     return {
       categories,
       where: {
@@ -246,7 +250,11 @@ export class StorefrontService {
         // An empty OR would match everything (Prisma), so a store with none of its categories on sale (an RDP shop
         // before RDP opens) matches nothing.
         ...(() => {
-          const open: Prisma.ProductWhereInput[] = [...enabled.filter(row => categories.has(row.category)).map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])];
+          const open: Prisma.ProductWhereInput[] = sandbox
+            ? categories.size
+              ? [{ category: { in: [...categories] } }]
+              : []
+            : [...enabled.filter(row => categories.has(row.category)).map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])];
           return open.length ? { OR: open } : { id: { in: [] } };
         })(),
       },

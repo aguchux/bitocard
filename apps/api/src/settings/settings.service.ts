@@ -159,10 +159,6 @@ export const switchDefinitions = {
     description:
       "bitocard.com asks shoppers to install it as an app (home screen, full screen), on bitocard.com, for shoppers in this market: at most three times, on separate visits at least an hour apart, never once installed. Never on resellers' stores. Off: no prompt, and the browser's own install bar is held back too.",
   },
-  manual_reseller_approval: {
-    scopes: ['global', 'country'],
-    description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
-  },
   classifieds: {
     scopes: ['global', 'country'],
     description: "Udozo's marketplace in this market: browsing at udozo.com/<country>, posting and chatting. Off until the marketplace terms are cleared there.",

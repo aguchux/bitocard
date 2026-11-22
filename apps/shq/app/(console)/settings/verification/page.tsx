@@ -37,7 +37,7 @@ function Outcome({ check }: { check: Verification }) {
         {check.reseller_status === "active"
           ? "Your account is active."
           : check.reseller_status === "pending"
-            ? "BitoCard is reviewing your account before it goes live. We will email you."
+            ? "BitoCard is reviewing your account and will activate it for live selling. We will email you. Meanwhile your sandbox has the whole catalogue to test."
             : "Your account is suspended. Contact support."}
       </Notice>
     );

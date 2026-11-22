@@ -12,6 +12,7 @@ import {
   type PricingRule,
   type Product,
   type ProductCategory,
+  ProductCategory as ProductCategoryValues,
   type ResellerMarkup,
   type ResellerOffer,
   type Supplier,
@@ -49,6 +50,14 @@ export type OwnOffer = ResellerOffer & { connection: { routing: ConnectionRoutin
 export type PricedOffer = Pick<SupplierProduct, 'id' | 'supplierCode' | 'costCurrency' | 'meta'>;
 export type ProductWithOffers = Product & { supplierProducts: Offer[] };
 
+/** Every category, enabled: what the sandbox sells. A market's own rows keep their tax and verification flags. */
+export function sandboxCategories(countryCode: string, rows: CountryCategory[]): CountryCategory[] {
+  return Object.values(ProductCategoryValues).map(category => {
+    const row = rows.find(r => r.category === category);
+    return { countryCode, category, customerVerification: row?.customerVerification ?? false, taxable: row?.taxable ?? false, enabled: true };
+  });
+}
+
 /** Everything needed to price products for one reseller, loaded once per request. */
 export type PricingContext = {
   resellerId: string;
@@ -61,6 +70,11 @@ export type PricingContext = {
   rules: PricingRule[];
   /** supplierCode:category pairs switched on in the reseller market. */
   markets: Set<string>;
+  /**
+   * The sandbox: every product BitoCard has from its suppliers can be quoted and ordered (simulated), whatever is
+   * switched on for live selling in the reseller's market, so resellers can test the whole catalogue before going live.
+   */
+  sandbox: boolean;
   rates: Map<string, { pay: Decimal; receive: Decimal }>;
   planCode: string;
   /** BitoCard's fee rules for own-supplier orders. */
@@ -182,16 +196,19 @@ export class PricingService {
     });
     const ownByProduct = new Map<string, OwnOffer[]>();
     for (const offer of own) ownByProduct.set(offer.productId, [...(ownByProduct.get(offer.productId) ?? []), offer]);
+    const sandbox = mode === 'test';
     return {
       resellerId,
       mode,
-      country: reseller.countryRef,
+      // The sandbox sells every category; tax flags stay the market's own.
+      country: sandbox ? { ...reseller.countryRef, categories: sandboxCategories(reseller.countryRef.code, reseller.countryRef.categories) } : reseller.countryRef,
       currency: reseller.countryRef.currency,
       international: planIncludes(reseller, 'international_selling'),
       capBps: reseller.countryRef.markupCapPercent * 100,
       markups: await this.prisma.resellerMarkup.findMany({ where: { resellerId } }),
       rules: await this.prisma.pricingRule.findMany(),
       markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
+      sandbox,
       rates: new Map(),
       planCode: reseller.planCode,
       feeRules: await this.prisma.feeRule.findMany({ where: { kind: 'supplier_order' } }),
@@ -295,8 +312,9 @@ export class PricingService {
       offer =>
         !exclude.has(offer.supplierCode) &&
         offer.available &&
-        offer.supplier.enabled &&
-        (offer.supplierCode === stockSupplier || ctx.markets.has(`${offer.supplierCode}:${product.category}`)) &&
+        // The sandbox never calls a supplier, so it offers every synced offer, switched on for live or not.
+        (ctx.sandbox || offer.supplier.enabled) &&
+        (ctx.sandbox || offer.supplierCode === stockSupplier || ctx.markets.has(`${offer.supplierCode}:${product.category}`)) &&
         this.servesHere(ctx, product, offer.supplierCode) &&
         (ctx.mode === 'test' || this.adapters.get(offer.supplierCode).configured()),
     );
@@ -546,6 +564,8 @@ export class PricingService {
       markups: [],
       rules: rules ?? (await this.prisma.pricingRule.findMany()),
       markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
+      // Admin previews show what live selling would do.
+      sandbox: false,
       rates: new Map(),
       planCode: 'standard',
       feeRules: [],

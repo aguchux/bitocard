@@ -12,7 +12,6 @@ import { resellerVerificationEmail } from '../notifications/templates.js';
 import { PaymentProviders } from '../payments/payment-providers.js';
 import { resellerNotVerified, testModeOnly } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
-import { SettingsService } from '../settings/settings.service.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { DiditProvider } from './didit.provider.js';
 import { type CheckResult, namesMatch } from './providers.js';
@@ -121,7 +120,6 @@ export class IdentityService {
     private readonly integrations: IntegrationsService,
     private readonly prisma: PrismaService,
     private readonly providers: PaymentProviders,
-    private readonly settings: SettingsService,
     private readonly events: EventsService,
     private readonly audit: AuditService,
     private readonly email: EmailService,
@@ -481,7 +479,6 @@ export class IdentityService {
     }
     const ownerBvn = record.subject === 'reseller' && record.method === 'bvn';
     const ownerDocument = record.subject === 'reseller' && record.method === 'document';
-    const autoApprove = ownerDocument && status === 'approved' && !(await this.settings.isOn('manual_reseller_approval', record.resellerId));
     const changed = await this.prisma.$transaction(async tx => {
       const claimed = await tx.identityVerification.updateMany({
         where: { id: record.id, status: { in: openStatuses } },
@@ -501,7 +498,6 @@ export class IdentityService {
       if (ownerBvn && status === 'approved') await tx.reseller.update({ where: { id: record.resellerId }, data: { bvnVerifiedAt: now } });
       if (ownerDocument && status === 'approved') {
         await tx.reseller.update({ where: { id: record.resellerId }, data: { verifiedAt: now, verifiedName } });
-        if (autoApprove) await tx.reseller.updateMany({ where: { id: record.resellerId, status: 'pending' }, data: { status: 'active' } });
       }
       // Afrippa's traders' checks are Afrippa's: no reseller webhook event is written for them.
       if (record.subject === 'customer' && (status === 'approved' || status === 'declined') && kycPlatform(record.resellerId) === 'bitocard') {
@@ -524,7 +520,7 @@ export class IdentityService {
     if (record.subject === 'reseller') {
       const what = ownerBvn ? 'BVN check' : 'identity check';
       const outcomes: Record<string, { title: string; body: string }> = {
-        approved: { title: `Your ${what} was approved`, body: ownerBvn ? 'You can open your reserved bank accounts now.' : autoApprove ? 'Your account is live.' : 'BitoCard will activate your account shortly.' },
+        approved: { title: `Your ${what} was approved`, body: ownerBvn ? 'You can open your reserved bank accounts now.' : 'BitoCard will review your account and activate it for live selling. Your sandbox works meanwhile.' },
         declined: { title: `Your ${what} was declined`, body: reason === 'name_mismatch' ? 'The name on the record did not match your verified name.' : 'Start a new check from the verification page.' },
         in_review: { title: `Your ${what} is being reviewed`, body: 'BitoCard is reviewing it; we will tell you the outcome.' },
         expired:
@@ -544,6 +540,17 @@ export class IdentityService {
         });
       }
     }
+    if (ownerDocument && status === 'approved') {
+      const reseller = await this.prisma.reseller.findUnique({ where: { id: record.resellerId }, select: { status: true, name: true } });
+      if (reseller?.status === 'pending') {
+        await this.inbox.admins('admin.reseller.ready_to_activate', {
+          subject: record.resellerId,
+          title: 'A verified reseller is waiting to go live',
+          body: `${reseller.name} passed the identity check. Review the account and activate it to let it sell live.`,
+          link: `/resellers/${record.resellerId}`,
+        });
+      }
+    }
     if (status === 'in_review' && record.mode === 'live') {
       await this.inbox.admins('admin.verification.review', {
         subject: record.id,
@@ -556,7 +563,7 @@ export class IdentityService {
       const owner = await this.prisma.resellerMember.findFirst({ where: { resellerId: record.resellerId, role: 'owner' }, include: { user: true } });
       if (owner?.user.email) {
         await this.email
-          .send(resellerVerificationEmail(owner.user.email, status, autoApprove, `${this.config.DASHBOARD_URL}/verification`))
+          .send(resellerVerificationEmail(owner.user.email, status, false, `${this.config.DASHBOARD_URL}/verification`))
           .catch(error => this.logger.warn({ err: error }, 'Could not send the email'));
       }
     }
