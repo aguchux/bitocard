@@ -507,7 +507,7 @@ export type IntegrationSource = 'admin' | 'environment' | 'default' | 'unset';
 export type IntegrationField = {
   key: string;
   label: string;
-  kind: 'text' | 'url' | 'email' | 'number' | 'flag';
+  kind: 'text' | 'url' | 'email' | 'number' | 'flag' | 'data_plans';
   /** Secrets are write-only: `value` is always null and `hint` shows the last four characters. */
   secret: boolean;
   required: boolean;

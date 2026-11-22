@@ -14,6 +14,7 @@ import {
   useUpdateIntegrationMutation,
 } from "@bitocard/api-client/admin";
 import { ResellerAvailability } from "@/components/reseller-availability";
+import { DataPlansField } from "@/components/data-plans-field";
 
 const sourceLabels: Record<IntegrationSource, string> = { admin: "Set here", environment: "From .env", default: "Default", unset: "Not set" };
 const statusLabels: Record<Integration["status"], string> = { connected: "Connected", incomplete: "Incomplete", not_connected: "Not connected" };
@@ -21,6 +22,10 @@ const statusLabels: Record<Integration["status"], string> = { connected: "Connec
 function displayValue(field: IntegrationField) {
   if (field.secret) return field.hint ? `Set (${field.hint})` : "Not set";
   if (field.kind === "flag") return field.value ? "On" : "Off";
+  if (field.kind === "data_plans") {
+    const count = String(field.value ?? "").split(/[;\n]/).filter(line => line.trim()).length;
+    return count ? `${count} data plan${count === 1 ? "" : "s"}` : "None yet";
+  }
   return field.value === null ? "Not set" : String(field.value);
 }
 
@@ -221,6 +226,11 @@ function changesOf(integration: Integration, draft: Draft) {
       continue;
     }
     const text = String(entry.value).trim();
+    // Every data plan removed: clear the setting.
+    if (field.kind === "data_plans" && text === "" && field.source === "admin") {
+      values[field.key] = null;
+      continue;
+    }
     if (field.secret ? text !== "" : text !== "" && text !== String(field.value ?? "")) values[field.key] = field.kind === "number" ? Number(text) : text;
   }
   return values;
@@ -231,6 +241,7 @@ function EditDialog({ integration, onClose }: { integration: Integration; onClos
   const [update] = useUpdateIntegrationMutation();
   const [draft, setDraft] = useState<Draft>(() => initialDraft(integration));
   const [code, setCode] = useState("");
+  const [problems, setProblems] = useState<Record<string, string | null>>({});
   const set = (key: string, change: Partial<Draft[string]>) => setDraft(current => ({ ...current, [key]: { ...current[key], ...change } }));
 
   return (
@@ -242,6 +253,8 @@ function EditDialog({ integration, onClose }: { integration: Integration; onClos
       confirmLabel="Save changes"
       requireReason={false}
       onConfirm={async () => {
+        const problem = Object.values(problems).find(Boolean);
+        if (problem) throw new Error(problem);
         const values = changesOf(integration, draft);
         if (Object.keys(values).length === 0) throw new Error("Nothing has changed.");
         if (!/^\d{6}$/.test(code)) throw new Error("Enter the 6-digit code from your authenticator app.");
@@ -262,6 +275,21 @@ function EditDialog({ integration, onClose }: { integration: Integration; onClos
                   {hint ? <p className="text-xs text-muted">{hint}</p> : null}
                 </div>
                 <Toggle label={field.label} checked={Boolean(entry.value)} disabled={entry.clear} onChange={checked => set(field.key, { value: checked })} />
+              </div>
+            ) : field.kind === "data_plans" ? (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm font-semibold text-ink">{field.label}</p>
+                  {hint ? <p className="text-xs text-muted">{hint}</p> : null}
+                </div>
+                <DataPlansField
+                  value={String(entry.value)}
+                  disabled={entry.clear}
+                  onChange={(text, problem) => {
+                    set(field.key, { value: text });
+                    setProblems(current => ({ ...current, [field.key]: problem }));
+                  }}
+                />
               </div>
             ) : (
               <Field label={field.label} htmlFor={inputId} hint={hint || undefined}>

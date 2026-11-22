@@ -16,7 +16,8 @@ import { supplierCredentialGroups, supplierCredentialKey } from './supplier-cred
  * (ALLOWED_ORIGINS, cookie settings, ADMIN_EMAIL_DOMAINS, ENCRYPTION_KEY, CRON_SECRET): a mistaken admin edit must
  * never be able to lock admins out or widen who can sign in.
  */
-export type IntegrationKind = 'text' | 'url' | 'email' | 'number' | 'flag';
+/** `data_plans`: Africa's Talking's bundles, one per line (`parseDataPlans`), edited in the admin app as rows. */
+export type IntegrationKind = 'text' | 'url' | 'email' | 'number' | 'flag' | 'data_plans';
 
 export type IntegrationField = {
   /** The environment variable it replaces (platform settings), or the supplier credential's name (`NEXWAY_API_KEY`). */
@@ -508,6 +509,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       }),
       field('AFRICAS_TALKING_DATA_PRODUCT', 'Mobile Data product', { required: false, help: 'The product name created in the dashboard (Mobile Data > Products). Data bundles are synced only once it is set, and Test connection then also checks the Mobile Data wallet.' }),
       field('AFRICAS_TALKING_DATA_PLANS', 'Data plans', {
+        kind: 'data_plans',
         required: false,
         help: 'Africa’s Talking’s API has no plan list (a send names only the size and validity), so copy the bundles from its dashboard or price list for each network. One per line or separated by semicolons: country, network, size, validity (Day, Week, BiWeek, Month or Quarterly), the price customers know it by, BitoCard’s cost, for example KE safaricom 1GB Month 299 250.',
       }),

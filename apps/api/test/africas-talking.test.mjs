@@ -3,7 +3,7 @@
 // status callback (token in its address, body never trusted), clear refusals failing the order, and Test connection.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, adminCode, client, resellerClient, startApp } from './helpers.mjs';
 import { fakeAfricasTalking } from './fakes.mjs';
 
 const { AfricasTalkingAdapter, parseAirtimeMarkets, parseAirtimeDiscounts, parseDataPlans, africasTalkingNotice, atAmount } = await import('../dist/suppliers/africas-talking.adapter.js');
@@ -242,6 +242,18 @@ describe('Africa’s Talking connection', () => {
     assert.deepEqual([tested.json.environment, tested.json.ok, tested.json.message], ['live', true, null]);
     const group = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'africas_talking');
     assert.deepEqual([group.section, group.adapter_ready ?? group.adapterReady ?? true], ['suppliers', true]);
+  });
+
+  test('data plans are refused on save while a line cannot be read, and the admin app sees them as rows', async () => {
+    const group = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'africas_talking');
+    assert.equal(group.fields.find(field => field.key === 'AFRICAS_TALKING_DATA_PLANS').kind, 'data_plans');
+    const refused = await admin.put('/v1/admin/integrations/africas_talking', { values: { AFRICAS_TALKING_DATA_PLANS: 'NG mtn 1GB Month 1000 900; NG glo 2GB' }, code: await adminCode(server, admin) });
+    assert.equal(refused.status, 400, JSON.stringify(refused.json));
+    assert.match(refused.json.error.message, /not understood: "NG glo 2GB"/);
+    const saved = await admin.put('/v1/admin/integrations/africas_talking', { values: { AFRICAS_TALKING_DATA_PLANS: 'NG mtn 1GB Month 1000 900; KE safaricom 1GB Month 299 250' }, code: await adminCode(server, admin) });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    // Back to the environment's plans the other tests use.
+    assert.equal((await admin.put('/v1/admin/integrations/africas_talking', { values: { AFRICAS_TALKING_DATA_PLANS: null }, code: await adminCode(server, admin) })).status, 200);
   });
 
   test('with a Mobile Data product set, Test connection also reads the Mobile Data wallet, and a refusal fails it', async () => {

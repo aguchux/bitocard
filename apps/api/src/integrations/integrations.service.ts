@@ -7,9 +7,17 @@ import { integrationFields, integrationKeys, isPlatformKey, ownerOf, sharedKeys 
 import type { Platform } from '../generated/prisma/client.js';
 import { parseXpub } from '../crypto/derive.js';
 import { supplierCredentialGroups, supplierCredentialKey } from './supplier-credentials.js';
+import { parseDataPlans } from '../suppliers/africas-talking.adapter.js';
 
 /** The validation rule for a setting: a platform setting's environment rule, or a supplier credential's kind. */
 export function schemaFor(key: string): z.ZodType | null {
+  // Every line must be a plan Africa's Talking can be sent: one not understood would silently never be synced.
+  if (integrationFields.get(key)?.kind === 'data_plans') {
+    return z.string().superRefine((value, context) => {
+      const { problems } = parseDataPlans(value);
+      if (problems.length) context.addIssue({ code: 'custom', message: `these plans are not understood: ${problems.join(', ')}` });
+    });
+  }
   if (isPlatformKey(key)) return configSchema.shape[key];
   const field = integrationFields.get(key);
   if (!field) return null;
