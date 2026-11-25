@@ -197,6 +197,12 @@ export class AdminSuppliersController {
   }
 
   @AdminRoles('operations', 'finance', 'support')
+  @Get('products/gift-card-countries')
+  giftCardCountries() {
+    return this.suppliers.giftCardCountries();
+  }
+
+  @AdminRoles('operations', 'finance', 'support')
   @Get('products')
   products(@Query() filter: ProductFilterDto) {
     return this.suppliers.products(filter);

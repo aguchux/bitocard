@@ -13,6 +13,7 @@ import {
   type ProductCategory,
   type SupplierOffer,
   useCountriesQuery,
+  useGiftCardCountriesQuery,
   useProductsInfiniteQuery,
   useSetProductListingMutation,
   useSuppliersQuery,
@@ -137,6 +138,8 @@ function Products() {
   const listedCount = products.data?.pages[0]?.listed ?? 0;
   const suppliers = useSuppliersQuery();
   const countries = useCountriesQuery();
+  const giftCardCountries = useGiftCardCountriesQuery(undefined, { skip: category !== "gift_cards" });
+  const countryOptions = category === "gift_cards" ? giftCardCountries.data?.data : countries.data?.data;
   const [updateProduct, productState] = useUpdateProductMutation();
   const rows = products.data?.pages.flatMap(page => page.data);
   const operator = can(admin, "operations");
@@ -164,13 +167,16 @@ function Products() {
               label="Country"
               value={country}
               onChange={setCountry}
-              options={[{ value: "", label: "All markets" }, ...(countries.data?.data.map(item => ({ value: item.code, label: item.name })) ?? [])]}
+              options={[{ value: "", label: category === "gift_cards" ? "All gift card countries" : "All markets" }, ...(countryOptions?.map(item => ({ value: item.code, label: item.name })) ?? [])]}
             />
             <FilterSelect
               id="category"
               label="Category"
               value={category}
-              onChange={value => setCategory(value as "" | ProductCategory)}
+              onChange={value => {
+                setCategory(value as "" | ProductCategory);
+                setCountry("");
+              }}
               options={[{ value: "", label: "All categories" }, ...productCategories.map(value => ({ value, label: categoryName(value) }))]}
             />
             <FilterSelect

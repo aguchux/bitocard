@@ -8,6 +8,7 @@ import { PricingService, worldwideCategories } from '../catalogue/pricing.servic
 import type { CatalogueItem, CatalogueScope, SupplierAdapter } from './adapter.js';
 import { stockSupplier } from './stock.adapter.js';
 import { StorefrontService } from '../storefront/storefront.service.js';
+import { productCountries } from '../catalogue/product-countries.js';
 import { SupplierAdapters } from './supplier-adapters.js';
 
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
@@ -437,6 +438,11 @@ export class SuppliersService {
       })),
       has_more: products.length > limit,
     };
+  }
+
+  async giftCardCountries() {
+    const rows = await this.prisma.product.groupBy({ by: ['country'], where: { category: 'gift_cards' } });
+    return { object: 'list' as const, data: productCountries(rows) };
   }
 
   async updateProduct(actorId: string | null, id: string, input: { active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }) {

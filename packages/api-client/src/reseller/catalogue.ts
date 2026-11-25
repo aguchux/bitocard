@@ -41,6 +41,7 @@ export type Product = {
 /** The catalogue pages on `next_cursor`: products that cannot be priced are left out, so the last item is not always the cursor. */
 export type ProductList = List<Product> & { next_cursor: string | null };
 export type ProductFilter = { category?: CatalogueCategory; country?: string; q?: string; listed?: boolean; limit?: number };
+export type ProductCountry = { code: string; name: string };
 
 export type QuoteStatus = 'open' | 'used' | 'expired';
 /** The recipient as checked: phone for airtime and data; account number, account name and details (such as the current package) for pay-TV and bills. */
@@ -154,6 +155,10 @@ export const resellerCatalogueApi = bitocardApi.injectEndpoints({
       query: ({ queryArg, pageParam }) => ({ url: '/v1/catalogue/products', params: params({ limit: 25, ...queryArg, starting_after: pageParam } satisfies ProductFilter & Page) }),
       providesTags: [{ type: 'Catalogue', id: 'LIST' }],
     }),
+    giftCardCountries: build.query<{ object: 'list'; data: ProductCountry[] }, void>({
+      query: () => '/v1/catalogue/gift-card-countries',
+      providesTags: [{ type: 'Catalogue', id: 'COUNTRIES' }],
+    }),
     catalogueProduct: build.query<Product, string>({
       query: id => `/v1/catalogue/products/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Catalogue', id }],
@@ -200,6 +205,7 @@ export const resellerCatalogueApi = bitocardApi.injectEndpoints({
 
 export const {
   useCatalogueProductsInfiniteQuery,
+  useGiftCardCountriesQuery,
   useCatalogueProductQuery,
   useSetListingMutation,
   useCreateQuoteMutation,

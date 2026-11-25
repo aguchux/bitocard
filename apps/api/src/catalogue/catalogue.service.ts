@@ -5,6 +5,7 @@ import type { LedgerMode, Product, ProductCategory } from '../generated/prisma/c
 import { minor } from '../ledger/mode.js';
 import { StorefrontService } from '../storefront/storefront.service.js';
 import { type PricingContext, PricingService, type ProductWithOffers, worldwideCategories } from './pricing.service.js';
+import { productCountries } from './product-countries.js';
 
 /** At most this many denominations are priced in a catalogue listing; quotes price any valid value. */
 const maxListedValues = 20;
@@ -105,6 +106,20 @@ export class CatalogueService {
       if (presented) data.push(presented);
     }
     return { object: 'list' as const, data, has_more: products.length > limit, next_cursor: products.length > limit ? products[limit - 1].id : null };
+  }
+
+  async giftCardCountries(resellerId: string, mode: LedgerMode) {
+    const ctx = await this.pricing.context(resellerId, mode);
+    const rows = await this.prisma.product.groupBy({
+      by: ['country'],
+      where: {
+        active: true,
+        category: 'gift_cards',
+        supplierProducts: { some: { available: true } },
+        ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
+      },
+    });
+    return { object: 'list' as const, data: productCountries(rows) };
   }
 
   /** What one sale earns the reseller, with their settings or ones they are trying. */

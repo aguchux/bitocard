@@ -38,6 +38,8 @@ describe("BitoCard's store listing", () => {
     assert.ok(all.total > 0 && all.data.every(product => product.listed === false && product.offers.some(offer => offer.supplier === 'reloadly')));
     assert.equal(all.listed, 0);
     assert.equal((await admin.get('/v1/admin/products?supplier=vtpass')).json.total, 0, "only that supplier's products");
+    const countries = (await admin.get('/v1/admin/products/gift-card-countries')).json.data;
+    assert.ok(countries.some(country => country.code === 'US' && country.name === 'United States'));
   });
 
   test('admins list and unlist one product; it shows on the store only while listed', async () => {
@@ -64,6 +66,8 @@ describe("BitoCard's store listing", () => {
     assert.equal(giftCards.json.updated, count);
     const keys = await storeKeys();
     assert.ok(keys.length > 0 && keys.every(key => key.startsWith('gift_cards:')), 'only the gift cards');
+    assert.ok((await visitor.get('/v1/store/gift-card-countries')).json.data.some(country => country.code === 'US' && country.name === 'United States'));
+    assert.ok((await visitor.get('/v1/store/search?q=United%20States')).json.products.some(product => product.country === 'US'), 'country names find cards for that country');
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'products.listed' } }));
     assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: { category: 'gift_cards' } })).json.updated, 0, 'already listed ones are not counted again');
 
@@ -125,6 +129,7 @@ describe("a reseller's own store listing", () => {
     const { browser } = await resellerClient(server);
     // Gift cards (sold by markup here): discount products need a share first (above).
     const catalogue = (await browser.get('/v1/catalogue/products?category=gift_cards&limit=50', sandbox)).json;
+    assert.ok((await browser.get('/v1/catalogue/gift-card-countries', sandbox)).json.data.some(country => country.code === 'US' && country.name === 'United States'));
     assert.ok(catalogue.data.length > 0, 'the whole catalogue, though BitoCard has listed nothing');
     assert.ok(catalogue.data.every(product => product.listed === false));
 

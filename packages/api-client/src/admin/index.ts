@@ -32,6 +32,7 @@ import type {
   AdminPricePreview,
   AdminPricePreviewArgs,
   ProductCategory,
+  ProductCountry,
   ResellerDetail,
   ResellerStatus,
   ResellerSummary,
@@ -302,6 +303,10 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/products', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
       providesTags: [{ type: 'Product', id: 'LIST' }],
     }),
+    giftCardCountries: build.query<List<ProductCountry>, void>({
+      query: () => '/v1/admin/products/gift-card-countries',
+      providesTags: [{ type: 'Product', id: 'COUNTRIES' }],
+    }),
     updateProduct: build.mutation<
       { id: string; active: boolean; listed: boolean; name: string; image_url: string | null },
       { id: string; active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }
@@ -518,6 +523,7 @@ export const {
   useSetSupplierMarketMutation,
   useSyncSupplierMutation,
   useProductsInfiniteQuery,
+  useGiftCardCountriesQuery,
   useUpdateProductMutation,
   useSetProductListingMutation,
   useUpdateOfferMutation,

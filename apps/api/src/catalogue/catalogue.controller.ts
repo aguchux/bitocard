@@ -236,6 +236,12 @@ export class CatalogueController {
     return this.catalogue.list(resellerOf(caller), mode, filter);
   }
 
+  @ApiOperation({ summary: 'List gift card redemption countries' })
+  @Get('gift-card-countries')
+  giftCardCountries(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+    return this.catalogue.giftCardCountries(resellerOf(caller), mode);
+  }
+
   @ApiOperation({ summary: 'Get a product' })
   @Get('products/:id')
   get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {

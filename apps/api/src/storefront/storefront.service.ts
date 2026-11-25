@@ -15,12 +15,12 @@ import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, reg
 import { storeLayout, verifyStorePreview } from '../stores/store-home.service.js';
 import { templateFor } from '../stores/templates.js';
 import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
+import { giftCardCountrySearch, productCountries, productCountryName as countryName } from '../catalogue/product-countries.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;
 const homeKey = 'home';
 const previewLifetimeMs = 30 * 60_000;
-const regionNames = new Intl.DisplayNames(['en-GB'], { type: 'region' });
 
 /** "amazon-us" becomes "Amazon US" when a brand has no presentation of its own. */
 const brandNameFromSlug = (slug: string) =>
@@ -29,14 +29,6 @@ const brandNameFromSlug = (slug: string) =>
     .filter(Boolean)
     .map(part => (part.length <= 3 && /^[a-z]{2,3}$/.test(part) && part !== 'tv' ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)))
     .join(' ');
-
-const countryName = (code: string) => {
-  try {
-    return regionNames.of(code) ?? code;
-  } catch {
-    return code;
-  }
-};
 
 export type StoreProductFilter = {
   category?: ProductCategory;
@@ -455,6 +447,12 @@ export class StorefrontService {
     return { object: 'list' as const, data: await this.present(rows), has_more: total > offset + limit, total };
   }
 
+  async giftCardCountries() {
+    const { where } = await this.availability();
+    const rows = await this.prisma.product.groupBy({ by: ['country'], where: { AND: [where, { category: 'gift_cards' }] } });
+    return { object: 'list' as const, data: productCountries(rows) };
+  }
+
   async product(key: string) {
     const { where } = await this.availability();
     const product = await this.prisma.product.findFirst({ where: { AND: [where, { key }] } });
@@ -590,6 +588,7 @@ export class StorefrontService {
       OR: [
         { AND: words.map(word => ({ OR: [{ name: { contains: word, mode: 'insensitive' as const } }, { brand: { contains: word } }] })) },
         ...(brands.length ? [{ brand: { in: brands } }] : []),
+        ...giftCardCountrySearch(q),
       ],
     };
   }

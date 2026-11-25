@@ -261,6 +261,13 @@ export class StorefrontController {
     return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.products(query), query.currency);
   }
 
+  @ApiOperation({ summary: 'List gift card redemption countries' })
+  @Get('gift-card-countries')
+  @Header('Cache-Control', 'public, max-age=60')
+  giftCardCountries(@Query() query: MarketQueryDto) {
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.giftCardCountries());
+  }
+
   @ApiOperation({ summary: 'Get a product', description: 'Its face values, how it is delivered, and related products.' })
   @Get('products/:key')
   @Header('Cache-Control', 'public, max-age=60')

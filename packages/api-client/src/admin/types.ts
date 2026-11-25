@@ -348,6 +348,7 @@ export type AdminProduct = {
 };
 /** Admin product filters: a supplier's offers and BitoCard store listing among them. */
 export type AdminProductFilter = { category?: ProductCategory; country?: string; q?: string; supplier?: string; listed?: boolean };
+export type ProductCountry = { code: string; name: string };
 /** Products, with how many match the filters and how many of those are listed. */
 export type AdminProductList = List<AdminProduct> & { total: number; listed: number };
 /**

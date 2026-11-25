@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, ShoppingCart, Store } from "lucide-react";
 import { Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatMoney, Input, LoadMore, Notice, PageHeader, useDebouncedValue } from "@bitocard/admin-ui";
-import { type CatalogueCategory, catalogueCategories, type Product, useCatalogueProductsInfiniteQuery, useSetListingMutation } from "@bitocard/api-client/reseller";
+import { type CatalogueCategory, catalogueCategories, type Product, useCatalogueProductsInfiniteQuery, useGiftCardCountriesQuery, useSetListingMutation } from "@bitocard/api-client/reseller";
 import { ProductPricingDialog } from "@/components/product-pricing";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -134,6 +134,7 @@ export default function CataloguePage() {
   const [listing, setListingFilter] = useState<Listing>("");
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim());
+  const giftCardCountries = useGiftCardCountriesQuery(undefined, { skip: category !== "gift_cards" });
   const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
   const rows = query.data?.pages.flatMap(page => page.data);
   const [opened, setOpen] = useState<Product | null>(null);
@@ -154,8 +155,10 @@ export default function CataloguePage() {
     }
   };
 
-  // The API has no list of markets for resellers: offer their own country and every country seen so far.
-  const countries = [...new Set([membership.reseller.country, country, ...(rows?.map(row => row.country) ?? [])].filter((value): value is string => Boolean(value)))].sort();
+  const loadedCountries = [...new Set([membership.reseller.country, country, ...(rows?.map(row => row.country) ?? [])].filter((value): value is string => Boolean(value)))].sort();
+  const countryOptions = category === "gift_cards"
+    ? (giftCardCountries.data?.data.map(item => ({ value: item.code, label: item.name })) ?? [])
+    : loadedCountries.map(value => ({ value, label: value }));
 
   return (
     <ShqShell section="catalogue" current="/catalogue" crumbs={[{ label: "Catalogue", href: "/catalogue" }, { label: "Products" }]}>
@@ -168,10 +171,13 @@ export default function CataloguePage() {
           id="category"
           label="Category"
           value={category}
-          onChange={value => setCategory(value as "" | CatalogueCategory)}
+          onChange={value => {
+            setCategory(value as "" | CatalogueCategory);
+            setCountry("");
+          }}
           options={[{ value: "", label: "All categories" }, ...catalogueCategories.map(value => ({ value, label: categoryName(value) }))]}
         />
-        <FilterSelect id="country" label="Used in" value={country} onChange={setCountry} options={[{ value: "", label: "All countries" }, ...countries.map(value => ({ value, label: value }))]} />
+        <FilterSelect id="country" label={category === "gift_cards" ? "Gift card country" : "Used in"} value={country} onChange={setCountry} options={[{ value: "", label: "All countries" }, ...countryOptions]} />
         <FilterSelect
           id="listing"
           label="Your store"
