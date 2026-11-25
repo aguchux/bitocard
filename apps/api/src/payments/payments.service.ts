@@ -14,12 +14,13 @@ import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { FxService } from '../fx/fx.service.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
-import { type PaymentGateway, paymentGateways, PaymentProviders } from './payment-providers.js';
+import { type PaymentGateway, paymentGateways, PaymentProviders, providerUnavailable } from './payment-providers.js';
 import { ProviderError } from './provider-error.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import type { ChargeResult, CheckoutProvider, PaymentRef, ReservedAccountProvider } from './providers.js';
+import { PaystackProvider } from './paystack.provider.js';
 
 /** What a payment record gives its provider to look it up: what the gateway charged (another currency, if it did). */
 export const paymentRef = (payment: Payment): PaymentRef => ({
@@ -674,7 +675,7 @@ export class PaymentsService {
   }
 
   /**
-   * Creates the wallet's reserved bank account(s), trying each provider in turn (Flutterwave, then Monnify in Nigeria).
+   * Creates the wallet's reserved bank account(s) using the market's priority, or its legacy routing.
    * Asking again returns the existing accounts. Live accounts need the country to offer them, BitoCard's
    * `reserved_accounts` switch on for the reseller, and an active reseller; in Nigeria the owner's BVN check must have
    * passed, and its BVN (held encrypted only for this) goes to the bank and is erased once the accounts exist.
@@ -703,12 +704,13 @@ export class PaymentsService {
       holder = { ...splitName(reseller.verifiedName), phone: ghanaPhone(input.phone ?? owner.phone) };
     }
 
-    const outcome = await this.openReservedAccounts(this.providers.reservedAccounts(mode, country.code, currency), {
+    const outcome = await this.openReservedAccounts(this.providers.reservedAccounts(mode, country.code, currency, country.dvaGatewayPriority), {
       reference: `bc_ra_${mode}_${resellerId.replaceAll('-', '')}`,
       mode,
       resellerId,
       currency,
-      ask: { email: owner.email, name: reseller.name, bvn: bvn?.value, ...holder },
+      orderedFailover: country.dvaGatewayPriority.length > 0,
+      ask: { email: owner.email, name: reseller.name, bvn: bvn?.value, ...splitName(reseller.verifiedName ?? reseller.name), phone: input.phone ?? owner.phone ?? undefined, ...holder },
     });
     if (outcome === 'opened') {
       // The bank has it now: BitoCard keeps no BVN.
@@ -723,15 +725,14 @@ export class PaymentsService {
   }
 
   /**
-   * A store customer's reserved bank account(s), through Flutterwave (the sandbox in test mode): transfers into them top
-   * up the customer's wallet in the seller's currency. Asking again returns the existing ones. In Nigeria Flutterwave
-   * needs the customer's BVN: passed to it and never kept.
+   * A store customer's reserved bank accounts use the market's priority (Flutterwave in unconfigured markets).
+   * Transfers fund the customer's wallet. Nigeria still requires the BVN; it is only sent to Flutterwave if selected.
    */
   async createCustomerReservedAccounts(input: {
-    customer: { id: string; email: string; name: string };
+    customer: { id: string; email: string; name: string; phone?: string | null };
     sellerId: string;
     mode: LedgerMode;
-    country: { code: string; currency: string; reservedAccounts: boolean };
+    country: { code: string; currency: string; reservedAccounts: boolean; dvaGatewayPriority: string[] };
     bvn?: string;
     /** Ghana: the holder's names (as verified, else as given) and phone number. */
     holder?: { name: string; phone?: string };
@@ -745,16 +746,17 @@ export class PaymentsService {
     if (mode === 'live' && country.code === 'NG' && !input.bvn) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your BVN: the bank needs it to open your account number. We do not keep it.', 'bvn');
     }
-    const holder = mode === 'live' && country.code === 'GH' ? { ...splitName(input.holder?.name ?? customer.name), phone: ghanaPhone(input.holder?.phone) } : undefined;
-    const providers = mode === 'test' ? this.providers.reservedAccounts(mode, country.code, country.currency) : this.providers.reservedAccounts(mode, country.code, country.currency).filter(provider => provider.name === 'flutterwave');
-    if (providers.length === 0) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'Bank account numbers are unavailable right now. Top up with a card or mobile money instead.');
+    const phone = input.holder?.phone ?? customer.phone ?? undefined;
+    const holder = { ...splitName(input.holder?.name ?? customer.name), phone: mode === 'live' && country.code === 'GH' ? ghanaPhone(phone) : phone };
+    const providers = this.providers.reservedAccounts(mode, country.code, country.currency, country.dvaGatewayPriority, true);
     const outcome = await this.openReservedAccounts(providers, {
       reference: `bc_rc_${mode}_${customer.id.replaceAll('-', '')}`,
       mode,
       resellerId: input.sellerId,
       customerId: customer.id,
       currency: country.currency,
-      ask: { email: customer.email, name: holder ? `${holder.firstName} ${holder.lastName}` : customer.name, bvn: input.bvn, ...holder },
+      orderedFailover: country.dvaGatewayPriority.length > 0,
+      ask: { email: customer.email, name: country.code === 'GH' ? `${holder.firstName} ${holder.lastName}` : customer.name, bvn: input.bvn, ...holder },
     });
     if (outcome === 'opened') return this.customerReservedAccounts(customer.id, mode, country.currency);
     if (outcome === 'busy') throw reservedAccountBusy();
@@ -765,28 +767,40 @@ export class PaymentsService {
   }
 
   /**
-   * Asks each provider in turn (Flutterwave first) to open the wallet's accounts under `reference`, the same every time
+   * Asks each provider in order to open the wallet's accounts under `reference`, the same every time
    * for one wallet. Each request is written and claimed before the provider is asked, so two clicks never ask at once
    * and a reply lost after the bank opened the account still leaves its owner on record: transfers carrying the
    * reference are credited to that wallet (`recordDeposit`) whether or not the account number reached us. A clear
-   * refusal or an unclear failure moves on to the next provider.
+   * refusal can move on to the next provider. An unclear failure in a configured route is reconciled first.
    */
   private async openReservedAccounts(
-    providers: ReservedAccountProvider[],
-    input: { reference: string; mode: LedgerMode; resellerId: string; customerId?: string; currency: string; ask: AccountAsk },
+    providers: Array<ReservedAccountProvider | PaystackProvider>,
+    input: { reference: string; mode: LedgerMode; resellerId: string; customerId?: string; currency: string; orderedFailover: boolean; ask: AccountAsk },
   ): Promise<'opened' | 'refused' | 'unavailable' | 'busy'> {
     let refused = false;
-    let busy = false;
-    for (const provider of providers) {
-      const request = await this.claimReservedRequest({ provider: provider.name, reference: input.reference, mode: input.mode, resellerId: input.resellerId, customerId: input.customerId ?? null, currency: input.currency });
-      if (!request) {
-        busy = true;
-        continue;
-      }
+    const pending = input.mode === 'live' ? await this.prisma.reservedAccountRequest.findFirst({
+      where: { provider: { in: input.orderedFailover ? ['paystack', 'flutterwave'] : ['paystack'] }, reference: input.reference, status: 'pending', attempts: { gt: 0 } },
+      select: { provider: true },
+      orderBy: { createdAt: 'asc' },
+    }) : null;
+    // A changed preference must not send an unresolved assignment to a second bank.
+    const resume = providers.find(provider => provider.name === pending?.provider);
+    if (pending && !resume) return 'busy';
+    const ordered = resume ? [resume, ...providers.filter(provider => provider !== resume)] : providers;
+    for (const provider of ordered) {
+      const request = await this.claimReservedRequest({ provider: provider.name, reference: input.reference, mode: input.mode, resellerId: input.resellerId, customerId: input.customerId ?? null, currency: input.currency }, input.orderedFailover);
+      if (!request) return 'busy';
+      let assignmentMayExist = request.status === 'pending' && !!request.providerCustomerId;
       try {
-        const accounts = await provider.createReservedAccount({ reference: input.reference, currency: input.currency, ...input.ask });
-        await this.prisma.$transaction([
-          this.prisma.reservedAccount.createMany({
+        const ask = { reference: input.reference, currency: input.currency, ...input.ask };
+        const accounts = provider instanceof PaystackProvider
+          ? await provider.openDedicatedAccount(ask, request.providerCustomerId, assignmentMayExist, async code => {
+            await this.bindPaystackCustomer(request.id, code);
+            assignmentMayExist = true;
+          })
+          : await provider.createReservedAccount(ask);
+        await this.prisma.$transaction(async tx => {
+          const saved = await tx.reservedAccount.createMany({
             data: accounts.map(account => ({
               resellerId: input.resellerId,
               customerId: input.customerId ?? null,
@@ -800,41 +814,64 @@ export class PaymentsService {
               providerAccountId: account.providerAccountId ?? null,
             })),
             skipDuplicates: true,
-          }),
-          this.prisma.reservedAccountRequest.update({ where: { id: request.id }, data: { status: 'active', lastError: null, claimedAt: null } }),
-        ]);
+          });
+          if (provider instanceof PaystackProvider && saved.count !== accounts.length) {
+            throw new ProviderError('paystack', 'A reserved account number already belongs to a different request', false);
+          }
+          await tx.reservedAccountRequest.update({ where: { id: request.id }, data: { status: 'active', lastError: null, claimedAt: null } });
+        });
         return 'opened';
       } catch (error) {
         const definite = error instanceof ProviderError && error.definite;
+        // A failure before a Paystack customer was bound could not have issued a bank number.
+        const beforeAssignment = error instanceof ProviderError && provider instanceof PaystackProvider && !assignmentMayExist;
         refused ||= definite;
         // Unclear stays pending: the bank may have opened it, and its transfers are still credited by the reference.
         await this.prisma.reservedAccountRequest.update({
           where: { id: request.id },
-          data: { status: definite ? 'refused' : 'pending', lastError: (error instanceof Error ? error.message : String(error)).slice(0, 300), claimedAt: null },
+          data: { status: definite || beforeAssignment ? 'refused' : 'pending', lastError: (error instanceof Error ? error.message : String(error)).slice(0, 300), claimedAt: null },
         });
-        this.logger.warn({ err: error, provider: provider.name, resellerId: input.resellerId, customerId: input.customerId }, 'Reserved account provider failed; trying the next one');
+        this.logger.warn({ provider: provider.name, resellerId: input.resellerId, customerId: input.customerId, definite }, 'Reserved account provider could not complete the request');
+        if ((input.orderedFailover || provider instanceof PaystackProvider) && !definite && !beforeAssignment) return 'busy';
       }
     }
-    return refused ? 'refused' : busy ? 'busy' : 'unavailable';
+    return refused ? 'refused' : 'unavailable';
+  }
+
+  private async bindPaystackCustomer(id: string, code: string) {
+    try {
+      await this.prisma.reservedAccountRequest.update({ where: { id }, data: { providerCustomerId: code } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ProviderError('paystack', 'The Paystack customer belongs to a different wallet', true);
+      }
+      throw error;
+    }
   }
 
   /** The request for this provider and reference, claimed for this call; null while another call holds it. */
-  private async claimReservedRequest(data: { provider: string; reference: string; mode: LedgerMode; resellerId: string; customerId: string | null; currency: string }) {
-    const where = { provider_reference: { provider: data.provider, reference: data.reference } };
-    let request = await this.prisma.reservedAccountRequest.findUnique({ where });
-    if (!request) {
-      try {
-        request = await this.prisma.reservedAccountRequest.create({ data });
-      } catch (error) {
-        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
-        request = await this.prisma.reservedAccountRequest.findUniqueOrThrow({ where });
-      }
-    }
-    const claimed = await this.prisma.reservedAccountRequest.updateMany({
-      where: { id: request.id, OR: [{ claimedAt: null }, { claimedAt: { lt: new Date(Date.now() - reservedClaimMs) } }] },
-      data: { claimedAt: new Date(), attempts: { increment: 1 } },
+  private async claimReservedRequest(data: { provider: string; reference: string; mode: LedgerMode; resellerId: string; customerId: string | null; currency: string }, orderedFailover: boolean) {
+    return this.prisma.$transaction(async tx => {
+      // Serialize the claim for this wallet even if two callers read different market priorities.
+      if (data.customerId) await tx.$queryRaw`SELECT id FROM customers WHERE id = ${data.customerId}::uuid FOR UPDATE`;
+      else await tx.$queryRaw`SELECT id FROM resellers WHERE id = ${data.resellerId}::uuid FOR UPDATE`;
+      const now = new Date();
+      const where = { provider_reference: { provider: data.provider, reference: data.reference } };
+      const other = await tx.reservedAccountRequest.findFirst({
+        where: { reference: data.reference, provider: { not: data.provider }, OR: [
+          { status: 'active' },
+          { claimedAt: { gte: new Date(now.getTime() - reservedClaimMs) } },
+          { status: 'pending', attempts: { gt: 0 }, provider: { in: orderedFailover ? ['paystack', 'flutterwave'] : ['paystack'] } },
+        ] },
+        select: { id: true },
+      });
+      if (other) return null;
+      const request = await tx.reservedAccountRequest.findUnique({ where });
+      if (!request) return tx.reservedAccountRequest.create({ data: { ...data, claimedAt: now, attempts: 1 } });
+      const lease = reservedClaimMs * (data.provider === 'paystack' ? 2 : 1);
+      if (request.status === 'active' || (request.claimedAt && now.getTime() - request.claimedAt.getTime() < lease)) return null;
+      return tx.reservedAccountRequest.update({ where, data: { claimedAt: now, attempts: { increment: 1 } } });
     });
-    return claimed.count ? request : null;
   }
 
   /** A customer's reserved bank accounts in one mode and currency. */
@@ -1119,6 +1156,31 @@ export class PaymentsService {
     const monnify = this.providers.monnify;
     if (!monnify) return { handled: false };
     return { handled: true, ...(await this.recordDeposit('monnify', await monnify.verifyTransaction(transactionReference))) };
+  }
+
+  async paystackDeposit(reference: string) {
+    const paystack = this.providers.paystack;
+    if (!paystack) return { handled: false };
+    const transfer = await paystack.verifyDedicatedDeposit(reference);
+    if (!transfer) return { handled: false };
+    const { result, customerCode, accountNumber } = transfer;
+    const request = await this.prisma.reservedAccountRequest.findUnique({
+      where: { provider_providerCustomerId: { provider: 'paystack', providerCustomerId: customerCode } },
+    });
+    if (request?.mode === 'live' && request.status === 'pending') {
+      // The account may be opening right now. A retry must use the saved account number before crediting it.
+      throw providerUnavailable('Paystack dedicated account reconciliation');
+    }
+    const account = request?.mode === 'live' && request.status === 'active'
+      ? await this.prisma.reservedAccount.findFirst({
+        where: { provider: 'paystack', mode: 'live', providerReference: request.reference, accountNumber },
+        select: { providerReference: true },
+      }) : null;
+    if (!account) {
+      if (result.status === 'succeeded') await this.unmatchedDeposit('paystack', result, 'its dedicated account could not be matched');
+      return { handled: true, credited: false, reason: 'unknown_account' };
+    }
+    return { handled: true, ...(await this.recordDeposit('paystack', { ...result, reference: account.providerReference })) };
   }
 }
 

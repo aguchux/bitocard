@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, type PipeTransform, Post, Put } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
@@ -31,6 +31,8 @@ class UpdateCountryDto {
   @IsOptional() @IsString() @Length(2, 80) name?: string;
   @IsOptional() @IsBoolean() reseller_signup?: boolean;
   @IsOptional() @IsBoolean() reserved_accounts?: boolean;
+  @ValidateIf((_object, value) => value !== undefined) @IsArray() @ArrayMinSize(2) @ArrayMaxSize(2) @ArrayUnique() @IsIn(['paystack', 'flutterwave'], { each: true })
+  dva_gateway_priority?: Array<'paystack' | 'flutterwave'>;
   @IsOptional() @IsIn(['bitocard', 'didit']) identity_provider?: 'bitocard' | 'didit';
   @ValidateIf((_object, value) => value !== null) @IsOptional() @IsIn(['termii', 'africas_talking']) sms_provider?: 'termii' | 'africas_talking' | null;
   @IsOptional() @IsInt() @Min(0) @Max(100) markup_cap_percent?: number;

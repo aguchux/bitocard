@@ -128,10 +128,15 @@ export class PaymentProviders {
     return provider;
   }
 
-  /** In failover order: Flutterwave first, then Monnify (Nigeria). */
-  reservedAccounts(mode: LedgerMode, country: string, currency: string): ReservedAccountProvider[] {
+  /** A saved market order is authoritative. Unconfigured markets keep their existing routing. */
+  reservedAccounts(mode: LedgerMode, country: string, currency: string, priority: readonly string[] = [], customer = false): Array<ReservedAccountProvider | PaystackProvider> {
     if (mode === 'test') return [this.sandbox];
-    const providers = [this.flutterwave, this.monnify].filter((p): p is FlutterwaveProvider | MonnifyProvider => p !== null && p.supportsReservedAccounts(country, currency));
+    const available = { flutterwave: this.flutterwave, paystack: this.paystack };
+    const ordered = priority.length
+      ? priority.map(name => name === 'flutterwave' || name === 'paystack' ? available[name] : null)
+      : [this.flutterwave, ...(customer ? [] : [this.monnify])];
+    const providers = ordered.filter((provider): provider is FlutterwaveProvider | MonnifyProvider | PaystackProvider =>
+      provider !== null && provider.supportsReservedAccounts(country, currency));
     if (providers.length === 0) throw providerUnavailable('Reserved bank accounts');
     return providers;
   }

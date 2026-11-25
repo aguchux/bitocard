@@ -50,7 +50,10 @@ export async function topUpWallet(_state: FormState, form: FormData): Promise<Fo
 
 /** Opens the customer's own bank account number for the wallet (Nigeria asks for the BVN, passed to the bank only). */
 export async function openBankAccount(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi<{ data: StoreReservedAccount[] }>("POST", "/v1/store/wallet/reserved-accounts", { bvn: text(form, "bvn") || undefined });
+  const result = await customerApi<{ data: StoreReservedAccount[] }>("POST", "/v1/store/wallet/reserved-accounts", {
+    bvn: text(form, "bvn") || undefined,
+    phone: text(form, "phone").trim() || undefined,
+  });
   if (!result.ok) return { error: result.message, field: result.param };
   revalidatePath("/account/wallet");
   return { notice: "Your account number is ready. Transfers into it top up your wallet." };

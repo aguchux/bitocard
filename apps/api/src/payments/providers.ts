@@ -91,13 +91,16 @@ export function uuidFor(kind: string, reference: string) {
 
 /** `providerAccountId` is the provider's own ID for the account (Flutterwave's `order_ref`), when it gives one. */
 export type ReservedAccountDetails = { bankName: string; accountNumber: string; accountName: string; providerAccountId?: string };
+export type ReservedAccountInput = {
+  reference: string; email: string; name: string; currency: string; bvn?: string; firstName?: string; lastName?: string; phone?: string;
+};
 
 /** Dedicated bank account numbers; transfers into them top up the wallet. */
 export interface ReservedAccountProvider {
   readonly name: string;
   supportsReservedAccounts(country: string, currency: string): boolean;
   /** `firstName`, `lastName` and `phone` are the holder's, for providers that need them (Flutterwave in Ghana). */
-  createReservedAccount(input: { reference: string; email: string; name: string; currency: string; bvn?: string; firstName?: string; lastName?: string; phone?: string }): Promise<ReservedAccountDetails[]>;
+  createReservedAccount(input: ReservedAccountInput): Promise<ReservedAccountDetails[]>;
 }
 
 export type TransferResult = { status: 'paid' | 'failed' | 'pending'; providerTransferId: string; fee: bigint; failureReason?: string; reference?: string };

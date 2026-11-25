@@ -619,6 +619,8 @@ model Country {
   resellerSignup            Boolean           @default(false) @map("reseller_signup")
   /// Reserved (dedicated) bank accounts for wallet funding; customer wallets exist only where this is on.
   reservedAccounts          Boolean           @default(false) @map("reserved_accounts")
+  /// An empty list keeps the legacy reserved-account routing for this market.
+  dvaGatewayPriority        String[]          @default([]) @map("dva_gateway_priority")
   /// Markup Protection Scheme: highest markup over BitoCard's wholesale price, in percent.
   markupCapPercent          Int               @default(100) @map("markup_cap_percent")
   /// Days before a sale's profit can be withdrawn.
@@ -944,6 +946,8 @@ enum AccountKind {
 model ReservedAccountRequest {
   id         String     @id @default(uuid()) @db.Uuid
   provider   String
+  /// A Paystack customer can belong to only one BitoCard wallet on our integration.
+  providerCustomerId String? @map("provider_customer_id")
   /// The reference sent (Flutterwave's `tx_ref`, Monnify's `accountReference`): every deposit carries it.
   reference  String
   mode       LedgerMode
@@ -962,6 +966,7 @@ model ReservedAccountRequest {
   updatedAt  DateTime   @updatedAt @map("updated_at")
 
   @@unique([provider, reference])
+  @@unique([provider, providerCustomerId])
   @@index([status, updatedAt])
   @@map("reserved_account_requests")
 }

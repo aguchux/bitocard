@@ -1,10 +1,19 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 import { ProviderError, providerRequest } from './provider-error.js';
-import type { ChargeResult, CheckoutInput, CheckoutProvider, PaymentRef, RefundResult } from './providers.js';
+import type { ChargeResult, CheckoutInput, CheckoutProvider, PaymentRef, RefundResult, ReservedAccountDetails, ReservedAccountInput } from './providers.js';
 
 type PaystackResponse<T> = { status: boolean; message?: string; data: T };
-type PaystackTransaction = { id: number; reference: string; status: string; amount: number; currency: string; fees?: number | null; gateway_response?: string | null };
+type PaystackTransaction = {
+  id: number; reference: string; status: string; amount: number; currency: string; fees?: number | null; gateway_response?: string | null;
+  domain?: string; channel?: string; customer?: { customer_code?: string }; authorization?: { channel?: string; receiver_bank_account_number?: string };
+};
 type PaystackRefund = { id: number; status: string; transaction?: number | { id?: number } };
+type PaystackCustomer = { id: number; customer_code: string; email: string };
+type PaystackDva = {
+  id: number; bank: { name: string }; account_number: string; account_name: string; currency: string;
+  active: boolean; assigned: boolean; customer?: { id?: number };
+};
 
 /**
  * The country each Paystack market takes payments in, in its own currency. A Paystack account belongs to one country
@@ -55,6 +64,77 @@ export class PaystackProvider implements CheckoutProvider {
 
   supportsCheckout(country: string, currency: string) {
     return checkoutCurrencies[country] === currency;
+  }
+
+  supportsReservedAccounts(country: string, currency: string) {
+    return (country === 'NG' || country === 'GH') && checkoutCurrencies[country] === currency;
+  }
+
+  /** Multi-step assignment. The caller binds the Paystack customer to one wallet before we can create an account. */
+  async openDedicatedAccount(input: ReservedAccountInput, linkedCustomer: string | null, recoverOnly: boolean, bind: (code: string) => Promise<void>): Promise<ReservedAccountDetails[]> {
+    const country = input.currency === 'NGN' ? 'NG' : 'GH';
+    const phone = input.phone ? parsePhoneNumberFromString(input.phone, country) : undefined;
+    if (!recoverOnly && (!phone?.isValid() || phone.country !== country || !input.firstName || !input.lastName)) {
+      throw new ProviderError(this.name, 'A first name, last name and local phone number are required for Paystack dedicated accounts', true);
+    }
+    const details = { email: input.email, first_name: input.firstName, last_name: input.lastName, phone: phone?.number };
+    let customer: PaystackCustomer;
+    try {
+      customer = await this.call<PaystackCustomer>(`/customer/${encodeURIComponent(linkedCustomer ?? input.email)}`);
+    } catch (error) {
+      if (linkedCustomer || !(error instanceof ProviderError) || error.status !== 404) throw error;
+      customer = await this.call<PaystackCustomer>('/customer', { method: 'POST', body: details });
+    }
+    if (!Number.isSafeInteger(customer?.id) || customer.id < 1 || !/^CUS_[A-Za-z0-9]+$/.test(customer.customer_code)) {
+      throw new ProviderError(this.name, 'Paystack returned an invalid customer', false);
+    }
+    if (linkedCustomer ? customer.customer_code !== linkedCustomer : customer.email?.toLowerCase() !== input.email.toLowerCase()) {
+      throw new ProviderError(this.name, 'Paystack returned a different customer', true);
+    }
+    const query = new URLSearchParams({ customer: String(customer.id), currency: input.currency, active: 'true' });
+    const accounts = await this.call<PaystackDva[]>(`/dedicated_account?${query}`);
+    if (!Array.isArray(accounts) || accounts.some(account => account.customer?.id !== customer.id)) {
+      throw new ProviderError(this.name, 'Paystack returned an unexpected dedicated account list', false);
+    }
+    const existing = accounts.filter(account => account.active === true && account.assigned === true && account.currency === input.currency);
+    if (existing.length) {
+      if (!linkedCustomer) throw new ProviderError(this.name, 'The Paystack customer already has an account outside this wallet', true);
+      if (existing.length !== 1) throw new ProviderError(this.name, 'Multiple Paystack accounts need reconciliation', false);
+      return [this.dedicatedDetails(existing[0], input.currency)];
+    }
+    if (recoverOnly) throw new ProviderError(this.name, 'Paystack has not confirmed the dedicated account assignment', false);
+    await bind(customer.customer_code);
+    const account = await this.call<PaystackDva>('/dedicated_account', {
+      method: 'POST',
+      body: { customer: customer.customer_code, first_name: details.first_name, last_name: details.last_name, phone: details.phone,
+        ...(this.secretKey.startsWith('sk_test_') ? { preferred_bank: 'test-bank' } : {}) },
+    }).catch((error: unknown) => {
+      if (error instanceof ProviderError && error.status === 409) throw new ProviderError(this.name, 'Paystack has not confirmed the dedicated account assignment', false, 409);
+      throw error;
+    });
+    if (account?.customer?.id !== undefined && account.customer.id !== customer.id) throw new ProviderError(this.name, 'Paystack returned an account for another customer', false);
+    return [this.dedicatedDetails(account, input.currency)];
+  }
+
+  private dedicatedDetails(account: PaystackDva, currency: string): ReservedAccountDetails {
+    if (!account || account.currency !== currency || account.assigned !== true || account.active !== true ||
+        !/^\d{8,18}$/.test(account.account_number) || !account.bank?.name || !account.account_name || !Number.isSafeInteger(account.id) || account.id < 1) {
+      throw new ProviderError(this.name, 'Paystack has not returned an active dedicated account', false);
+    }
+    return { bankName: account.bank.name, accountNumber: account.account_number, accountName: account.account_name, providerAccountId: String(account.id) };
+  }
+
+  /** The webhook reference is only a locator. Paystack's transaction lookup supplies the amount and the recipient. */
+  async verifyDedicatedDeposit(reference: string) {
+    const tx = await this.call<PaystackTransaction>(`/transaction/verify/${encodeURIComponent(reference)}`);
+    if (tx?.authorization?.channel !== 'dedicated_nuban' && tx?.channel !== 'dedicated_nuban') return null;
+    const customerCode = tx.customer?.customer_code;
+    if (tx.reference !== reference || tx.domain !== 'live' || !customerCode || !/^CUS_[A-Za-z0-9]+$/.test(customerCode) ||
+        !Number.isSafeInteger(tx.id) || tx.id <= 0 || !Number.isSafeInteger(tx.amount) || tx.amount <= 0 ||
+        (tx.fees != null && (!Number.isSafeInteger(tx.fees) || tx.fees < 0 || tx.fees > tx.amount))) {
+      throw new ProviderError(this.name, 'Paystack returned incomplete dedicated deposit details', false);
+    }
+    return { result: this.charge(tx), customerCode, accountNumber: tx.authorization?.receiver_bank_account_number };
   }
 
   async createCheckout(input: CheckoutInput) {

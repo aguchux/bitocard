@@ -218,8 +218,8 @@ export const resellerWalletApi = bitocardApi.injectEndpoints({
     reservedAccounts: build.query<List<ReservedAccount>, void>({ query: () => '/v1/wallet/reserved-accounts', providesTags: ['ReservedAccount'] }),
     /** Where the country offers them. Nigeria needs the owner's BVN, passed to the bank and never stored. Asking again returns the existing accounts. */
     /** Live accounts need BitoCard's switch, and in Nigeria a passed BVN check (see `useStartBvnCheckMutation`). */
-    createReservedAccounts: build.mutation<List<ReservedAccount>, void>({
-      query: () => ({ url: '/v1/wallet/reserved-accounts', method: 'POST' }),
+    createReservedAccounts: build.mutation<List<ReservedAccount>, { phone: string } | void>({
+      query: body => ({ url: '/v1/wallet/reserved-accounts', method: 'POST', body: body || undefined }),
       invalidatesTags: ['ReservedAccount'],
     }),
     /** Sandbox only. */

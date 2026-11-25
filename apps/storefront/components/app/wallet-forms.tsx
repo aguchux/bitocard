@@ -109,6 +109,7 @@ export function BankAccountForm({ needsBvn }: { needsBvn: boolean }) {
       {needsBvn ? (
         <TextField label="BVN" name="bvn" inputMode="numeric" pattern="\d{11}" maxLength={11} required state={state} hint="The bank needs your BVN to open the account. We pass it on and do not keep it." />
       ) : null}
+      <TextField label="Phone number" name="phone" type="tel" autoComplete="tel" state={state} hint="The account provider may need this. Leave blank to use the number on your profile." />
       <Submit pending={pending} className="w-full sm:w-auto">
         <Landmark className="size-4" aria-hidden="true" /> Get my account number
       </Submit>

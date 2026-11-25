@@ -35,6 +35,7 @@ export function presentCountry(country: CountryWithCategories) {
 export function presentCountryAdmin(country: CountryWithCategories) {
   return {
     ...presentCountry(country),
+    dva_gateway_priority: country.dvaGatewayPriority as Array<'paystack' | 'flutterwave'>,
     spin_daily_limit: country.spinDailyLimit,
     public_spins_enabled: country.publicSpinsEnabled,
     public_spin_limit: country.publicSpinLimit,
@@ -53,6 +54,7 @@ export type CountryUpdate = Partial<{
   name: string;
   reseller_signup: boolean;
   reserved_accounts: boolean;
+  dva_gateway_priority: Array<'paystack' | 'flutterwave'>;
   identity_provider: 'bitocard' | 'didit';
   sms_provider: 'termii' | 'africas_talking' | null;
   markup_cap_percent: number;
@@ -130,6 +132,7 @@ export class CountriesService {
         name: input.name,
         resellerSignup: input.reseller_signup,
         reservedAccounts: input.reserved_accounts,
+        dvaGatewayPriority: input.dva_gateway_priority,
         identityProvider: input.identity_provider,
         smsProvider: input.sms_provider,
         markupCapPercent: input.markup_cap_percent,

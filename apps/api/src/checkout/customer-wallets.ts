@@ -295,7 +295,7 @@ export class CustomerWalletsService {
     return presentCustomerTopUp(await this.payments.simulate(payment, outcome));
   }
 
-  /** Opens the customer's own bank account number for the wallet (Flutterwave), where the market offers them. */
+  /** Opens a dedicated bank account number for the wallet, where the market offers one. */
   async createReservedAccounts(customer: CustomerWithStore, input: { bvn?: string; phone?: string }) {
     this.requireConfirmed(customer);
     const context = await this.context(customer);
@@ -515,7 +515,7 @@ class ReservedAccountDto {
   @IsOptional() @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
   bvn?: string;
 
-  /** Ghana: the phone number the bank opens the account with. */
+  /** The number used by the account provider. Defaults to the customer's profile number. */
   @IsOptional() @Matches(/^[+\d][\d ]{8,15}$/, { message: 'phone must be a phone number' })
   phone?: string;
 }

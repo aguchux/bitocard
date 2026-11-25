@@ -11,6 +11,7 @@ import { SmsProvider } from "./sms-provider";
 import { PaymentMethods } from "./payment-methods";
 import { TaxRateCard } from "./tax-rate";
 import { BankDepositAccounts } from "./bank-deposit-accounts";
+import { DvaPriority } from "./dva-priority";
 import { TwoStepSignIn } from "./two-step";
 import { WhatsappGroup } from "./whatsapp-group";
 
@@ -27,6 +28,7 @@ const panels = [
   { id: "identity", label: "Identity checks", icon: ShieldCheck },
   { id: "phone", label: "Phone verification", icon: Smartphone },
   { id: "payments", label: "Payment methods", icon: CreditCard },
+  { id: "dva-priority", label: "Dedicated accounts", icon: Banknote },
   { id: "bank-deposits", label: "Bank deposits", icon: Banknote },
   { id: "tax", label: "Tax", icon: Receipt },
   { id: "two-step", label: "Two-step sign-in", icon: KeyRound },
@@ -186,6 +188,10 @@ function Markets() {
 
           <SettingsPanel id="payments" icon={CreditCard} title="Payment methods" description={`How resellers top up and customers pay in ${country.name}, in the order offered.`}>
             <PaymentMethods code={country.code} country={country.name} editable={paymentsEditable} />
+          </SettingsPanel>
+
+          <SettingsPanel id="dva-priority" icon={Banknote} title="Dedicated accounts" description={`Which provider issues new wallet account numbers in ${country.name}.`}>
+            <DvaPriority code={country.code} priority={country.dva_gateway_priority} enabled={country.reserved_accounts} editable={editable} />
           </SettingsPanel>
 
           <SettingsPanel id="bank-deposits" icon={Banknote} title="Bank deposits" description={`Golojan's accounts customers in ${country.name} pay cash into, or transfer to, when gateways are off or not working.`}>

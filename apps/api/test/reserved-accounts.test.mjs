@@ -3,20 +3,59 @@
 // on record and transfers into it are credited), finance told about money no wallet can take, the sweep that credits
 // transfers whose notification never came, and the admin list.
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { fakeFlutterwave, fakeMonnify } from './fakes.mjs';
-import { adminClient, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, client, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let flw;
 let monnify;
 let prisma;
 let finance;
+let paystack;
+const paystackKey = 'sk_live_dva_test';
+const paystackCustomers = new Map();
+const paystackAccounts = new Map();
+const paystackTransfers = new Map();
+let paystackReply = 'success';
 
 before(async () => {
   flw = await fakeFlutterwave();
   monnify = await fakeMonnify();
-  server = await startApp({ env: { ...flw.env, ...monnify.env, CRON_SECRET: 'cron-secret' } });
+  paystack = await fakeService(call => {
+    if (call.headers.authorization !== `Bearer ${paystackKey}`) return { status: 401 };
+    const url = new URL(call.url, 'http://fake');
+    const data = value => ({ body: { status: true, data: value } });
+    if (url.pathname === '/customer' && call.method === 'POST') {
+      const id = paystackCustomers.size + 1;
+      const customer = { id, customer_code: `CUS_customer${id}`, email: call.body.email };
+      paystackCustomers.set(customer.email, customer);
+      return data(customer);
+    }
+    if (url.pathname.startsWith('/customer/')) {
+      const identifier = decodeURIComponent(url.pathname.slice('/customer/'.length));
+      const customer = paystackCustomers.get(identifier) ?? [...paystackCustomers.values()].find(row => row.customer_code === identifier);
+      return customer ? data(customer) : { status: 404, body: { status: false, message: 'Customer not found' } };
+    }
+    if (url.pathname === '/dedicated_account' && call.method === 'GET') {
+      const account = paystackAccounts.get(Number(url.searchParams.get('customer')));
+      return data(account ? [account] : []);
+    }
+    if (url.pathname === '/dedicated_account' && call.method === 'POST') {
+      if (paystackReply === 'refused') return { status: 422, body: { status: false, message: 'Account not assigned' } };
+      const customer = [...paystackCustomers.values()].find(row => row.customer_code === call.body.customer);
+      const account = { id: customer.id, account_number: String(1000000000 + customer.id), bank: { name: 'Paystack Bank' }, account_name: 'Ada Obi', currency: 'NGN', active: true, assigned: true, customer };
+      paystackAccounts.set(customer.id, account);
+      return paystackReply === 'lost' ? { status: 503, body: { status: false, message: 'Try again later' } } : data(account);
+    }
+    if (url.pathname.startsWith('/transaction/verify/')) {
+      const transfer = paystackTransfers.get(decodeURIComponent(url.pathname.split('/').at(-1)));
+      return transfer ? data(transfer) : { status: 404 };
+    }
+    return { status: 404 };
+  });
+  server = await startApp({ env: { ...flw.env, ...monnify.env, CRON_SECRET: 'cron-secret', PAYSTACK_SECRET_KEY: paystackKey, PAYSTACK_API_URL: paystack.url } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   finance = await adminClient(server, ['finance']);
   await prisma.country.update({ where: { code: 'GH' }, data: { reservedAccounts: true } });
@@ -26,6 +65,7 @@ after(async () => {
   await server?.close();
   await flw?.close();
   await monnify?.close();
+  await paystack?.close();
 });
 
 const flutterwaveWebhook = body =>
@@ -188,5 +228,121 @@ describe('admins', () => {
     assert.equal(swept.status, 200, JSON.stringify(swept.json));
     assert.equal(swept.json.object, 'reserved_deposit_sweep');
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'reserved_accounts.swept' } }));
+  });
+});
+
+describe('dedicated account provider priority', () => {
+  let operations;
+  const paystackFirst = ['paystack', 'flutterwave'];
+  const reserve = browser => browser.post('/v1/wallet/reserved-accounts', { phone: '+2348031234567' });
+  const saves = () => paystack.calls.filter(call => call.method === 'POST' && call.url === '/dedicated_account');
+  const notify = async (reference, valid = true) => {
+    const body = JSON.stringify({ event: 'charge.success', data: { reference, amount: 1, authorization: { channel: 'dedicated_nuban' } } });
+    const signature = createHmac('sha512', valid ? paystackKey : 'bad-key').update(body).digest('hex');
+    const response = await fetch(`${server.base}/v1/webhooks/paystack`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-paystack-signature': signature }, body });
+    return { status: response.status, data: await response.json() };
+  };
+  before(async () => {
+    operations = await adminClient(server, ['operations']);
+    const path = '/v1/admin/countries/NG';
+    assert.equal((await finance.patch(path, { dva_gateway_priority: paystackFirst })).status, 403);
+    assert.equal((await operations.patch(path, { dva_gateway_priority: ['paystack', 'paystack'] })).status, 400);
+    const saved = await operations.patch(path, { dva_gateway_priority: paystackFirst });
+    assert.deepEqual([saved.status, saved.json.dva_gateway_priority], [200, paystackFirst]);
+  });
+
+  test('Paystack issues once and its verified deposit credits the correct wallet once', async () => {
+    const { browser, resellerId } = await liveReseller();
+    const created = await reserve(browser);
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    const account = await prisma.reservedAccount.findFirstOrThrow({ where: { resellerId } });
+    assert.equal(account.provider, 'paystack');
+    const request = await prisma.reservedAccountRequest.findFirstOrThrow({ where: { resellerId, provider: 'paystack' } });
+    assert.match(request.providerCustomerId, /^CUS_/);
+    assert.equal(saves().at(-1).body.phone, '+2348031234567');
+    assert.equal(saves().at(-1).body.bvn, undefined);
+    const calls = saves().length;
+    const again = await reserve(browser);
+    assert.equal(again.json.data[0].account_number, account.accountNumber);
+    assert.equal(saves().length, calls);
+
+    const ref = 'dva.transfer.1';
+    const transfer = {
+      id: 99128, reference: ref, status: 'success', amount: 180000, fees: 100, currency: 'NGN', domain: 'live',
+      authorization: { channel: 'dedicated_nuban', receiver_bank_account_number: account.accountNumber },
+      customer: { customer_code: request.providerCustomerId },
+    };
+    paystackTransfers.set(ref, { ...transfer, authorization: { ...transfer.authorization, receiver_bank_account_number: '9999999999' } });
+    assert.equal((await notify(ref, false)).status, 401);
+    assert.equal((await notify(ref)).data.reason, 'unknown_account');
+    assert.equal((await browser.get('/v1/wallet')).json.available, 0);
+    paystackTransfers.set(ref, transfer);
+    assert.equal((await notify(ref)).data.credited, true);
+    assert.equal((await notify(ref)).data.reason, 'duplicate');
+    assert.equal((await browser.get('/v1/wallet')).json.available, transfer.amount);
+  });
+
+  test('falls back on a definite refusal, and uses the new order the next time', async () => {
+    const { browser, resellerId } = await liveReseller();
+    paystackReply = 'refused';
+    try {
+      assert.equal((await reserve(browser)).status, 201);
+      assert.equal((await prisma.reservedAccount.findFirstOrThrow({ where: { resellerId } })).provider, 'flutterwave');
+    } finally {
+      paystackReply = 'success';
+    }
+    const path = '/v1/admin/countries/NG';
+    assert.equal((await operations.patch(path, { dva_gateway_priority: ['flutterwave', 'paystack'] })).status, 200);
+    try {
+      const next = await liveReseller();
+      const calls = saves().length;
+      assert.equal((await reserve(next.browser)).status, 201);
+      assert.equal(saves().length, calls);
+    } finally {
+      await operations.patch(path, { dva_gateway_priority: paystackFirst });
+    }
+  });
+
+  test('a confirmed storefront customer gets a Paystack account for their own wallet', async () => {
+    const shopper = client(server.base, { autoIdempotency: true });
+    const email = 'paystack-dva-shopper@example.com';
+    const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery', country: 'NG' });
+    assert.equal(signup.status, 201, JSON.stringify(signup.json));
+    const session = { 'bitocard-customer-session': signup.json.session.token };
+    const accountPath = '/v1/store/wallet/reserved-accounts';
+    const payload = { bvn: '22222222222', phone: '+2348031234567' };
+    assert.equal((await shopper.post(accountPath, payload, session)).status, 403);
+    assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) }, session)).status, 200);
+    const opened = await shopper.post(accountPath, payload, session);
+    assert.equal(opened.status, 200, JSON.stringify(opened.json));
+    const id = signup.json.customer.id;
+    const account = await prisma.reservedAccount.findFirstOrThrow({ where: { customerId: id } });
+    assert.equal(account.provider, 'paystack');
+    const request = await prisma.reservedAccountRequest.findFirstOrThrow({ where: { customerId: id, provider: 'paystack' } });
+    const ref = 'dva.customer.transfer.1';
+    paystackTransfers.set(ref, { id: 99129, reference: ref, status: 'success', amount: 24600, currency: 'NGN', domain: 'live',
+      authorization: { channel: 'dedicated_nuban', receiver_bank_account_number: account.accountNumber },
+      customer: { customer_code: request.providerCustomerId } });
+    assert.equal((await notify(ref)).data.credited, true);
+    assert.equal((await shopper.get('/v1/store/wallet', session)).json.balance, 24600);
+  });
+
+  test('looks up a lost Paystack assignment before trying another provider', async () => {
+    const { browser, resellerId } = await liveReseller();
+    const path = '/v1/admin/countries/NG';
+    paystackReply = 'lost';
+    try {
+      const pending = await reserve(browser);
+      assert.deepEqual([pending.status, pending.json.error.code], [409, 'reserved_account_in_progress']);
+      assert.equal(await prisma.reservedAccountRequest.count({ where: { resellerId, provider: 'flutterwave' } }), 0);
+      assert.equal((await operations.patch(path, { dva_gateway_priority: ['flutterwave', 'paystack'] })).status, 200);
+      const calls = saves().length;
+      assert.equal((await reserve(browser)).status, 201);
+      assert.equal(saves().length, calls);
+      assert.equal((await prisma.reservedAccount.findFirstOrThrow({ where: { resellerId } })).provider, 'paystack');
+    } finally {
+      paystackReply = 'success';
+      await operations.patch(path, { dva_gateway_priority: paystackFirst });
+    }
   });
 });

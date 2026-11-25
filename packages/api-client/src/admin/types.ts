@@ -481,6 +481,8 @@ export type AdminPricePreviewArgs = {
 export type SwitchRow = { object: 'switch'; key: string; scope: 'global' | 'country' | 'reseller'; country_code: string | null; reseller_id: string | null; enabled: boolean };
 /** `default`: the switch's value where no admin has set it. */
 export type Switches = List<SwitchRow> & { definitions: Record<string, { scopes: string[]; description: string; default: boolean }> };
+export type DvaGateway = 'flutterwave' | 'paystack';
+
 export type Country = {
   object: 'country';
   code: string;
@@ -488,6 +490,7 @@ export type Country = {
   currency: string;
   reseller_signup: boolean;
   reserved_accounts: boolean;
+  dva_gateway_priority?: DvaGateway[];
   markup_cap_percent: number | null;
   payout_hold_days: number;
   min_withdrawal_minor: number;

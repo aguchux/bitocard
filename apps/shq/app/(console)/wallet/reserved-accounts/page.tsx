@@ -160,6 +160,8 @@ function BvnStep({ check, owner, onRefresh, refreshing }: { check: BvnCheck | un
 
 function CreateAccounts({ nigeria, sandbox }: { nigeria: boolean; sandbox: boolean }) {
   const { membership } = useReseller();
+  const phoneId = useId();
+  const [phone, setPhone] = useState("");
   // Live accounts are switched on by BitoCard per reseller; the sandbox always offers them.
   const settings = useResellerSettingsQuery(undefined, { skip: sandbox });
   const switchedOn = sandbox || Boolean(settings.data?.features.reserved_accounts);
@@ -180,7 +182,12 @@ function CreateAccounts({ nigeria, sandbox }: { nigeria: boolean; sandbox: boole
       <div className="mx-auto max-w-md space-y-4">
         {needsBvn ? <Notice tone="green">Your BVN is verified.</Notice> : null}
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-        <Button className="w-full" loading={state.isLoading} onClick={() => create()}>
+        {sandbox ? null : (
+          <Field label="Phone number" htmlFor={phoneId} hint="Leave blank to use the owner's number on file.">
+            <Input id={phoneId} type="tel" autoComplete="tel" maxLength={16} value={phone} onChange={event => setPhone(event.target.value)} />
+          </Field>
+        )}
+        <Button className="w-full" loading={state.isLoading} onClick={() => create(phone.trim() ? { phone: phone.trim() } : undefined)}>
           Create my account
         </Button>
       </div>

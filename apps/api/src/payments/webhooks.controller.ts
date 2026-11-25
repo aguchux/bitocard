@@ -21,7 +21,7 @@ type StripeEvent = { type?: string; data?: { object?: { id?: string; object?: st
 
 type PawapayDeposit = { depositId?: string };
 
-type PaystackEvent = { event?: string; data?: { reference?: string } };
+type PaystackEvent = { event?: string; data?: { reference?: string; channel?: string; authorization?: { channel?: string } } };
 
 /**
  * Notifications from payment providers. Each is authenticated, then the result is re-read from the provider before
@@ -101,6 +101,9 @@ export class ProviderWebhooksController {
   async paystack(@Req() req: Request & { rawBody?: Buffer }, @Body() body: PaystackEvent) {
     if (!this.providers.paystack?.webhookTrusted(req.rawBody, req.get('x-paystack-signature'))) throw untrusted();
     if (body.event === 'charge.success' && body.data?.reference) {
+      if (body.data.channel === 'dedicated_nuban' || body.data.authorization?.channel === 'dedicated_nuban') {
+        return { received: true, ...(await this.payments.paystackDeposit(body.data.reference)) };
+      }
       return { received: true, ...(await this.payments.paymentNotice('paystack', { reference: fromPaystackReference(body.data.reference) })) };
     }
     return { received: true };
