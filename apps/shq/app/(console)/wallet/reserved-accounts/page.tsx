@@ -172,7 +172,7 @@ function CreateAccounts({ nigeria, sandbox }: { nigeria: boolean; sandbox: boole
   const body = (() => {
     if (!sandbox && settings.isLoading) return <Skeleton className="mx-auto h-24 w-full max-w-md" />;
     if (!switchedOn) {
-      return <Notice tone="grey" title="Not switched on for your account yet">Bank transfer accounts are opened once BitoCard switches them on for you. Contact support, or top up through the payment page meanwhile.</Notice>;
+      return <Notice tone="grey" title="Not switched on for your account yet">BitoCard needs to enable virtual accounts for your business. Contact support or use a payment gateway to top up.</Notice>;
     }
     if (needsBvn && !bvn.data?.verified) {
       if (bvn.isLoading) return <Skeleton className="mx-auto h-24 w-full max-w-md" />;
@@ -188,7 +188,7 @@ function CreateAccounts({ nigeria, sandbox }: { nigeria: boolean; sandbox: boole
           </Field>
         )}
         <Button className="w-full" loading={state.isLoading} onClick={() => create(phone.trim() ? { phone: phone.trim() } : undefined)}>
-          Create my account
+          Get my account number
         </Button>
       </div>
     );
@@ -196,8 +196,8 @@ function CreateAccounts({ nigeria, sandbox }: { nigeria: boolean; sandbox: boole
 
   return (
     <Card className="p-5 sm:p-6">
-      <EmptyState title="No bank transfer account yet" icon={<Landmark className="size-6" aria-hidden />}>
-        Get your own bank account number. Money you transfer into it tops up your wallet automatically, without a payment page.
+      <EmptyState title="Get a virtual account" icon={<Landmark className="size-6" aria-hidden />}>
+        Get a dedicated bank account number. Transfers to it top up your wallet automatically.
       </EmptyState>
       {body}
     </Card>
@@ -270,10 +270,10 @@ export default function ReservedAccountsPage() {
   const [simulating, setSimulating] = useState<ReservedAccount | null>(null);
 
   return (
-    <ShqShell section="wallet" current="/wallet/reserved-accounts" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Bank transfer accounts" }]}>
-      <PageHeader title="Bank transfer accounts" description="Top up by bank transfer: your own account numbers, credited to your wallet automatically." />
+    <ShqShell section="wallet" current="/wallet/reserved-accounts" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Virtual accounts" }]}>
+      <PageHeader title="Virtual accounts" description="Fund your wallet by transferring to your dedicated bank account number." />
       {!allowed ? (
-        <Notice tone="grey" title="No access to bank transfer accounts">
+        <Notice tone="grey" title="No access to virtual accounts">
           Only the owner, admins and finance members can see these accounts.
         </Notice>
       ) : (
@@ -290,7 +290,7 @@ export default function ReservedAccountsPage() {
           {({ data: list }) =>
             list.length === 0 && !offered ? (
               <Notice tone="grey" title="Not offered in your country yet">
-                {`Bank transfer accounts are not available in ${country.data?.name ?? "your country"} yet. Top up by card or bank on the Top-ups page instead.`}
+                {`Virtual accounts are not available in ${country.data?.name ?? "your country"} yet. You can use a payment gateway on the Top-ups page.`}
               </Notice>
             ) : list.length === 0 ? (
               <CreateAccounts nigeria={membership.reseller.country === "NG"} sandbox={sandbox} />

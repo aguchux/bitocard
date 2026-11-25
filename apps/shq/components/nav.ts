@@ -91,7 +91,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     items: [
       { label: "Balance", href: "/wallet", icon: Wallet },
       { label: "Top-ups", href: "/wallet/top-ups", icon: CreditCard },
-      { label: "Bank transfer accounts", href: "/wallet/reserved-accounts", icon: Landmark },
+      { label: "Virtual accounts", href: "/wallet/reserved-accounts", icon: Landmark },
       { label: "Withdrawals", href: "/wallet/payouts", icon: Banknote },
       { label: "Payout bank accounts", href: "/wallet/bank-accounts", icon: Building },
       { label: "Invoices", href: "/wallet/invoices", icon: ReceiptText },

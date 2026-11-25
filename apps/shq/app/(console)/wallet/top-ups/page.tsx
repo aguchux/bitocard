@@ -7,9 +7,10 @@ import { Button, Card, CardHeader, DataTable, errorMessage, Field, formatDateTim
 import { type PaymentGateway, type TopUp, useCancelTopUpMutation, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpMethodsQuery, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
 import { parseMoney } from "@bitocard/api-client/money";
 import { MoneyField } from "@/components/money-field";
+import { PaymentGatewayHeading } from "@/components/payment-gateway-heading";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
-import { walletName, WalletSwitch } from "@/components/wallets";
+import { VirtualAccountLink, walletName, WalletSwitch } from "@/components/wallets";
 
 /** Smallest and largest top-up the API accepts, in minor units. */
 const minAmount = 100;
@@ -75,7 +76,7 @@ function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: b
         {methods.error ? <Notice tone="red">{errorMessage(methods.error, "Could not load the payment methods.")}</Notice> : null}
         {unavailable ? (
           <Notice tone="grey" title={primary ? "Payment page top-ups are not available in your country yet" : "US dollar top-ups are not available in your country yet"}>
-            {primary ? "Use your bank transfer accounts (Wallet > Bank transfer accounts) where they are offered, or contact BitoCard support." : "Top up your country wallet instead, or contact BitoCard support."}
+            {primary ? "Use a virtual account where available, or contact BitoCard support." : "Top up your country wallet instead, or contact BitoCard support."}
           </Notice>
         ) : null}
         {offered.length > 0 ? (
@@ -89,7 +90,7 @@ function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: b
                 >
                   <input type="radio" name={`${id}-method`} value={item.id} checked={method === item.id} onChange={() => setChosen(item.id)} className="mt-1 accent-brand-500" />
                   <span>
-                    <span className="block text-sm font-semibold text-ink">{item.label}</span>
+                    <PaymentGatewayHeading gateway={item.id} />
                     <span className="block text-xs text-muted">{item.description}</span>
                     {item.networks?.length ? <span className="mt-1 block text-xs font-semibold text-ink">{item.networks.join(" · ")}</span> : null}
                   </span>
@@ -118,11 +119,12 @@ function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: b
               />
             </Field>
           </div>
-          <Button type="submit" className="sm:mt-7" loading={state.isLoading} disabled={!currency || !value.trim() || unavailable} icon={<CreditCard className="size-4" aria-hidden />}>
+          <Button type="submit" className="sm:mt-7" loading={state.isLoading} disabled={!currency || !value.trim() || (!sandbox && !method)} icon={<CreditCard className="size-4" aria-hidden />}>
             {sandbox ? "Create test top-up" : "Continue to payment"}
           </Button>
         </div>
       </form>
+      {primary && currency ? <VirtualAccountLink className="mt-5" /> : null}
     </Card>
   );
 }

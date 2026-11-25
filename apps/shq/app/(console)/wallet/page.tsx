@@ -8,7 +8,7 @@ import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, form
 import { type Chargeback, type WalletTransaction, useWalletChargebacksQuery, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
-import { ConvertDialog, walletName, WalletSwitch } from "@/components/wallets";
+import { ConvertDialog, VirtualAccountLink, walletName, WalletSwitch } from "@/components/wallets";
 
 const primaryLink = "inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-600";
 const secondaryLink = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-brand-500 bg-white px-4 text-sm font-semibold text-brand-600 hover:bg-brand-50";
@@ -103,6 +103,7 @@ function Wallets() {
                 Top up
               </Link>
             ) : null}
+            {data && !dollars && can(membership, "admin", "finance") ? <VirtualAccountLink /> : null}
             {can(membership, "admin", "finance") && other && data ? (
               <Button variant="secondary" icon={<ArrowLeftRight className="size-4" aria-hidden />} onClick={() => setConverting(true)}>
                 Convert

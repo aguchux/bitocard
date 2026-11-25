@@ -1,14 +1,37 @@
 "use client";
 
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { ArrowLeftRight } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeftRight, Landmark, Plus } from "lucide-react";
 import { Button, cn, Dialog, errorMessage, Field, formatMoney, Notice, useDebouncedValue } from "@bitocard/admin-ui";
 import { parseMoney, withSymbol } from "@bitocard/api-client/money";
-import { type WalletConversion, type WalletSummary, useConvertWalletMutation } from "@bitocard/api-client/reseller";
+import { type WalletConversion, type WalletSummary, useConvertWalletMutation, usePublicCountryQuery, useReservedAccountsQuery, useResellerSettingsQuery } from "@bitocard/api-client/reseller";
 import { MoneyField } from "@/components/money-field";
+import { useReseller } from "@/components/reseller";
 
 /** "US dollars" for USD, otherwise the currency code. */
 export const walletName = (currency: string) => (currency === "USD" ? "US dollar wallet" : `${currency} wallet`);
+
+export function VirtualAccountLink({ className }: { className?: string }) {
+  const { membership, mode } = useReseller();
+  const code = membership.reseller.country;
+  const sandbox = mode === "test";
+  const country = usePublicCountryQuery(code ?? "", { skip: !code });
+  const settings = useResellerSettingsQuery(undefined, { skip: sandbox });
+  const accounts = useReservedAccountsQuery();
+  const hasAccount = Boolean(accounts.data?.data.length);
+  const canOpen = accounts.isSuccess && country.data?.reserved_accounts
+    && (sandbox || (membership.reseller.status === "active" && settings.data?.features.reserved_accounts));
+  if (!hasAccount && !canOpen) return null;
+
+  const Icon = hasAccount ? Landmark : Plus;
+  return (
+    <Link href="/wallet/reserved-accounts" className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-brand-500 bg-white px-4 text-sm font-semibold text-brand-600 hover:bg-brand-50", className)}>
+      <Icon className="size-4" aria-hidden />
+      {hasAccount ? "View virtual account" : "Get a virtual account"}
+    </Link>
+  );
+}
 
 /**
  * The reseller's wallets side by side (their country's currency, then US dollars), each with what it can spend; the

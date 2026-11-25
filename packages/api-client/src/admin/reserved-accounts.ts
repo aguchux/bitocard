@@ -29,7 +29,7 @@ export type ReservedAccountsFilter = { mode?: Mode; status?: ReservedAccountRequ
 /** Reserved bank accounts across every wallet (operations, finance, support), and the deposit sweep (finance, operations). */
 export const adminReservedAccountsApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
-    reservedAccounts: build.query<List<AdminReservedAccountRequest>, ReservedAccountsFilter>({
+    adminReservedAccounts: build.query<List<AdminReservedAccountRequest>, ReservedAccountsFilter>({
       query: filter => ({ url: '/v1/admin/reserved-accounts', params: { ...Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined && value !== '')), limit: 100 } }),
       providesTags: ['ReservedAccount'],
     }),
@@ -40,4 +40,4 @@ export const adminReservedAccountsApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useReservedAccountsQuery, useSweepReservedDepositsMutation } = adminReservedAccountsApi;
+export const { useAdminReservedAccountsQuery: useReservedAccountsQuery, useSweepReservedDepositsMutation } = adminReservedAccountsApi;
