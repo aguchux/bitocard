@@ -64,11 +64,21 @@ afterEach(() => {
 });
 
 describe("Add funds", () => {
-  test("one amount, then card or bank deposit as choices side by side; the card is chosen first", () => {
-    const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card]), bankDeposits: options }));
+  test("one amount, then branded gateways and bank deposit; the first gateway is chosen", () => {
+    const paystack = { ...card, id: "paystack", label: "Card, bank or USSD", description: "Cards and bank transfer" };
+    const flutterwave = { ...card, id: "flutterwave", label: "Card, bank or mobile money", description: "Cards and mobile money" };
+    const html = renderToStaticMarkup(createElement(AddFunds, { wallet: wallet([card, paystack, flutterwave]), bankDeposits: options }));
     expect(html.match(/name="amount"/g)).toHaveLength(1);
     expect(html).toContain('checked="" value="stripe"');
+    for (const [id, name] of [["stripe", "Stripe"], ["paystack", "Paystack"], ["flutterwave", "Flutterwave"]]) {
+      expect(html).toContain(`value="${id}"`);
+      expect(html).toContain(`src="/payment-gateways/${id}.svg"`);
+      expect(html).toContain(`>${name}</span>`);
+    }
+    expect(html).toContain("Cards and bank transfer");
+    expect(html).not.toContain(">Card, bank or USSD</span>");
     expect(html).toContain('value="bank_deposit"');
+    expect(html).toContain("Bank deposit");
     expect(html).toContain("Continue to payment");
     expect(html).not.toContain("Get the account details");
   });

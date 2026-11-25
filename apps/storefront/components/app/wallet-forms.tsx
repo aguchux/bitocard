@@ -5,6 +5,7 @@ import { ArrowLeftRight, Banknote, Landmark, Plus, Trash2, X } from "lucide-reac
 import { formatFace, walletName, type StoreBankDepositOptions, type StorePaymentMethod, type StoreWallet, type StoreWalletCurrencyOption } from "@bitocard/api-client/storefront";
 import { MoneyInput } from "@bitocard/ui/money-input";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
+import { PaymentMethodHeading } from "@/components/store/payment-method-heading";
 import type { FormState } from "@/lib/account-actions";
 import { startBankDeposit } from "@/lib/bank-deposits";
 import { addWallet, type ConversionState, convertWallets, openBankAccount, removeWallet, simulateDeposit, topUpWallet } from "@/lib/wallet";
@@ -43,10 +44,7 @@ export function FundsForm({ currency, primary = true, methods, amount, sandbox, 
               <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
                 <input type="radio" name="method" value={item.id} checked={choice === item.id} onChange={() => setChoice(item.id)} className="mt-1 accent-brand-500" />
                 <span>
-                  <span className="flex items-center gap-1.5 text-sm font-semibold">
-                    {item.id === bankDepositChoice ? <Banknote className="size-4" aria-hidden="true" /> : null}
-                    {item.label}
-                  </span>
+                  <PaymentMethodHeading id={item.id} label={item.label} />
                   <span className="block text-xs text-slate-500">{item.description}</span>
                   {item.networks.length ? (
                     <span className="mt-1.5 flex flex-wrap gap-1" aria-label={`Networks: ${item.networks.join(", ")}`}>
