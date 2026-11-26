@@ -493,7 +493,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     id: 'africas_talking',
     name: 'Africa’s Talking',
     description:
-      'Mobile airtime (any amount, every network in its countries) and data bundles (the plans set below), paid from BitoCard’s Africa’s Talking wallet. Without the username and API key it serves only the sandbox, never live orders.',
+      'Mobile airtime and data bundles paid from BitoCard’s Africa’s Talking wallet. Published Kenya and Nigeria data packages are built in; account-specific plans below replace them. Without the username and API key it serves only the sandbox, never live orders.',
     webhookPath: '/v1/webhooks/africas-talking?token=<callback token>',
     fields: [
       field('AFRICAS_TALKING_USERNAME', 'Username', { required: true, help: 'Your app’s username (Africa’s Talking dashboard > your team > the app). Its sandbox app’s username is always sandbox.' }),
@@ -511,7 +511,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('AFRICAS_TALKING_DATA_PLANS', 'Data plans', {
         kind: 'data_plans',
         required: false,
-        help: 'Africa’s Talking’s API has no plan list (a send names only the size and validity), so copy the bundles from its dashboard or price list for each network. One per line or separated by semicolons: country, network, size, validity (Day, Week, BiWeek, Month or Quarterly), the price customers know it by, BitoCard’s cost, for example KE safaricom 1GB Month 299 250.',
+        help: 'Leave empty to use Africa’s Talking’s published Kenya and Nigeria packages. To replace them with your account’s own schedule, enter one per line or separated by semicolons: country, network, size, validity (Day, Week, BiWeek, Month or Quarterly), retail face price, then BitoCard’s cost, for example KE safaricom 1GB Month 299 250.',
       }),
       field('AFRICAS_TALKING_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
       field('AFRICAS_TALKING_DATA_URL', 'Mobile Data address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),

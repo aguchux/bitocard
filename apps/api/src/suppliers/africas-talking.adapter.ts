@@ -3,6 +3,7 @@ import { Prisma, type ProductCategory } from '../generated/prisma/client.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
 import type { CatalogueItem, CatalogueScope, FulfilmentRequest, FulfilmentResult, SupplierAdapter } from './adapter.js';
 import { slug } from './adapter.js';
+import { dataValidities as validities, publishedAfricasTalkingDataPlans, type AfricasTalkingDataPlan as DataPlan, type DataValidity as Validity } from './africas-talking-data-plans.js';
 
 const Decimal = Prisma.Decimal;
 
@@ -42,13 +43,6 @@ const networkNames: Record<string, string> = {
   'cell-c': 'Cell C',
 };
 const networkName = (network: string) => networkNames[network] ?? network.replace(/(^|-)([a-z])/g, (_, dash: string, letter: string) => `${dash ? ' ' : ''}${letter.toUpperCase()}`);
-
-/** Africa's Talking's bundle validities and how the store names them. */
-const validities = { Day: '1 day', Week: '7 days', BiWeek: '14 days', Month: '30 days', Quarterly: '90 days' } as const;
-type Validity = keyof typeof validities;
-
-/** A data bundle as set up by an admin: Africa's Talking publishes no plan or price list, so each plan is configured. */
-export type DataPlan = { country: string; network: string; quantity: number; unit: 'MB' | 'GB'; validity: Validity; price: string; cost: string };
 
 const lines = (value: string | undefined) =>
   (value ?? '')
@@ -120,7 +114,7 @@ export function parseDataPlans(value: string | undefined): { plans: DataPlan[]; 
       problems.push(`"${line}"`);
       continue;
     }
-    plans.push({ country: match[1].toUpperCase(), network: slug(match[2]), quantity: Number(match[3]), unit: match[4].toUpperCase() as 'MB' | 'GB', validity, price: match[6], cost: match[7] });
+    plans.push({ country: match[1].toUpperCase(), network: networkSlug(match[2]), quantity: Number(match[3]), unit: match[4].toUpperCase() as 'MB' | 'GB', validity, price: match[6], cost: match[7] });
   }
   return { plans, problems };
 }
@@ -170,8 +164,8 @@ export type AfricasTalkingConfig = {
  *   integration setting; the actual discount each send reports is kept for reconciliation). Africa's Talking lists no products, so every airtime country it serves is stocked
  *   whichever market asks (as pawaPay's catalogue is), but each country's offers serve only that country's
  *   resellers and their customers, in their own currency, never another country's (`domesticOnly`).
- * - **Data** bundles are the plans an admin sets (Africa's Talking publishes no plan list), sent through the Mobile
- *   Data product made in its dashboard, each at the price customers know it by (face value) and BitoCard's cost.
+ * - **Data** bundles use Africa's Talking's published package list unless an admin sets an account-specific list,
+ *   sent through the Mobile Data product made in its dashboard, each at its retail face price and published cost.
  *
  * Sends carry our reference as the `Idempotency-Key`, and data sends also in their metadata (echoed by callbacks).
  * Africa's Talking replies `Sent`/`Queued` while the network works: the order waits for the status callback or the
@@ -267,7 +261,9 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
   }
 
   private data(country: string | null): CatalogueItem[] {
-    const { plans, problems } = parseDataPlans(this.config.dataPlans);
+    const configured = parseDataPlans(this.config.dataPlans);
+    const plans = lines(this.config.dataPlans).length ? configured.plans : [...publishedAfricasTalkingDataPlans];
+    const problems = configured.problems;
     if (problems.length) this.report.push(`Data plans not understood: ${problems.join(', ')}.`);
     if (!this.config.dataProduct?.trim()) {
       if (plans.length) this.report.push('Set the Mobile Data product name before data plans can be synced.');
@@ -397,7 +393,8 @@ export async function africasTalkingCheck(apiUrl: string, username: string | und
 
 /**
  * Test connection for Mobile Data: the Mobile Data wallet's balance (`bundles…/query/wallet/balance`), proving the
- * same username and key reach the bundles API too. Africa's Talking has no plan list to read: the plans are set.
+ * same username and key reach the bundles API too. The package catalogue comes from the published fallback or the
+ * account-specific plans set by an admin; Africa's Talking exposes no package-list API to query here.
  */
 export async function africasTalkingDataCheck(dataUrl: string, username: string | undefined, apiKey: string | undefined) {
   const query = new URLSearchParams({ username: (username ?? '').trim() });

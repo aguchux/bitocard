@@ -59,6 +59,6 @@ describe("the data plans editor", () => {
     expect(screen.getByText("KE nonsense")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(onChange.mock.lastCall).toEqual(["", null]);
-    expect(screen.getByText(/No data plans yet/)).toBeTruthy();
+    expect(screen.getByText(/Using Africa’s Talking’s published Kenya and Nigeria packages/)).toBeTruthy();
   });
 });

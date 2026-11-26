@@ -110,7 +110,18 @@ describe('Africa’s Talking catalogue', () => {
       'empty: the countries Africa’s Talking lists airtime as live in',
     );
     assert.deepEqual(parseDataPlans('ng mtn 2gb biweek 600 540').plans, [{ country: 'NG', network: 'mtn', quantity: 2, unit: 'GB', validity: 'BiWeek', price: '600', cost: '540' }]);
+    assert.deepEqual(parseDataPlans('NG t2 2GB Month 1000 965').plans, [{ country: 'NG', network: '9mobile', quantity: 2, unit: 'GB', validity: 'Month', price: '1000', cost: '965' }]);
     assert.deepEqual(atAmount('KES 100.5000'), { currency: 'KES', minor: 10050n });
+  });
+
+  test('the published package list supplies Nigeria and Kenya when no account-specific plans are set', async () => {
+    const adapter = new AfricasTalkingAdapter({ username: 'bitocard', apiKey: 'at-key', apiUrl: at.url, dataUrl: at.url, dataProduct: 'BitoCard Data' });
+    const nigeria = await adapter.catalogue({ category: 'data', country: 'NG' });
+    const kenya = await adapter.catalogue({ category: 'data', country: 'KE' });
+    assert.deepEqual([nigeria.length, kenya.length], [88, 5]);
+    assert.ok(nigeria.some(item => item.productKey === 'data:NG:mtn:1gb-1-day' && item.fixedValues[0] === 50_000n && item.costRatio === '0.98'));
+    assert.ok(nigeria.some(item => item.productKey === 'data:NG:9mobile:2gb-30-days' && item.fixedValues[0] === 100_000n && item.costRatio === '0.965'));
+    assert.ok(kenya.some(item => item.productKey === 'data:KE:safaricom:1gb-7-days' && item.fixedValues[0] === 20_500n));
   });
 
   test('airtime discounts are set per network, per country or for everything, the most specific winning', async () => {

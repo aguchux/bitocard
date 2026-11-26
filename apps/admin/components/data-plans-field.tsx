@@ -52,7 +52,7 @@ export function DataPlansField({ value, disabled, onChange }: { value: string; d
         </Notice>
       ) : null}
 
-      {rows.length === 0 ? <p className="rounded-lg border border-dashed border-line p-4 text-sm text-muted">No data plans yet. Add the bundles you sell from Africa’s Talking’s dashboard.</p> : null}
+      {rows.length === 0 ? <p className="rounded-lg border border-dashed border-line p-4 text-sm text-muted">Using Africa’s Talking’s published Kenya and Nigeria packages. Add rows only to replace them with your account’s own schedule.</p> : null}
 
       <ol className="space-y-3">
         {rows.map((row, index) => {
