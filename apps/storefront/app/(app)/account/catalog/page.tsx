@@ -109,41 +109,41 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
       {group === "mobile" ? <MobileActions exchangeOpen={exchangeOpen} /> : null}
 
       {giftCards && giftCardCountries.length ? (
-        <form method="get" action="/account/catalog" className="group ml-auto flex max-w-4xl flex-wrap items-end gap-2">
+        <form method="get" action="/account/catalog" className="group grid w-full grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 shadow-sm sm:grid-cols-2 sm:p-4 xl:grid-cols-4">
           <SubmitOnChange />
           <input type="hidden" name="group" value={group} />
           {q ? <input type="hidden" name="q" value={q} /> : null}
           {brand ? <input type="hidden" name="brand" value={brand} /> : null}
           {sell ? <input type="hidden" name="sell" value={sell} /> : null}
-          <label className="min-w-0 flex-1 text-sm font-semibold text-navy-900">
+          <label className="min-w-0 text-sm font-semibold text-navy-900">
             Gift card country
-            <select name="country" defaultValue={selectedCountry} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal sm:text-sm">
+            <select name="country" defaultValue={selectedCountry} className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base font-normal shadow-xs transition focus:border-brand-400 focus:ring-3 focus:ring-pink-100 focus:outline-none sm:text-sm">
               <option value="">All countries</option>
               {giftCardCountries.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
             </select>
           </label>
-          <label className="min-w-48 flex-1 text-sm font-semibold text-navy-900">
+          <label className="min-w-0 text-sm font-semibold text-navy-900">
             Gift card type
-            <select name="gift_category" defaultValue={giftCategory} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal sm:text-sm">
+            <select name="gift_category" defaultValue={giftCategory} className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base font-normal shadow-xs transition focus:border-brand-400 focus:ring-3 focus:ring-pink-100 focus:outline-none sm:text-sm">
               <option value="">All Gift Cards</option>
               {giftCardFacets?.categories.filter(item => item.products > 0).map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
             </select>
           </label>
-          <label className="min-w-36 flex-1 text-sm font-semibold text-navy-900">
-            Rating
-            <select name="rating_min" defaultValue={rating} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal sm:text-sm">
-              <option value="">Any rating</option>
-              {[4, 3, 2, 1].map(value => <option key={value} value={value}>{value}+ stars</option>)}
-            </select>
-          </label>
-          <label className="min-w-48 flex-1 text-sm font-semibold text-navy-900">
+          <label className="min-w-0 text-sm font-semibold text-navy-900">
             Redeemable
-            <select name="redeemable" defaultValue={redemption} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal sm:text-sm">
+            <select name="redeemable" defaultValue={redemption} className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base font-normal shadow-xs transition focus:border-brand-400 focus:ring-3 focus:ring-pink-100 focus:outline-none sm:text-sm">
               <option value="">Any method</option>
               {giftCardFacets?.redemption_channels.filter(item => item.products > 0).map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
             </select>
           </label>
-          <button type="submit" className="min-h-11 rounded-xl bg-navy-900 px-4 font-semibold text-white group-data-auto:hidden">Filter</button>
+          <label className="min-w-0 text-sm font-semibold text-navy-900">
+            Rating
+            <select name="rating_min" defaultValue={rating} className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base font-normal shadow-xs transition focus:border-brand-400 focus:ring-3 focus:ring-pink-100 focus:outline-none sm:text-sm">
+              <option value="">Any rating</option>
+              {[4, 3, 2, 1].map(value => <option key={value} value={value}>{value}+ stars</option>)}
+            </select>
+          </label>
+          <button type="submit" className="min-h-12 rounded-xl bg-navy-900 px-4 font-semibold text-white group-data-auto:hidden hover:bg-navy-800 sm:col-span-2 xl:col-span-4">Apply filters</button>
         </form>
       ) : null}
 
