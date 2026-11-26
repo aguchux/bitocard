@@ -54,8 +54,8 @@ export const sandboxSwitches = {
 type Config = Partial<Record<keyof AppConfig, unknown>>;
 
 /**
- * Gateways that tell test from live by the key itself, at the same address: Flutterwave's FLWSECK_TEST-… and Stripe's
- * sk_test_…/rk_test_… keys. A test key must never be used for live payments, where test cards would credit real money.
+ * Gateways that tell test from live by the key itself, at the same address: Flutterwave's FLWSECK_TEST-â€¦ and Stripe's
+ * sk_test_â€¦/rk_test_â€¦ keys. A test key must never be used for live payments, where test cards would credit real money.
  */
 const testKeyPatterns: Record<string, RegExp> = { flutterwave: /^FLWSECK_TEST/i, stripe: /^(sk|rk)_test_/, paystack: /^sk_test_/ };
 
@@ -66,6 +66,16 @@ export function isTestKey(id: string, key: string | undefined) {
 
 /** Whether BitoCard's own account with this integration is switched to the provider's sandbox. */
 export function inSandbox(config: Config, id: string) {
+  if (
+    id === 'remita' &&
+    typeof config.REMITA_API_URL === 'string' &&
+    URL.parse(config.REMITA_API_URL)?.hostname === 'api-demo.systemspecsng.com'
+  ) return true;
+  if (
+    id === 'prestmit' &&
+    typeof config.PRESTMIT_API_URL === 'string' &&
+    URL.parse(config.PRESTMIT_API_URL)?.hostname === 'dev-api.prestmit.io'
+  ) return true;
   const key = sandboxSwitches[id as keyof typeof sandboxSwitches];
   return Boolean(key && config[key] === true);
 }
@@ -73,6 +83,10 @@ export function inSandbox(config: Config, id: string) {
 /** One provider address for an environment: an override when set, otherwise the live or sandbox address. */
 function resolve(config: Config, address: Address, environment: Environment) {
   const set = config[address.key];
+  if (address.key === 'PRESTMIT_API_URL' && environment === 'sandbox' && typeof set === 'string') {
+    const host = URL.parse(set)?.hostname;
+    if (host === 'api.prestmit.io' || host === 'prestmit.com' || host === 'www.prestmit.com') return address.sandbox;
+  }
   if (typeof set === 'string' && set !== address.live) return set;
   return environment === 'sandbox' ? address.sandbox : address.live;
 }

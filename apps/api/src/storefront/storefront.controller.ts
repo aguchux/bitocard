@@ -6,6 +6,8 @@ import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../au
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import { NetworkDetectionService } from '../catalogue/network-detection.service.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
+import type { GiftCardCategory, GiftCardRedemptionChannel } from '../generated/prisma/client.js';
+import { giftCardCategories, giftCardRedemptionChannels } from '../catalogue/gift-card-taxonomy.js';
 import { categoryLabels, navigationGroups } from './layout.js';
 import { StorefrontAdminService } from './storefront-admin.service.js';
 import { StorefrontService } from './storefront.service.js';
@@ -111,6 +113,16 @@ class StoreProductsQueryDto {
   @IsString()
   @Length(1, 40)
   tag?: string;
+
+  @ApiPropertyOptional({ enum: giftCardCategories, description: 'Gift-card merchandising category.' })
+  @IsOptional()
+  @IsIn(giftCardCategories)
+  gift_category?: GiftCardCategory;
+
+  @ApiPropertyOptional({ enum: giftCardRedemptionChannels, description: 'How the gift card can be redeemed.' })
+  @IsOptional()
+  @IsIn(giftCardRedemptionChannels)
+  redeemable?: GiftCardRedemptionChannel;
 
   @ApiPropertyOptional({ description: 'Words to match in names, brands and the companies behind them.' })
   @IsOptional()
@@ -266,6 +278,13 @@ export class StorefrontController {
   @Header('Cache-Control', 'public, max-age=60')
   giftCardCountries(@Query() query: MarketQueryDto) {
     return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.giftCardCountries());
+  }
+
+  @ApiOperation({ summary: 'List gift card category and redemption facets' })
+  @Get('gift-card-facets')
+  @Header('Cache-Control', 'public, max-age=60')
+  giftCardFacets(@Query() query: MarketQueryDto) {
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.giftCardFacets());
   }
 
   @ApiOperation({ summary: 'Get a product', description: 'Its face values, how it is delivered, and related products.' })

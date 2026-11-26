@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, ShoppingCart, Store } from "lucide-react";
 import { Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatMoney, Input, LoadMore, Notice, PageHeader, useDebouncedValue } from "@bitocard/admin-ui";
-import { type CatalogueCategory, catalogueCategories, type Product, useCatalogueProductsInfiniteQuery, useGiftCardCountriesQuery, useSetListingMutation } from "@bitocard/api-client/reseller";
+import { type CatalogueCategory, catalogueCategories, type GiftCardCategory, type GiftCardRedemptionChannel, type Product, useCatalogueProductsInfiniteQuery, useGiftCardCountriesQuery, useGiftCardFacetsQuery, useSetListingMutation } from "@bitocard/api-client/reseller";
 import { ProductPricingDialog } from "@/components/product-pricing";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -131,11 +131,14 @@ export default function CataloguePage() {
   const manage = can(membership, "admin");
   const [category, setCategory] = useState<"" | CatalogueCategory>("");
   const [country, setCountry] = useState("");
+  const [giftCategory, setGiftCategory] = useState<GiftCardCategory | "">("");
+  const [redeemable, setRedeemable] = useState<GiftCardRedemptionChannel | "">("");
   const [listing, setListingFilter] = useState<Listing>("");
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim());
   const giftCardCountries = useGiftCardCountriesQuery(undefined, { skip: category !== "gift_cards" });
-  const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
+  const giftCardFacets = useGiftCardFacetsQuery(undefined, { skip: category !== "gift_cards" });
+  const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, gift_category: giftCategory || undefined, redeemable: redeemable || undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
   const rows = query.data?.pages.flatMap(page => page.data);
   const [opened, setOpen] = useState<Product | null>(null);
   const [pricing, setPricing] = useState<Product | null>(null);
@@ -174,10 +177,18 @@ export default function CataloguePage() {
           onChange={value => {
             setCategory(value as "" | CatalogueCategory);
             setCountry("");
+            setGiftCategory("");
+            setRedeemable("");
           }}
           options={[{ value: "", label: "All categories" }, ...catalogueCategories.map(value => ({ value, label: categoryName(value) }))]}
         />
         <FilterSelect id="country" label={category === "gift_cards" ? "Gift card country" : "Used in"} value={country} onChange={setCountry} options={[{ value: "", label: "All countries" }, ...countryOptions]} />
+        {category === "gift_cards" ? (
+          <>
+            <FilterSelect id="gift-category" label="Gift card type" value={giftCategory} onChange={value => setGiftCategory(value as GiftCardCategory | "")} options={[{ value: "", label: "All gift card types" }, ...(giftCardFacets.data?.categories.map(item => ({ value: item.code, label: `${item.name} (${item.products})` })) ?? [])]} />
+            <FilterSelect id="redeemable" label="Redeemable" value={redeemable} onChange={value => setRedeemable(value as GiftCardRedemptionChannel | "")} options={[{ value: "", label: "Any redemption method" }, ...(giftCardFacets.data?.redemption_channels.map(item => ({ value: item.code, label: item.name })) ?? [])]} />
+          </>
+        ) : null}
         <FilterSelect
           id="listing"
           label="Your store"

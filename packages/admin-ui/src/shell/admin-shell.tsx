@@ -8,9 +8,14 @@ import { AccountMenu, ConsoleShell, type Crumb } from './console-shell';
 import { menus, sections, type SectionKey } from './nav';
 import { NotificationBell } from './notifications';
 import { StepUpPrompt } from './step-up';
-import { AppLink, useAdmin, useMode } from './session';
+import { AppLink, can, useAdmin, useMode } from './session';
 
 export type { Crumb };
+
+const staffMenus = {
+  ...menus,
+  settings: { ...menus.settings, items: menus.settings.items.filter(item => item.href !== '/settings/team') },
+};
 
 function AdminAccountMenu() {
   const admin = useAdmin();
@@ -59,8 +64,9 @@ export function ModeSwitch() {
 
 /** The layout of every admin page (see ConsoleShell). */
 export function AdminShell({ section, current, crumbs, actions, children }: { section: SectionKey; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
+  const admin = useAdmin();
   return (
-    <ConsoleShell brand="Bitocard" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
+    <ConsoleShell brand="Bitocard" sections={sections} menus={can(admin) ? menus : staffMenus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
       {children}
       <StepUpPrompt />
     </ConsoleShell>

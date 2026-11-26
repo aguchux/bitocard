@@ -74,7 +74,7 @@ export class PrestmitAdapter implements SupplierAdapter {
     const most = Math.floor(card.maxPrice);
     if (least > most) return null;
     const cost = await this.client.buyCost(card.sku, least, 1);
-    if (cost.naira === null) return null;
+    if (!cost.available || cost.naira === null) return null;
     const fixed = least === most;
     const brand = matchBrand(card.category, card.title) ?? slug(card.category || card.title);
     const currency = card.currency.toLowerCase();

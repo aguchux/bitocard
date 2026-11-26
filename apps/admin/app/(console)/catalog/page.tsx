@@ -9,11 +9,15 @@ import { GiftCardRateDialog } from "./gift-card-rate";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type AdminProduct,
+  type GiftCardCategory,
+  type GiftCardFacets,
+  type GiftCardRedemptionChannel,
   productCategories,
   type ProductCategory,
   type SupplierOffer,
   useCountriesQuery,
   useGiftCardCountriesQuery,
+  useGiftCardFacetsQuery,
   useProductsInfiniteQuery,
   useSetProductListingMutation,
   useSuppliersQuery,
@@ -42,6 +46,65 @@ function ProductImage({ product, editable }: { product: AdminProduct; editable: 
         {state.error ? <span className="mr-auto text-sm text-red-700">{errorMessage(state.error)}</span> : null}
         <Button size="sm" disabled={!editable || !changed || (image.trim() !== "" && !image.trim().startsWith("https://"))} loading={state.isLoading} onClick={() => update({ id: product.id, image_url: image.trim() || null })}>
           Save image
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function GiftCardClassification({ product, facets, editable }: { product: AdminProduct; facets?: GiftCardFacets; editable: boolean }) {
+  const [update, state] = useUpdateProductMutation();
+  const [primary, setPrimary] = useState<GiftCardCategory | "">(product.gift_card_primary_category ?? "");
+  const [categories, setCategories] = useState<GiftCardCategory[]>(product.gift_card_categories);
+  const [channels, setChannels] = useState<GiftCardRedemptionChannel[]>(product.gift_card_redemption_channels);
+  const [countries, setCountries] = useState(product.gift_card_countries.join(", "));
+  const toggle = <T extends string>(values: T[], value: T) => values.includes(value) ? values.filter(item => item !== value) : [...values, value];
+  const countryCodes = countries.split(",").map(value => value.trim().toUpperCase()).filter(Boolean);
+  const validCountries = countryCodes.every(value => /^[A-Z]{2}$/.test(value));
+  return (
+    <div className="space-y-4 rounded-xl border border-line p-4">
+      <div>
+        <p className="font-semibold">Gift card classification</p>
+        <p className="text-xs text-muted">Reviewed values are locked and supplier syncs cannot overwrite them.</p>
+      </div>
+      <label className="block text-sm font-semibold">
+        Primary category
+        <select value={primary} disabled={!editable} onChange={event => setPrimary(event.target.value as GiftCardCategory | "")} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-white px-3 font-normal">
+          <option value="">Not classified</option>
+          {facets?.categories.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
+        </select>
+      </label>
+      <fieldset>
+        <legend className="text-sm font-semibold">Categories</legend>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {facets?.categories.map(item => (
+            <label key={item.code} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={categories.includes(item.code)} disabled={!editable} onChange={() => setCategories(value => toggle(value, item.code))} />
+              {item.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="text-sm font-semibold">Redemption</legend>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+          {facets?.redemption_channels.map(item => (
+            <label key={item.code} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={channels.includes(item.code)} disabled={!editable} onChange={() => setChannels(value => toggle(value, item.code))} />
+              {item.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <label className="block text-sm font-semibold">
+        Works in countries
+        <Input value={countries} disabled={!editable} onChange={event => setCountries(event.target.value)} placeholder="GB, US" className="mt-1" />
+        <span className="mt-1 block text-xs font-normal text-muted">Two-letter codes separated by commas. Leave empty for a global card.</span>
+      </label>
+      <div className="flex items-center justify-end gap-3">
+        {state.error ? <span className="mr-auto text-sm text-red-700">{errorMessage(state.error)}</span> : null}
+        <Button size="sm" disabled={!editable || !validCountries} loading={state.isLoading} onClick={() => update({ id: product.id, gift_card_primary_category: primary || null, gift_card_categories: categories, gift_card_redemption_channels: channels, gift_card_countries: countryCodes })}>
+          Review and lock
         </Button>
       </div>
     </div>
@@ -116,6 +179,8 @@ function Products() {
   const linkedSupplier = useSearchParams().get("supplier") ?? "";
   const [country, setCountry] = useState("");
   const [category, setCategory] = useState<"" | ProductCategory>("");
+  const [giftCategory, setGiftCategory] = useState<GiftCardCategory | "">("");
+  const [redeemable, setRedeemable] = useState<GiftCardRedemptionChannel | "">("");
   const [supplier, setSupplier] = useState(linkedSupplier);
   const [listing, setListing] = useState<Listing>("");
   const [search, setSearch] = useState("");
@@ -129,6 +194,8 @@ function Products() {
   const filter = {
     country: country || undefined,
     category: category || undefined,
+    gift_category: giftCategory || undefined,
+    redeemable: redeemable || undefined,
     supplier: supplier || undefined,
     listed: listing === "" ? undefined : listing === "listed",
     q: q.length >= 2 ? q : undefined,
@@ -139,6 +206,7 @@ function Products() {
   const suppliers = useSuppliersQuery();
   const countries = useCountriesQuery();
   const giftCardCountries = useGiftCardCountriesQuery(undefined, { skip: category !== "gift_cards" });
+  const giftCardFacets = useGiftCardFacetsQuery(undefined, { skip: category !== "gift_cards" && open?.category !== "gift_cards" });
   const countryOptions = category === "gift_cards" ? giftCardCountries.data?.data : countries.data?.data;
   const [updateProduct, productState] = useUpdateProductMutation();
   const rows = products.data?.pages.flatMap(page => page.data);
@@ -176,9 +244,17 @@ function Products() {
               onChange={value => {
                 setCategory(value as "" | ProductCategory);
                 setCountry("");
+                setGiftCategory("");
+                setRedeemable("");
               }}
               options={[{ value: "", label: "All categories" }, ...productCategories.map(value => ({ value, label: categoryName(value) }))]}
             />
+            {category === "gift_cards" ? (
+              <>
+                <FilterSelect id="gift-category" label="Gift card type" value={giftCategory} onChange={value => setGiftCategory(value as GiftCardCategory | "")} options={[{ value: "", label: "All gift card types" }, ...(giftCardFacets.data?.categories.map(item => ({ value: item.code, label: `${item.name} (${item.products})` })) ?? [])]} />
+                <FilterSelect id="redeemable" label="Redeemable" value={redeemable} onChange={value => setRedeemable(value as GiftCardRedemptionChannel | "")} options={[{ value: "", label: "Any redemption method" }, ...(giftCardFacets.data?.redemption_channels.map(item => ({ value: item.code, label: item.name })) ?? [])]} />
+              </>
+            ) : null}
             <FilterSelect
               id="supplier"
               label="Supplier"
@@ -325,6 +401,7 @@ function Products() {
               </Button>
             </div>
             <ProductImage key={`${current.id}:${current.image_url ?? ""}`} product={current} editable={operator} />
+            {current.category === "gift_cards" ? <GiftCardClassification key={`${current.id}:${current.gift_card_classification_status ?? ""}`} product={current} facets={giftCardFacets.data} editable={operator} /> : null}
             <ul className="space-y-3">
               {current.offers.map(offer => (
                 <OfferRow key={offer.id} offer={offer} />

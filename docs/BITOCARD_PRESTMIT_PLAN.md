@@ -1,5 +1,20 @@
 # BitoCard gift card selling, trading and Prestmit: implementation plan
 
+## Testing the integration
+
+BitoCard's checkout sandbox simulates gift card purchases and sale decisions, including wallet changes. Prestmit's Sandbox switch selects the provider environment for **Test connection** and sell-offer sync. With it on, synced sell offers are stored in test mode and live Prestmit purchases and sales are unavailable. Test connection reports availability for both provider flows.
+
+To exercise Prestmit itself from a local checkout, build the API with `npm run build -w @bitocard/api`. Set `PRESTMIT_SANDBOX_API_KEY` and `PRESTMIT_SANDBOX_API_SECRET` in your shell using activated keys from the [Prestmit sandbox](https://sandbox.prestmit.io). Run `npm run smoke:prestmit -w @bitocard/api` to check service availability, both catalogues, and a signed buy quote. The command always uses Prestmit's official sandbox URL.
+
+- For a test purchase, set `PRESTMIT_SANDBOX_BUY_SKU` and `PRESTMIT_SANDBOX_AMOUNT` to a sandbox SKU and whole face value. Set `PRESTMIT_SANDBOX_ACCOUNT_PIN` if your account requires it and make sure the sandbox NGN wallet has a test balance. Run `npm run smoke:prestmit -w @bitocard/api -- buy`.
+- For a test sale, set `PRESTMIT_SANDBOX_SELL_CARD_ID`, `PRESTMIT_SANDBOX_AMOUNT`, and either `PRESTMIT_SANDBOX_SELL_CODE` or `PRESTMIT_SANDBOX_SELL_PHOTO` using sandbox fixtures. Run `npm run smoke:prestmit -w @bitocard/api -- sell`.
+- Save the printed identifier. Run the same command with `-- buy-status <identifier>` or `-- sell-status <identifier>` to check history, including delivery for a completed purchase. If a submission times out, look it up by identifier before submitting again.
+- To verify actual webhook delivery, register the isolated test deployment's HTTPS `/v1/webhooks/prestmit` endpoint against the sandbox key and set that sandbox key's webhook signing secret on that deployment. Check delivery and the response in the Prestmit console when a sandbox trade changes status. The local API suites cover signed webhook processing and settlement with a fake provider.
+
+These local tests run against PGlite and a fake Prestmit HTTP server. From `apps/api`, after building, run `node --test test/gift-card-sales.test.mjs test/prestmit-supplier.test.mjs test/integrations.test.mjs`.
+
+## Original implementation proposal
+
 **Status:** planned on 12 November 2026. Nothing has been built. Today Prestmit is only:
 
 - a disabled supplier row (`prestmit`, gift cards, "Later (selling phase)");

@@ -15,7 +15,9 @@ import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, reg
 import { storeLayout, verifyStorePreview } from '../stores/store-home.service.js';
 import { templateFor } from '../stores/templates.js';
 import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
-import { giftCardCountrySearch, productCountries, productCountryName as countryName } from '../catalogue/product-countries.js';
+import { giftCardCountrySearch, giftCardProductCountries, productCountryName as countryName } from '../catalogue/product-countries.js';
+import { giftCardCategorySearch, giftCardFacets } from '../catalogue/gift-card-taxonomy.js';
+import type { GiftCardCategory, GiftCardRedemptionChannel } from '../generated/prisma/client.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;
@@ -36,6 +38,8 @@ export type StoreProductFilter = {
   country?: string;
   brand?: string;
   tag?: string;
+  gift_category?: GiftCardCategory;
+  redeemable?: GiftCardRedemptionChannel;
   q?: string;
   sort?: 'popular' | 'name' | 'new';
   limit?: number;
@@ -319,6 +323,11 @@ export class StorefrontService {
       /** The face values in the signed-in customer's currency (`currency` asked), or null. */
       price: this.localPrice(product.faceCurrency, from, to),
       description: product.description,
+      gift_card_primary_category: product.giftCardPrimaryCategory,
+      gift_card_categories: product.giftCardCategories,
+      gift_card_redemption_channels: product.giftCardRedemptionChannels,
+      gift_card_countries: product.giftCardCountries,
+      gift_card_redemption_scope: product.giftCardRedemptionScope,
       /** The admin's product image, else the brand's logo from BitoCard's own files: never the supplier's (it would name them). */
       logo_url: product.imageUrl ?? this.presentBrand(product.brand, brand).logo_url,
       brand: this.presentBrand(product.brand, brand),
@@ -400,9 +409,15 @@ export class StorefrontService {
       const group = navigationGroups.find(item => item.key === filter.group);
       and.push({ category: { in: group?.categories ?? [] } });
     }
-    if (filter.country === 'global') and.push({ category: { in: [...worldwideCategories] } });
-    else if (filter.country) and.push({ country: filter.country.toUpperCase() });
+    const giftCards = filter.category === 'gift_cards' || filter.group === 'gift-cards' || Boolean(filter.gift_category || filter.redeemable);
+    if (filter.country === 'global') and.push(giftCards ? { giftCardRedemptionScope: 'global' } : { category: { in: [...worldwideCategories] } });
+    else if (filter.country) {
+      const country = filter.country.toUpperCase();
+      and.push(giftCards ? { OR: [{ giftCardCountries: { has: country } }, { country }] } : { country });
+    }
     if (filter.brand) and.push({ brand: filter.brand });
+    if (filter.gift_category) and.push({ category: 'gift_cards', giftCardCategories: { has: filter.gift_category } });
+    if (filter.redeemable) and.push({ category: 'gift_cards', giftCardRedemptionChannels: { has: filter.redeemable } });
     return and.length ? { AND: and } : {};
   }
 
@@ -449,8 +464,17 @@ export class StorefrontService {
 
   async giftCardCountries() {
     const { where } = await this.availability();
-    const rows = await this.prisma.product.groupBy({ by: ['country'], where: { AND: [where, { category: 'gift_cards' }] } });
-    return { object: 'list' as const, data: productCountries(rows) };
+    const rows = await this.prisma.product.findMany({ where: { AND: [where, { category: 'gift_cards' }] }, select: { country: true, giftCardCountries: true, giftCardRedemptionScope: true } });
+    return { object: 'list' as const, data: giftCardProductCountries(rows) };
+  }
+
+  async giftCardFacets() {
+    const { where } = await this.availability();
+    const rows = await this.prisma.product.findMany({
+      where: { AND: [where, { category: 'gift_cards' }] },
+      select: { giftCardCategories: true, giftCardRedemptionChannels: true },
+    });
+    return giftCardFacets(rows);
   }
 
   async product(key: string) {
@@ -584,11 +608,13 @@ export class StorefrontService {
     const words = this.tokens(q);
     if (!words.length) return {};
     const brands = await this.matchingBrandSlugs(q);
+    const giftCardCategory = giftCardCategorySearch(q);
     return {
       OR: [
         { AND: words.map(word => ({ OR: [{ name: { contains: word, mode: 'insensitive' as const } }, { brand: { contains: word } }] })) },
         ...(brands.length ? [{ brand: { in: brands } }] : []),
         ...giftCardCountrySearch(q),
+        ...(giftCardCategory ? [{ category: 'gift_cards' as const, giftCardCategories: { has: giftCardCategory } }] : []),
       ],
     };
   }

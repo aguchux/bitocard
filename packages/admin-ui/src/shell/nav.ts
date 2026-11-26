@@ -107,6 +107,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     title: 'Settings',
     items: [
       { label: 'Feature switches', href: '/settings', icon: ToggleRight },
+      { label: 'Team', href: '/settings/team', icon: Users },
       { label: 'Markets', href: '/settings/markets', icon: Globe2 },
       { label: 'Integrations', href: '/settings/integrations', icon: PlugZap },
       { label: 'pawaPay coverage', href: '/settings/pawapay', icon: Smartphone },

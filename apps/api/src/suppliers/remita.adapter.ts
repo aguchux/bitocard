@@ -137,7 +137,10 @@ export class RemitaAdapter implements SupplierAdapter {
   }
 
   private url(path: string) {
-    return `${this.options.baseUrl.replace(/\/+$/, '')}/api/v1/vending${path}`;
+    const base = this.options.baseUrl.trim().replace(/\/+$/, '');
+    // RemitaConnect publishes the sandbox host. Vending endpoints sit under the Connect gateway on that host.
+    const gateway = base === 'https://api-demo.systemspecsng.com' ? `${base}/services/connect-gateway` : base;
+    return `${gateway}/api/v1/vending${path}`;
   }
 
   /**
@@ -176,8 +179,15 @@ export class RemitaAdapter implements SupplierAdapter {
 
   /** Test connection: the category list, which needs a valid key (and, live, a whitelisted address). */
   async check() {
-    const page = await this.read<Page<RemitaCategory>>('/categories?page=0&size=50');
-    return page.items?.length ?? 0;
+    try {
+      const page = await this.read<Page<RemitaCategory>>('/categories?page=0&size=50');
+      return page.items?.length ?? 0;
+    } catch (error) {
+      if (error instanceof ProviderError && error.status === 401) {
+        throw new ProviderError(this.code, 'HTTP 401 Not Authenticated. Check the RemitaConnect Secret Key for this environment and the Vending Bills subscription and IP allowlist', true, 401);
+      }
+      throw error;
+    }
   }
 
   syncReport() {

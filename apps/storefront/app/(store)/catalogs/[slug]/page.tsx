@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { categoryLabels, type ProductCategory, type ProductCountry, type StoreList } from "@bitocard/api-client/storefront";
+import { categoryLabels, type GiftCardFacets, type ProductCategory, type ProductCountry, type StoreList } from "@bitocard/api-client/storefront";
 import { CatalogueView, loadCatalogue, readParams } from "@/components/store/catalogue";
 import { storeNavigation } from "@/lib/navigation";
 import { storeApi } from "@/lib/api";
@@ -28,10 +28,11 @@ export default async function CataloguePage({ params, searchParams }: { params: 
   const found = await resolve(slug);
   if (!found) notFound();
   const filters = readParams(await searchParams);
-  const [{ groups, countries: marketCountries }, { page, result }, cardCountries] = await Promise.all([
+  const [{ groups, countries: marketCountries }, { page, result }, cardCountries, giftCardFacets] = await Promise.all([
     storeNavigation(),
     loadCatalogue(found.base, filters),
     slug === 'gift_cards' ? storeApi<StoreList<ProductCountry>>(await inMarket('/v1/store/gift-card-countries')).then(response => response.ok ? response.data.data : []) : Promise.resolve([]),
+    slug === 'gift_cards' ? storeApi<GiftCardFacets>(await inMarket('/v1/store/gift-card-facets')).then(response => response.ok ? response.data : undefined) : Promise.resolve(undefined),
   ]);
   const countries = slug === 'gift_cards' ? cardCountries.map(item => ({ ...item, currency: '', products: 0 })) : marketCountries;
   return (
@@ -46,6 +47,7 @@ export default async function CataloguePage({ params, searchParams }: { params: 
       banner={(isCategory(slug) ? groups.flatMap(group => group.categories).filter(category => category.category === slug) : (groups.find(group => group.key === slug)?.categories ?? [])).find(category => category.image_url)?.image_url ?? null}
       page={page}
       result={result}
+      giftCardFacets={giftCardFacets}
     />
   );
 }

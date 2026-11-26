@@ -57,4 +57,4 @@ A change is ready only when both the PGlite and the Docker runs pass.
 
 Each web app is its own Vercel project with Root Directory `apps/<app>`; install, build and ignore commands are in each app's `vercel.json`. Both APIs and every app are moving to DigitalOcean Kubernetes: each push to `main` builds the images it affects and pushes them to Docker Hub (`golojan/bitocard_<app>`, `.github/workflows/docker-images.yml`), then rolls the cluster onto them once switched on (`deploy/k8s/README.md`). Until the cut-over the API still runs on the droplet, deployed by hand (`deploy/droplet/README.md`). Details are in AGENTS.md.
 
-Admins are set up and reset from the admin app's sign-in page only, for addresses listed in the API's `ADMIN_SETUP_EMAILS` environment variable; there are no admin scripts.
+Bootstrap super admins from the admin app's sign-in page using addresses in `ADMIN_SETUP_EMAILS`. A signed-in super admin can use **Settings → Team** to invite staff on an `ADMIN_EMAIL_DOMAINS` domain, assign roles (including Support), resend password links, and manage access. Team changes require an authenticator code. Invitations use BitoCard's configured email provider.

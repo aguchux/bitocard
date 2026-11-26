@@ -43,9 +43,8 @@ const invalidCode = () =>
 const alreadySetUp = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'mfa_already_set_up', 'Your authenticator is already set up.');
 
 /**
- * Whether an admin must use an authenticator app. Afrippa's admins always; BitoCard's choose (every BitoCard admin is
- * a super admin set up from the sign-in page), off until they set it up. Step-up for sensitive and money actions always
- * needs it.
+ * Whether an admin must use an authenticator app to sign in. Afrippa's admins always; BitoCard's may turn it on
+ * later. Step-up for sensitive and money actions always needs it.
  */
 export function authenticatorRequired(user: Pick<User, 'realm'>) {
   return user.realm !== 'admin';
@@ -168,14 +167,14 @@ export class AdminAuthService {
    * account until it is used. At most one a minute per admin (others are silently skipped), and a failed
    * send is logged, never shown, so the answers stay the same.
    */
-  private async sendPasswordLink(user: User, kind: 'create' | 'reset') {
+  async sendPasswordLink(user: User, kind: 'create' | 'reset'): Promise<'sent' | 'outbox' | 'skipped' | 'failed'> {
     const last = await this.prisma.verificationCode.findFirst({
       where: { userId: user.id, purpose: 'admin_password_link', createdAt: { gt: new Date(Date.now() - passwordLinkGapMs) } },
       select: { id: true },
     });
     if (last) {
       this.logger.log({ userId: user.id }, 'Admin password link skipped: one a minute');
-      return;
+      return 'skipped';
     }
     const token = `${user.id}.${randomToken()}`;
     const hours = passwordLinkHours[kind];
@@ -188,15 +187,25 @@ export class AdminAuthService {
     const realm = this.realmOf(user);
     const { appUrl, product, platform } = this.settings(realm);
     const link = `${new URL('/set-password', appUrl).toString()}#token=${token}`;
+    let sentWith: string;
     try {
       // Each product's admins are emailed through its own email settings.
-      const sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product, authenticatorOptional: !authenticatorRequired(user) }));
+      sentWith = await this.email.sendFor(platform, adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours, product, authenticatorOptional: !authenticatorRequired(user) }));
       this.logger.log({ userId: user.id, kind, sentWith }, sentWith === 'outbox' ? 'Admin password link NOT sent: no email provider is set up' : 'Admin password link emailed');
     } catch (error) {
       this.logger.error({ err: error, userId: user.id }, 'Could not email an admin password link');
-      return;
+      return 'failed';
     }
     await this.audit.record({ actorId: null, action: 'admin.password_link_sent', targetType: 'user', targetId: user.id, after: { email: user.email, kind, expires_at: expiresAt.toISOString() }, platform });
+    return sentWith === 'outbox' ? 'outbox' : 'sent';
+  }
+
+  isAdminDomain(email: string) {
+    return this.allowedDomain(email, 'admin');
+  }
+
+  adminDomains() {
+    return this.settings('admin').domains;
   }
 
   /** What the set-password page shows before the admin chooses a password. */

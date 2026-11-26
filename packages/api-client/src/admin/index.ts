@@ -33,6 +33,9 @@ import type {
   AdminPricePreviewArgs,
   ProductCategory,
   ProductCountry,
+  GiftCardFacets,
+  GiftCardCategory,
+  GiftCardRedemptionChannel,
   ResellerDetail,
   ResellerStatus,
   ResellerSummary,
@@ -307,9 +310,13 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: () => '/v1/admin/products/gift-card-countries',
       providesTags: [{ type: 'Product', id: 'COUNTRIES' }],
     }),
+    giftCardFacets: build.query<GiftCardFacets, void>({
+      query: () => '/v1/admin/products/gift-card-facets',
+      providesTags: [{ type: 'Product', id: 'FACETS' }],
+    }),
     updateProduct: build.mutation<
-      { id: string; active: boolean; listed: boolean; name: string; image_url: string | null },
-      { id: string; active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }
+      Partial<AdminProduct> & { id: string },
+      { id: string; active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null; gift_card_primary_category?: GiftCardCategory | null; gift_card_categories?: GiftCardCategory[]; gift_card_redemption_channels?: GiftCardRedemptionChannel[]; gift_card_countries?: string[] }
     >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/products/${id}`, method: 'PATCH', body }),
       // Shown at once in every loaded product list (with the listed count), then the saved fields replace it: one
@@ -524,6 +531,7 @@ export const {
   useSyncSupplierMutation,
   useProductsInfiniteQuery,
   useGiftCardCountriesQuery,
+  useGiftCardFacetsQuery,
   useUpdateProductMutation,
   useSetProductListingMutation,
   useUpdateOfferMutation,

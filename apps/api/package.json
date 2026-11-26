@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "test:docker": "node --env-file=test/docker.env --test --test-concurrency=1 \"test/*.test.mjs\"",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:prestmit": "node scripts/prestmit-sandbox.mjs",
     "push:keys": "node scripts/push-keys.mjs",
     "media:cors": "node scripts/media-cors.mjs",
     "brands:logos": "node scripts/brand-logos.mjs"

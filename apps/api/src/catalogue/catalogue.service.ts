@@ -1,11 +1,12 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { LedgerMode, Product, ProductCategory } from '../generated/prisma/client.js';
+import type { GiftCardCategory, GiftCardRedemptionChannel, LedgerMode, Product, ProductCategory } from '../generated/prisma/client.js';
 import { minor } from '../ledger/mode.js';
 import { StorefrontService } from '../storefront/storefront.service.js';
 import { type PricingContext, PricingService, type ProductWithOffers, worldwideCategories } from './pricing.service.js';
-import { productCountries } from './product-countries.js';
+import { giftCardProductCountries } from './product-countries.js';
+import { giftCardFacets as summarizeGiftCardFacets } from './gift-card-taxonomy.js';
 
 /** At most this many denominations are priced in a catalogue listing; quotes price any valid value. */
 const maxListedValues = 20;
@@ -32,6 +33,11 @@ export function presentProductBase(product: Product, logoUrl: string | null) {
     recipient_type: product.recipientType,
     description: product.description,
     redeem_instructions: product.redeemInstructions,
+    gift_card_primary_category: product.giftCardPrimaryCategory,
+    gift_card_categories: product.giftCardCategories,
+    gift_card_redemption_channels: product.giftCardRedemptionChannels,
+    gift_card_countries: product.giftCardCountries,
+    gift_card_redemption_scope: product.giftCardRedemptionScope,
     logo_url: logoUrl,
   };
 }
@@ -73,7 +79,7 @@ export class CatalogueService {
     };
   }
 
-  async list(resellerId: string, mode: LedgerMode, filter: { category?: ProductCategory; country?: string; q?: string; listed?: boolean; limit?: number; starting_after?: string }) {
+  async list(resellerId: string, mode: LedgerMode, filter: { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; q?: string; listed?: boolean; limit?: number; starting_after?: string }) {
     const ctx = await this.pricing.context(resellerId, mode);
     const limit = filter.limit ?? 25;
     const categories = ctx.country.categories.filter(c => c.enabled).map(c => c.category);
@@ -81,11 +87,13 @@ export class CatalogueService {
       where: {
         active: true,
         category: filter.category ? { in: categories.includes(filter.category) ? [filter.category] : [] } : { in: categories },
-        country: filter.country?.toUpperCase(),
+        giftCardCategories: filter.gift_category ? { has: filter.gift_category } : undefined,
+        giftCardRedemptionChannels: filter.redeemable ? { has: filter.redeemable } : undefined,
         ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
         AND: [
           // BitoCard's offers, or the reseller's own.
           { OR: [{ supplierProducts: { some: { available: true } } }, { id: { in: [...ctx.own.keys()] } }] },
+          ...(filter.country ? [{ OR: [{ giftCardCountries: { has: filter.country.toUpperCase() } }, { country: filter.country.toUpperCase() }] }] : []),
           ...(filter.q ? [{ OR: [{ name: { contains: filter.q, mode: 'insensitive' as const } }, { brand: { contains: filter.q.toLowerCase() } }] }] : []),
           ...(filter.listed === undefined ? [] : [{ listings: filter.listed ? { some: { resellerId } } : { none: { resellerId } } }]),
         ],
@@ -110,16 +118,30 @@ export class CatalogueService {
 
   async giftCardCountries(resellerId: string, mode: LedgerMode) {
     const ctx = await this.pricing.context(resellerId, mode);
-    const rows = await this.prisma.product.groupBy({
-      by: ['country'],
+    const rows = await this.prisma.product.findMany({
       where: {
         active: true,
         category: 'gift_cards',
         supplierProducts: { some: { available: true } },
         ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
       },
+      select: { country: true, giftCardCountries: true, giftCardRedemptionScope: true },
     });
-    return { object: 'list' as const, data: productCountries(rows) };
+    return { object: 'list' as const, data: giftCardProductCountries(rows) };
+  }
+
+  async giftCardFacets(resellerId: string, mode: LedgerMode) {
+    const ctx = await this.pricing.context(resellerId, mode);
+    const rows = await this.prisma.product.findMany({
+      where: {
+        active: true,
+        category: 'gift_cards',
+        supplierProducts: { some: { available: true } },
+        ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
+      },
+      select: { giftCardCategories: true, giftCardRedemptionChannels: true },
+    });
+    return summarizeGiftCardFacets(rows);
   }
 
   /** What one sale earns the reseller, with their settings or ones they are trying. */

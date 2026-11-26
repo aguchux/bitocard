@@ -6,7 +6,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { GiftCardSale, GiftCardSellOffer, LedgerMode, Reseller, Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
-import { urlsFor } from '../integrations/endpoints.js';
+import { inSandbox, urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { checkDocument } from '../kyc/files.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -92,7 +92,7 @@ export class GiftCardSalesService {
   /** Prestmit at the address its Sandbox switch says, and which of BitoCard's modes it serves. */
   private client() {
     const config = this.integrations.config;
-    const sandbox = Boolean(config.PRESTMIT_SANDBOX);
+    const sandbox = inSandbox(config, 'prestmit');
     const prestmit = new Prestmit({ apiKey: config.PRESTMIT_API_KEY, apiSecret: config.PRESTMIT_API_SECRET, baseUrl: urlsFor(config, sandbox ? 'sandbox' : 'live').PRESTMIT_API_URL });
     return { prestmit, mode: (sandbox ? 'test' : 'live') as LedgerMode };
   }
@@ -136,7 +136,10 @@ export class GiftCardSalesService {
     if (!country || !payoutCountries[country]) return 'country_unsupported';
     if (!(await this.settings.isOnForCountry('gift_card_selling', country))) return 'not_enabled';
     if (this.defaultMargin() === null) return 'not_configured';
-    if (mode === 'live' && !this.client().prestmit.configured()) return 'not_configured';
+    if (mode === 'live') {
+      const client = this.client();
+      if (client.mode !== 'live' || !client.prestmit.configured()) return 'not_configured';
+    }
     return null;
   }
 
@@ -280,6 +283,10 @@ export class GiftCardSalesService {
     if (code && (code.length < 4 || code.length > 200)) throw invalid('parameter_invalid', 'Enter the card’s code as it is written (4 to 200 characters).', 'code');
     if (code && files.length) throw invalid('parameter_invalid', 'Send the code or photos, not both.', 'photos');
     const photos = form === 'physical' ? this.checkPhotos(files) : [];
+    const client = this.client();
+    if (mode === 'live' && (client.mode !== 'live' || !client.prestmit.configured())) {
+      throw conflict('gift_card_selling_unavailable', 'Selling gift cards is not available right now.');
+    }
 
     const sale = await this.prisma.giftCardSale.create({
       data: {
@@ -304,7 +311,7 @@ export class GiftCardSalesService {
       return this.present(await this.prisma.giftCardSale.update({ where: { id: sale.id }, data: { status: 'pending', providerReference: `SANDBOX-${sale.number}` } }), offer);
     }
     try {
-      const trade = await this.client().prestmit.createTrade({ cardId: offer.providerCardId, amount: sale.amount, uniqueIdentifier: this.reference(sale), code, photos });
+      const trade = await client.prestmit.createTrade({ cardId: offer.providerCardId, amount: sale.amount, uniqueIdentifier: this.reference(sale), code, photos });
       const saved = await this.prisma.giftCardSale.update({ where: { id: sale.id }, data: { status: 'pending', providerReference: trade.reference || null, nextCheckAt: new Date(Date.now() + checkDelays[0]) } });
       return this.present(await this.apply(saved, trade), offer);
     } catch (error) {

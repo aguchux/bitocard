@@ -530,7 +530,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       secret('REMITA_SECRET_KEY', 'Secret key', { help: 'RemitaConnect (connect.remita.net) > API keys: the Secret Key. Test and production keys differ; production also needs Vending subscribed and approved, and BitoCard’s server IP addresses whitelisted by Remita.' }),
       field('REMITA_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Remita’s demo gateway (api-demo.systemspecsng.com) with the test key, for Test connection only; Remita is not synced or used for live orders. Off: live (api-gateway.remita.net).' }),
       field('REMITA_CONTACT_PHONE', 'Contact phone', { required: false, help: 'Sent with electricity and TV payments when the customer gave no phone number, for example 08011111111.' }),
-      field('REMITA_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
+      field('REMITA_API_URL', 'API address override', { kind: 'url', help: 'Leave blank to follow the Sandbox switch. The RemitaConnect sandbox host is also accepted with or without /services/connect-gateway.' }),
     ],
   },
   {

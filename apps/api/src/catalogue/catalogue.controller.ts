@@ -8,7 +8,8 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { adminId } from '../countries/countries.controller.js';
 import { productCategories } from '../countries/countries.service.js';
-import type { LedgerMode, ProductCategory } from '../generated/prisma/client.js';
+import type { GiftCardCategory, GiftCardRedemptionChannel, LedgerMode, ProductCategory } from '../generated/prisma/client.js';
+import { giftCardCategories, giftCardRedemptionChannels } from './gift-card-taxonomy.js';
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { CatalogueService } from './catalogue.service.js';
@@ -24,6 +25,14 @@ class CatalogueFilterDto extends PageDto {
   @ApiPropertyOptional({ description: 'Where the product is used (the card region, or the network or biller country).', example: 'NG' })
   @IsOptional() @Matches(/^[A-Za-z]{2}$/)
   country?: string;
+
+  @ApiPropertyOptional({ enum: giftCardCategories })
+  @IsOptional() @IsIn(giftCardCategories)
+  gift_category?: GiftCardCategory;
+
+  @ApiPropertyOptional({ enum: giftCardRedemptionChannels })
+  @IsOptional() @IsIn(giftCardRedemptionChannels)
+  redeemable?: GiftCardRedemptionChannel;
 
   @ApiPropertyOptional({ description: 'Search by name or brand.' })
   @IsOptional() @IsString() @Length(1, 60)
@@ -240,6 +249,12 @@ export class CatalogueController {
   @Get('gift-card-countries')
   giftCardCountries(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
     return this.catalogue.giftCardCountries(resellerOf(caller), mode);
+  }
+
+  @ApiOperation({ summary: 'List gift card category and redemption facets' })
+  @Get('gift-card-facets')
+  giftCardFacets(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+    return this.catalogue.giftCardFacets(resellerOf(caller), mode);
   }
 
   @ApiOperation({ summary: 'Get a product' })

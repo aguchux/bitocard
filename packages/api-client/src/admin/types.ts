@@ -338,6 +338,12 @@ export type AdminProduct = {
   /** Set by an admin; shown instead of the supplier's logo. */
   image_url: string | null;
   face_currency: string;
+  gift_card_primary_category: GiftCardCategory | null;
+  gift_card_categories: GiftCardCategory[];
+  gift_card_redemption_channels: GiftCardRedemptionChannel[];
+  gift_card_countries: string[];
+  gift_card_redemption_scope: 'single_country' | 'multiple_countries' | 'global' | 'unknown' | null;
+  gift_card_classification_status: 'needs_review' | 'inferred' | 'reviewed' | null;
   active: boolean;
   /** Shown on BitoCard's own store (bitocard.com). Resellers' catalogues are not affected. */
   listed: boolean;
@@ -347,7 +353,10 @@ export type AdminProduct = {
   offers: SupplierOffer[];
 };
 /** Admin product filters: a supplier's offers and BitoCard store listing among them. */
-export type AdminProductFilter = { category?: ProductCategory; country?: string; q?: string; supplier?: string; listed?: boolean };
+export type GiftCardCategory = 'online_marketplaces' | 'travel' | 'food_groceries' | 'restaurants_delivery' | 'gaming' | 'gasoline_automotive' | 'transportation' | 'electronics' | 'fashion' | 'privacy_tools' | 'ai' | 'department_stores' | 'multi_brand' | 'entertainment' | 'music_streaming' | 'home_diy' | 'health_beauty' | 'sports_outdoors' | 'gifts_experiences' | 'kids' | 'crypto_payments' | 'app_stores_mobile' | 'books_learning';
+export type GiftCardRedemptionChannel = 'online' | 'in_store' | 'app' | 'phone';
+export type GiftCardFacets = { object: 'gift_card_facets'; categories: Array<{ code: GiftCardCategory; name: string; products: number }>; redemption_channels: Array<{ code: GiftCardRedemptionChannel; name: string; products: number }>; unclassified: number };
+export type AdminProductFilter = { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; q?: string; supplier?: string; listed?: boolean };
 export type ProductCountry = { code: string; name: string };
 /** Products, with how many match the filters and how many of those are listed. */
 export type AdminProductList = List<AdminProduct> & { total: number; listed: number };

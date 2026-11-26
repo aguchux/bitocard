@@ -20,13 +20,19 @@ const cards = [
 /** A fake Prestmit: the rate calculator, trades by our reference, and what to answer for each. */
 function fakePrestmit() {
   const trades = new Map();
-  const state = { createStatus: 200, history: 'PENDING', total: null };
+  const state = { createStatus: 200, history: 'PENDING', total: null, availability: { buyGiftCard: true, sellGiftCard: true } };
   return {
     state,
     trades,
     service: fakeService(call => {
       const url = new URL(call.url, 'http://x');
-      if (url.pathname.endsWith('/general/service-availability')) return { body: { data: { sellGiftCard: true } } };
+      if (url.pathname.endsWith('/general/service-availability')) {
+        const hash = createHmac('sha256', 'sk_test').update('pk_test:{}').digest('hex');
+        if (call.headers['api-key'] !== 'pk_test' || call.headers['api-hash'] !== hash || call.headers['content-type'] !== 'application/json') {
+          return { status: 401, body: { message: 'Invalid credentials' } };
+        }
+        return { body: { data: state.availability } };
+      }
       if (url.pathname.endsWith('/giftcard-trade/sell/rate-calculator-data')) return { body: { data: { sellableGiftcards: cards, giftCardCategories: [] } } };
       if (url.pathname.endsWith('/giftcard-trade/sell/create')) {
         if (state.createStatus !== 200) return { status: state.createStatus, body: { message: 'Card not accepted' } };
@@ -38,7 +44,7 @@ function fakePrestmit() {
         const id = url.searchParams.get('uniqueIdentifier');
         const trade = trades.get(id);
         if (!trade) return { body: { data: [] } };
-        return { body: { data: [{ ...trade, uniqueIdentifier: id, status: state.history, totalAmount: state.total, rejectionReason: state.history === 'REJECTED' ? 'Code already used' : null }] } };
+        return { body: { data: { data: [{ ...trade, uniqueIdentifier: id, status: state.history, totalAmount: state.total, rejectionReason: state.history === 'REJECTED' ? 'Code already used' : null }] } } };
       }
       return { status: 404, body: { message: 'unknown' } };
     }),
@@ -92,6 +98,13 @@ async function customer(server, country = 'NG', store = null) {
 }
 
 describe('Prestmit helpers', () => {
+  test('Prestmit sandbox and live URLs stay in their respective environments', async () => {
+    const { inSandbox, providerUrl } = await import('../dist/integrations/endpoints.js');
+    const sandbox = 'https://dev-api.prestmit.io/partners/v1';
+    assert.equal(inSandbox({ PRESTMIT_API_URL: sandbox + '/' }, 'prestmit'), true);
+    assert.equal(providerUrl({ PRESTMIT_API_URL: 'https://api.prestmit.io/partners/v1/' }, 'prestmit', 'sandbox'), sandbox);
+    assert.equal(providerUrl({ PRESTMIT_API_URL: 'https://prestmit.com/api/partners/v1' }, 'prestmit', 'sandbox'), sandbox);
+  });
   test('API-Hash, forms, countries and brands', () => {
     assert.equal(prestmitHash('key', 'secret', { a: '1' }), createHmac('sha256', 'secret').update('key:{"a":"1"}').digest('hex'));
     assert.deepEqual(['Physical', 'Ecode', 'Physical and Ecode'].map(prestmitForm), ['physical', 'ecode', 'both']);
@@ -135,6 +148,17 @@ describe('selling gift cards in the sandbox', () => {
   });
 
   test('synced cards are matched to brands; selling stays closed until switched on with a margin', async () => {
+    const connection = await admin.post('/v1/admin/integrations/prestmit/test');
+    assert.deepEqual([connection.status, connection.json.environment, connection.json.ok], [200, 'sandbox', true]);
+    assert.match(connection.json.message, /Buying: available\. Selling: available\./);
+    prestmit.state.availability = {};
+    try {
+      const malformed = await admin.post('/v1/admin/integrations/prestmit/test');
+      assert.equal(malformed.json.ok, false);
+      assert.match(malformed.json.message, /unexpected service availability response/);
+    } finally {
+      prestmit.state.availability = { buyGiftCard: true, sellGiftCard: true };
+    }
     const synced = await admin.post('/v1/admin/gift-card-sales/offers/sync');
     assert.equal(synced.status, 200, JSON.stringify(synced.json));
     assert.deepEqual([synced.json.mode, synced.json.cards], ['test', 3]);
@@ -354,5 +378,19 @@ describe('selling gift cards live', () => {
     await service.job();
     assert.equal((await prisma.giftCardSale.findUnique({ where: { id: unclear.json.id } })).status, 'failed');
     prestmit.state.createStatus = 200;
+  });
+
+  test('switching Prestmit to sandbox closes live selling even with previously synced live offers', async () => {
+    const path = '/v1/store/gift-card-sales/offers?product=gift_cards:US:amazon&country=NG';
+    const shopper = await customer(server);
+    const before = await shopper.get(path);
+    assert.ok(before.json.offers.length > 0);
+    const saved = await admin.put('/v1/admin/integrations/prestmit', { values: { PRESTMIT_SANDBOX: true }, code: await adminCode(server, admin) });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    const closed = await shopper.get(path);
+    assert.deepEqual([closed.json.available, closed.json.reason], [false, 'not_configured']);
+    const sale = await shopper.sell({ offer_id: before.json.offers[0].id, amount: 100, code: 'DO-NOT-SEND' });
+    assert.deepEqual([sale.status, sale.json.error.code], [409, 'gift_card_selling_unavailable']);
+    assert.equal(await prisma.giftCardSale.count({ where: { customerId: shopper.id } }), 0);
   });
 });

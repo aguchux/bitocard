@@ -9,6 +9,12 @@ import { formatCurrency } from './money';
 export { currencyDigits as moneyDigits, currencySymbol, formatCurrency, formatMoneyInput, moneyInputValue, parseMoney } from './money';
 
 export type ProductCategory = 'gift_cards' | 'airtime' | 'data' | 'bills' | 'pay_tv' | 'software' | 'vpn' | 'rdp' | 'mobile_money';
+export type GiftCardCategory = 'online_marketplaces' | 'travel' | 'food_groceries' | 'restaurants_delivery' | 'gaming' | 'gasoline_automotive' | 'transportation' | 'electronics' | 'fashion' | 'privacy_tools' | 'ai' | 'department_stores' | 'multi_brand' | 'entertainment' | 'music_streaming' | 'home_diy' | 'health_beauty' | 'sports_outdoors' | 'gifts_experiences' | 'kids' | 'crypto_payments' | 'app_stores_mobile' | 'books_learning';
+export type GiftCardRedemptionChannel = 'online' | 'in_store' | 'app' | 'phone';
+export const giftCardCategories = ['online_marketplaces', 'travel', 'food_groceries', 'restaurants_delivery', 'gaming', 'gasoline_automotive', 'transportation', 'electronics', 'fashion', 'privacy_tools', 'ai', 'department_stores', 'multi_brand', 'entertainment', 'music_streaming', 'home_diy', 'health_beauty', 'sports_outdoors', 'gifts_experiences', 'kids', 'crypto_payments', 'app_stores_mobile', 'books_learning'] as const satisfies readonly GiftCardCategory[];
+export const giftCardRedemptionChannels = ['online', 'in_store', 'app', 'phone'] as const satisfies readonly GiftCardRedemptionChannel[];
+export type GiftCardFacet = { code: string; name: string; products: number };
+export type GiftCardFacets = { object: 'gift_card_facets'; categories: Array<GiftCardFacet & { code: GiftCardCategory }>; redemption_channels: Array<GiftCardFacet & { code: GiftCardRedemptionChannel }>; unclassified: number };
 
 export const categoryLabels: Record<ProductCategory, string> = {
   gift_cards: 'Gift cards',
@@ -28,6 +34,11 @@ export type StoreBrand = {
   name: string;
   company: string | null;
   description: string | null;
+  gift_card_primary_category: GiftCardCategory | null;
+  gift_card_categories: GiftCardCategory[];
+  gift_card_redemption_channels: GiftCardRedemptionChannel[];
+  gift_card_countries: string[];
+  gift_card_redemption_scope: 'single_country' | 'multiple_countries' | 'global' | 'unknown' | null;
   logo_url: string | null;
   image_url: string | null;
   color: string | null;

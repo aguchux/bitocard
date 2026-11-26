@@ -188,6 +188,30 @@ describe('Remita orders', () => {
 });
 
 describe('Remita connection', () => {
+  test('the RemitaConnect sandbox host and the full gateway URL send the same category request', async t => {
+    const { inSandbox } = await import('../dist/integrations/endpoints.js');
+    const calls = [];
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+      calls.push([url, options.headers.secretKey]);
+      return Response.json({ status: '00', data: { items: [] } });
+    });
+    const host = 'https://api-demo.systemspecsng.com';
+    for (const baseUrl of [host, host + '/', host + '/services/connect-gateway/']) {
+      assert.equal(inSandbox({ REMITA_SANDBOX: false, REMITA_API_URL: baseUrl }, 'remita'), true);
+      await new RemitaAdapter({ secretKey: 'sandbox-secret', baseUrl }).check();
+    }
+    assert.deepEqual(calls, Array.from({ length: 3 }, () => [
+      host + '/services/connect-gateway/api/v1/vending/categories?page=0&size=50',
+      'sandbox-secret',
+    ]));
+  });
+
+  test('a gateway 401 explains what to check when there is no Vending status code', async t => {
+    t.mock.method(globalThis, 'fetch', async () => Response.json({ status: 401, detail: 'Not Authenticated' }, { status: 401 }));
+    const adapter = new RemitaAdapter({ secretKey: 'sandbox-secret', baseUrl: 'https://api-demo.systemspecsng.com' });
+    await assert.rejects(adapter.check(), { status: 401, definite: true, message: /Secret Key.*Vending Bills.*IP allowlist/ });
+  });
+
   test('Test connection reads the categories; a wrong key is refused with what to check', async () => {
     const tested = await admin.post('/v1/admin/integrations/remita/test');
     assert.equal(tested.status, 200, JSON.stringify(tested.json));

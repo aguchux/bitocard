@@ -8,6 +8,7 @@ import { type FormState, startCheckout } from "@/lib/account-actions";
 import { type PaymentChoice, paymentMethodsFor } from "@/lib/payment-methods";
 import { prefillFrom } from "@/lib/quick-buy";
 import { FormMessage, Submit, TextField } from "./account-forms";
+import { PaymentMethodHeading } from "./payment-method-heading";
 
 /** Bought several at a time, each its own code. */
 const multiples = new Set(["gift_cards", "software"]);
@@ -243,7 +244,7 @@ export function BuyForm({
               <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
                 <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-brand-500" />
                 <span>
-                  <span className="block text-sm font-semibold">{method.label}</span>
+                  <PaymentMethodHeading id={method.id} label={method.label} />
                   <span className="block text-xs text-slate-500">{method.description}</span>
                   {method.id === "wallet" && shown.wallet ? (
                     <span className="mt-1.5 block text-xs">

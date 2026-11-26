@@ -158,11 +158,14 @@ export class Prestmit {
     return Boolean(this.options.apiKey?.trim() && this.options.apiSecret?.trim());
   }
 
-  /** Whether Prestmit is taking gift card sales now (`/general/service-availability`). */
-  async sellingOpen() {
+  /** The buy and sell capabilities reported by Prestmit's service availability endpoint. */
+  async availability() {
     const body = record(await this.call('GET', '/general/service-availability'));
     const data = record(body.data ?? body);
-    return data.sellGiftCard !== false;
+    const buy = typeof data.buyGiftCard === 'boolean' ? data.buyGiftCard : null;
+    const sell = typeof data.sellGiftCard === 'boolean' ? data.sellGiftCard : null;
+    if (buy === null && sell === null) throw new ProviderError('prestmit', 'unexpected service availability response', false);
+    return { buy, sell };
   }
 
   /** The gift cards Prestmit buys, with their rates (`sellableGiftcards` of the rate calculator's data). */
@@ -214,7 +217,8 @@ export class Prestmit {
   /** The trade made with BitoCard's reference, or null when Prestmit has none. */
   async findTrade(uniqueIdentifier: string): Promise<PrestmitTrade | null> {
     const body = record(await this.call('GET', '/giftcard-trade/sell/history', { uniqueIdentifier }));
-    const rows = list(body.data ?? record(body.data).data);
+    const rows = Array.isArray(body.data) ? body.data : record(body.data).data;
+    if (!Array.isArray(rows)) throw new ProviderError('prestmit', 'unexpected sell history response', false);
     const row = rows.map(record).find(item => !item.uniqueIdentifier || item.uniqueIdentifier === uniqueIdentifier);
     return row ? this.trade(row) : null;
   }
@@ -337,9 +341,10 @@ export class Prestmit {
     const url = new URL(`${this.options.baseUrl.replace(/\/+$/, '')}${path}`);
     if (method === 'GET') for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     const headers: Record<string, string> = { Accept: 'application/json', 'API-KEY': apiKey, 'API-Hash': prestmitHash(apiKey, apiSecret, params) };
+    if (method === 'GET') headers['Content-Type'] = 'application/json';
     let response: Response;
     try {
-      response = await fetch(url, { method, headers, body: form, signal: AbortSignal.timeout(this.options.timeoutMs ?? 30_000) });
+      response = await fetch(url, { method, headers, body: form, redirect: 'error', signal: AbortSignal.timeout(this.options.timeoutMs ?? 30_000) });
     } catch (error) {
       throw new ProviderError('prestmit', error instanceof Error ? error.message : 'unreachable', false);
     }

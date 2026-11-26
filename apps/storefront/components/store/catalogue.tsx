@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
-import { type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
+import { giftCardCategories, giftCardRedemptionChannels, type GiftCardCategory, type GiftCardFacets, type GiftCardRedemptionChannel, type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
 import { query, storeApi } from "@/lib/api";
 import { inMarket } from "@/lib/market";
 import { ProductCard } from "./product-card";
@@ -9,7 +9,7 @@ import { SubmitOnChange } from "./submit-on-change";
 
 export const pageSize = 24;
 
-export type CatalogueParams = { q?: string; country?: string; brand?: string; tag?: string; sort?: string; page?: string };
+export type CatalogueParams = { q?: string; country?: string; brand?: string; tag?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; sort?: string; page?: string };
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -18,11 +18,15 @@ export function readParams(search: Record<string, string | string[] | undefined>
   const country = one(search.country)?.toLowerCase();
   const sort = one(search.sort);
   const page = one(search.page);
+  const giftCategory = one(search.gift_category);
+  const redeemable = one(search.redeemable);
   return {
     q: one(search.q)?.trim().slice(0, 100) || undefined,
     country: country && /^([a-z]{2}|global)$/.test(country) ? country : undefined,
     brand: one(search.brand)?.slice(0, 80) || undefined,
     tag: one(search.tag)?.toLowerCase().slice(0, 40) || undefined,
+    gift_category: giftCardCategories.includes(giftCategory as GiftCardCategory) ? giftCategory as GiftCardCategory : undefined,
+    redeemable: giftCardRedemptionChannels.includes(redeemable as GiftCardRedemptionChannel) ? redeemable as GiftCardRedemptionChannel : undefined,
     sort: sort === "name" || sort === "new" ? sort : undefined,
     page: page && /^\d{1,3}$/.test(page) && Number(page) > 1 ? page : undefined,
   };
@@ -32,7 +36,7 @@ export function readParams(search: Record<string, string | string[] | undefined>
 export async function loadCatalogue(base: { category?: string; group?: string }, params: CatalogueParams) {
   const page = Number(params.page ?? 1);
   const result = await storeApi<StoreList<StoreProduct>>(
-    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, limit: pageSize, offset: (page - 1) * pageSize })}`),
+    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, gift_category: params.gift_category, redeemable: params.redeemable, sort: params.sort, limit: pageSize, offset: (page - 1) * pageSize })}`),
   );
   return { page, result };
 }
@@ -50,15 +54,16 @@ const chipRow = "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:non
 const field = "min-h-11 w-full rounded-xl border border-slate-200 bg-white text-base text-navy-900 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none sm:text-sm";
 
 /** Country and sort, with Apply (a plain form, so it works without script). `compact`: one row, labels for screen readers only. */
-function Filters({ path, params, countries, compact = false }: { path: string; params: CatalogueParams; countries: StoreCountry[]; compact?: boolean }) {
+function Filters({ path, params, countries, giftCardFacets, compact = false }: { path: string; params: CatalogueParams; countries: StoreCountry[]; giftCardFacets?: GiftCardFacets; compact?: boolean }) {
   const label = compact ? "sr-only" : "mb-1 block font-semibold";
   return (
     // Compact: the two fields share the row, applying as soon as one changes; Apply shows only until script runs.
-    <form method="get" action={path} className={compact ? "group grid grid-flow-col grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2" : "mt-6 grid gap-2"}>
+    <form method="get" action={path} className={compact ? "group grid grid-cols-2 gap-2" : "mt-6 grid gap-2"}>
       {compact ? <SubmitOnChange /> : null}
       {params.q ? <input type="hidden" name="q" value={params.q} /> : null}
       {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
       {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
+      {params.gift_category ? <input type="hidden" name="gift_category" value={params.gift_category} /> : null}
       <label className="min-w-0 text-sm">
         <span className={label}>Country</span>
         <select name="country" defaultValue={params.country ?? ""} className={`${field} px-3`}>
@@ -71,6 +76,15 @@ function Filters({ path, params, countries, compact = false }: { path: string; p
           ))}
         </select>
       </label>
+      {giftCardFacets ? (
+        <label className="min-w-0 text-sm">
+          <span className={label}>Redeemable</span>
+          <select name="redeemable" defaultValue={params.redeemable ?? ""} className={`${field} px-3`}>
+            <option value="">Any redemption method</option>
+            {giftCardFacets.redemption_channels.filter(item => item.products > 0).map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
+          </select>
+        </label>
+      ) : null}
       <label className="min-w-0 text-sm">
         <span className={label}>Sort by</span>
         <select name="sort" defaultValue={params.sort ?? ""} className={`${field} px-3`}>
@@ -97,6 +111,7 @@ export function CatalogueView({
   page,
   result,
   banner,
+  giftCardFacets,
 }: {
   path: string;
   title: string;
@@ -107,6 +122,7 @@ export function CatalogueView({
   active?: string;
   /** The category's banner (Storefront > Categories), shown above the title. */
   banner?: string | null;
+  giftCardFacets?: GiftCardFacets;
   page: number;
   result: Awaited<ReturnType<typeof loadCatalogue>>["result"];
 }) {
@@ -117,6 +133,8 @@ export function CatalogueView({
     params.country ? { label: params.country === "global" ? "Usable anywhere" : (countries.find(item => item.code.toLowerCase() === params.country)?.name ?? params.country.toUpperCase()), change: { country: undefined } } : null,
     params.brand ? { label: `Brand: ${params.brand}`, change: { brand: undefined } } : null,
     params.tag ? { label: params.tag.charAt(0).toUpperCase() + params.tag.slice(1), change: { tag: undefined } } : null,
+    params.gift_category ? { label: giftCardFacets?.categories.find(item => item.code === params.gift_category)?.name ?? params.gift_category, change: { gift_category: undefined } } : null,
+    params.redeemable ? { label: giftCardFacets?.redemption_channels.find(item => item.code === params.redeemable)?.name ?? params.redeemable, change: { redeemable: undefined } } : null,
   ].filter(Boolean) as Array<{ label: string; change: Partial<CatalogueParams> }>;
 
   return (
@@ -160,8 +178,19 @@ export function CatalogueView({
               </div>
             );
           })}
+          {active === "gift_cards" && giftCardFacets ? (
+            <div className="mt-5 border-t border-slate-200 pt-4">
+              <p className="px-2 text-xs font-bold tracking-wide text-slate-500 uppercase">Gift card type</p>
+              <ul className="mt-2 space-y-0.5">
+                <li><Link href={hrefWith(path, params, { gift_category: undefined })} className={`block rounded-md px-2 py-1.5 text-sm ${!params.gift_category ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}>All Gift Cards</Link></li>
+                {giftCardFacets.categories.filter(item => item.products > 0).map(item => (
+                  <li key={item.code}><Link href={hrefWith(path, params, { gift_category: item.code })} className={`flex justify-between rounded-md px-2 py-1.5 text-sm ${params.gift_category === item.code ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}><span>{item.name}</span><span className="text-xs text-slate-400">{item.products}</span></Link></li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </nav>
-        <Filters path={path} params={params} countries={countries} />
+        <Filters path={path} params={params} countries={countries} giftCardFacets={giftCardFacets} />
       </aside>
 
       <div className="min-w-0">
@@ -200,8 +229,14 @@ export function CatalogueView({
             );
           })}
         </ul>
+        {active === "gift_cards" && giftCardFacets ? (
+          <ul aria-label="Gift card types" className={`mt-3 lg:hidden ${chipRow}`}>
+            <li className="shrink-0"><Link href={hrefWith(path, params, { gift_category: undefined })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${!params.gift_category ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>All Gift Cards</Link></li>
+            {giftCardFacets.categories.filter(item => item.products > 0).map(item => <li key={item.code} className="shrink-0"><Link href={hrefWith(path, params, { gift_category: item.code })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${params.gift_category === item.code ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>{item.name}</Link></li>)}
+          </ul>
+        ) : null}
         <div className="mt-3 lg:hidden">
-          <Filters path={path} params={params} countries={countries} compact />
+          <Filters path={path} params={params} countries={countries} giftCardFacets={giftCardFacets} compact />
         </div>
         {chips.length ? (
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Active filters">
@@ -224,6 +259,8 @@ export function CatalogueView({
             {params.country ? <input type="hidden" name="country" value={params.country} /> : null}
             {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
             {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
+            {params.gift_category ? <input type="hidden" name="gift_category" value={params.gift_category} /> : null}
+            {params.redeemable ? <input type="hidden" name="redeemable" value={params.redeemable} /> : null}
             {params.sort ? <input type="hidden" name="sort" value={params.sort} /> : null}
                   <label htmlFor="catalogue-search" className="sr-only">{`Search ${title.toLowerCase()}`}</label>
             <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />

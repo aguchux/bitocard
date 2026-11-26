@@ -99,7 +99,7 @@ export class IntegrationsAdminService {
         message = null;
       } catch (error) {
         const detail = error instanceof Error ? error.message.replace(new RegExp(`^${groupId}: `), '') : 'unknown error';
-        message = error instanceof ProviderError && error.definite ? `${where} refused these credentials (${detail}).` : `Could not reach ${where} (${detail}). Try again in a moment.`;
+        message = error instanceof ProviderError && error.definite ? `${where} refused these credentials (${detail}).` : `Could not verify ${where} (${detail}). Try again in a moment.`;
       }
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
@@ -110,7 +110,7 @@ export class IntegrationsAdminService {
   private async testPrestmit(adminId: string) {
     await this.integrations.refresh(true);
     const config = this.integrations.config;
-    const environment = config.PRESTMIT_SANDBOX ? ('sandbox' as const) : ('live' as const);
+    const environment = inSandbox(config, 'prestmit') ? ('sandbox' as const) : ('live' as const);
     const where = environment === 'sandbox' ? 'Prestmit’s sandbox' : 'Prestmit';
     const prestmit = new Prestmit({ apiKey: config.PRESTMIT_API_KEY, apiSecret: config.PRESTMIT_API_SECRET, baseUrl: urlsFor(config, environment).PRESTMIT_API_URL });
     let ok = false;
@@ -118,8 +118,10 @@ export class IntegrationsAdminService {
     if (!prestmit.configured()) message = 'Set the API key and API secret first.';
     else {
       try {
+        const { buy, sell } = await prestmit.availability();
         ok = true;
-        message = (await prestmit.sellingOpen()) ? null : `${where} answered, but is not taking gift card sales right now.`;
+        const state = (available: boolean | null) => available === null ? 'not reported' : available ? 'available' : 'unavailable';
+        message = `Buying: ${state(buy)}. Selling: ${state(sell)}.`;
       } catch (error) {
         ok = false;
         const detail = error instanceof Error ? error.message.replace(/^prestmit: /, '') : 'unknown error';

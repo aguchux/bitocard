@@ -40,6 +40,21 @@ describe("BitoCard's store listing", () => {
     assert.equal((await admin.get('/v1/admin/products?supplier=vtpass')).json.total, 0, "only that supplier's products");
     const countries = (await admin.get('/v1/admin/products/gift-card-countries')).json.data;
     assert.ok(countries.some(country => country.code === 'US' && country.name === 'United States'));
+    const card = all.data.find(product => product.category === 'gift_cards');
+    assert.ok(card, 'the synced catalogue includes a gift card');
+    const classified = await admin.patch(`/v1/admin/products/${card.id}`, {
+      gift_card_primary_category: 'gaming',
+      gift_card_categories: ['gaming'],
+      gift_card_redemption_channels: ['online'],
+      gift_card_countries: [card.country],
+    });
+    assert.equal(classified.status, 200, JSON.stringify(classified.json));
+    assert.equal(classified.json.gift_card_classification_status, 'reviewed');
+    await admin.post('/v1/admin/suppliers/reloadly/sync');
+    const filtered = await admin.get('/v1/admin/products?gift_category=gaming&redeemable=online');
+    assert.equal(filtered.status, 200, JSON.stringify(filtered.json));
+    const kept = filtered.json.data.find(product => product.id === card.id);
+    assert.deepEqual(kept.gift_card_categories, ['gaming'], 'supplier sync keeps reviewed classifications');
   });
 
   test('admins list and unlist one product; it shows on the store only while listed', async () => {
@@ -67,6 +82,12 @@ describe("BitoCard's store listing", () => {
     const keys = await storeKeys();
     assert.ok(keys.length > 0 && keys.every(key => key.startsWith('gift_cards:')), 'only the gift cards');
     assert.ok((await visitor.get('/v1/store/gift-card-countries')).json.data.some(country => country.code === 'US' && country.name === 'United States'));
+    const facets = (await visitor.get('/v1/store/gift-card-facets')).json;
+    assert.ok(facets.categories.some(category => category.code === 'gaming' && category.products > 0));
+    const filtered = await visitor.get('/v1/store/products?category=gift_cards&gift_category=gaming&redeemable=online');
+    assert.equal(filtered.status, 200, JSON.stringify(filtered.json));
+    assert.ok(filtered.json.data.every(product => product.gift_card_categories.includes('gaming') && product.gift_card_redemption_channels.includes('online')));
+    assert.ok((await visitor.get('/v1/store/search?q=gaming')).json.products.some(product => product.gift_card_categories.includes('gaming')), 'category names find classified gift cards');
     assert.ok((await visitor.get('/v1/store/search?q=United%20States')).json.products.some(product => product.country === 'US'), 'country names find cards for that country');
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'products.listed' } }));
     assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: { category: 'gift_cards' } })).json.updated, 0, 'already listed ones are not counted again');
@@ -130,6 +151,7 @@ describe("a reseller's own store listing", () => {
     // Gift cards (sold by markup here): discount products need a share first (above).
     const catalogue = (await browser.get('/v1/catalogue/products?category=gift_cards&limit=50', sandbox)).json;
     assert.ok((await browser.get('/v1/catalogue/gift-card-countries', sandbox)).json.data.some(country => country.code === 'US' && country.name === 'United States'));
+    assert.ok((await browser.get('/v1/catalogue/gift-card-facets', sandbox)).json.categories.some(category => category.code === 'gaming'));
     assert.ok(catalogue.data.length > 0, 'the whole catalogue, though BitoCard has listed nothing');
     assert.ok(catalogue.data.every(product => product.listed === false));
 

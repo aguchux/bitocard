@@ -14,6 +14,7 @@ const cards = [
   { sku: 201, title: 'Steam Wallet', minPrice: 5, maxPrice: 100, currency: { code: 'USD' }, preOrder: false, categories: [{ name: 'Steam' }], regions: [{ name: 'USA', code: 'US' }], imageUrl: null },
   { sku: 301, title: 'Coming Soon Card', minPrice: 10, maxPrice: 10, currency: { code: 'USD' }, preOrder: true, categories: [{ name: 'Mystery' }], regions: [{ code: 'US' }] },
   { sku: 401, title: 'Nowhere Card', minPrice: 10, maxPrice: 10, currency: { code: 'USD' }, preOrder: false, categories: [{ name: 'Nowhere' }], regions: [] },
+  { sku: 501, title: 'Out of Stock Card', minPrice: 10, maxPrice: 10, currency: { code: 'USD' }, preOrder: false, categories: [{ name: 'Out of Stock' }], regions: [{ code: 'US' }] },
 ];
 
 /** ₦1,470 a dollar: what Prestmit charges BitoCard's Naira wallet. */
@@ -36,7 +37,7 @@ before(async () => {
     if (path.endsWith('/giftcard-trade/buy/calculate-payment')) {
       const price = Number(field(call.raw, 'price'));
       const quantity = Number(field(call.raw, 'quantity'));
-      return { body: { USD: price * quantity * 1.01, NAIRA: price * quantity * nairaPerDollar, CEDIS: 1, isAvailable: true } };
+      return { body: { USD: price * quantity * 1.01, NAIRA: price * quantity * nairaPerDollar, CEDIS: 1, isAvailable: field(call.raw, 'giftCardSKU') !== '501' } };
     }
     if (path.endsWith('/giftcard-trade/buy/create')) {
       if (state.reply === 'refuse') return { status: 422, body: { message: 'The given data was invalid.', errors: { price: ['Out of stock'] } } };
@@ -114,6 +115,7 @@ describe('Prestmit as a gift card supplier', () => {
     assert.deepEqual([range.denominationType, Number(range.minValueMinor), Number(range.maxValueMinor)], ['range', 500, 10_000]);
     assert.deepEqual([range.supplierProducts[0].meta.min_value, range.supplierProducts[0].meta.max_value], ['500', '10000']);
     assert.equal(await prisma.product.count({ where: { key: { contains: 'mystery' } } }), 0, 'pre-order cards are left out');
+    assert.equal(await prisma.product.count({ where: { key: { contains: 'out-of-stock' } } }), 0, 'out-of-stock cards are left out');
     assert.equal(await prisma.product.count({ where: { key: { contains: 'nowhere' } } }), 0, 'cards without a region are left out');
     // Every call is signed with the key and API-Hash.
     assert.ok(fake.calls.every(call => call.headers['api-key'] === 'pk_live' && /^[0-9a-f]{64}$/.test(call.headers['api-hash'])));

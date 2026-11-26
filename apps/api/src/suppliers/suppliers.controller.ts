@@ -1,12 +1,13 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import type { ConfirmMethod } from '../auth/confirm-methods.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import { productCategories } from '../countries/countries.service.js';
-import type { LedgerMode, ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
+import type { GiftCardCategory, GiftCardRedemptionChannel, LedgerMode, ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
+import { giftCardCategories, giftCardRedemptionChannels } from '../catalogue/gift-card-taxonomy.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { reportRange } from '../reports/range.js';
 import { SupplierFundingService } from './supplier-funding.service.js';
@@ -43,6 +44,8 @@ const toBoolean = ({ value }: { value: unknown }) => (value === 'true' || value 
 class ProductFilterFields {
   @IsOptional() @IsIn(productCategories) category?: ProductCategory;
   @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
+  @IsOptional() @IsIn(giftCardCategories) gift_category?: GiftCardCategory;
+  @IsOptional() @IsIn(giftCardRedemptionChannels) redeemable?: GiftCardRedemptionChannel;
   @IsOptional() @IsString() @Length(1, 60) q?: string;
   /** Products with an offer from this supplier. */
   @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier?: string;
@@ -53,6 +56,8 @@ class ProductFilterFields {
 class ProductFilterDto extends PageDto {
   @IsOptional() @IsIn(productCategories) category?: ProductCategory;
   @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
+  @IsOptional() @IsIn(giftCardCategories) gift_category?: GiftCardCategory;
+  @IsOptional() @IsIn(giftCardRedemptionChannels) redeemable?: GiftCardRedemptionChannel;
   @IsOptional() @IsString() @Length(1, 60) q?: string;
   @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier?: string;
   @IsOptional() @Transform(toBoolean) @IsBoolean() listed?: boolean;
@@ -74,6 +79,10 @@ class UpdateProductDto {
   @IsOptional() @ValidateIf(nullable) @IsString() @Length(0, 2000) description?: string | null;
   /** Shown instead of the supplier's logo; null goes back to it. */
   @IsOptional() @ValidateIf(nullable) @Matches(httpsUrl, { message: 'image_url must be an https:// address' }) @Length(0, 1000) image_url?: string | null;
+  @IsOptional() @ValidateIf(nullable) @IsIn(giftCardCategories) gift_card_primary_category?: GiftCardCategory | null;
+  @IsOptional() @IsArray() @ArrayUnique() @IsIn(giftCardCategories, { each: true }) gift_card_categories?: GiftCardCategory[];
+  @IsOptional() @IsArray() @ArrayUnique() @IsIn(giftCardRedemptionChannels, { each: true }) gift_card_redemption_channels?: GiftCardRedemptionChannel[];
+  @IsOptional() @IsArray() @ArrayUnique() @ArrayMaxSize(250) @Matches(/^[A-Za-z]{2}$/, { each: true }) gift_card_countries?: string[];
 }
 
 class UpdateOfferDto {
@@ -200,6 +209,12 @@ export class AdminSuppliersController {
   @Get('products/gift-card-countries')
   giftCardCountries() {
     return this.suppliers.giftCardCountries();
+  }
+
+  @AdminRoles('operations', 'finance', 'support')
+  @Get('products/gift-card-facets')
+  giftCardFacets() {
+    return this.suppliers.giftCardFacets();
   }
 
   @AdminRoles('operations', 'finance', 'support')

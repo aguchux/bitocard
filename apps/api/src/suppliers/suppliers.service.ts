@@ -3,12 +3,13 @@ import { ModuleRef } from '@nestjs/core';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma, type Product, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
+import { Prisma, type GiftCardCategory, type GiftCardRedemptionChannel, type Product, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
 import { PricingService, worldwideCategories } from '../catalogue/pricing.service.js';
+import { giftCardFacets, inferGiftCardClassification } from '../catalogue/gift-card-taxonomy.js';
 import type { CatalogueItem, CatalogueScope, SupplierAdapter } from './adapter.js';
 import { stockSupplier } from './stock.adapter.js';
 import { StorefrontService } from '../storefront/storefront.service.js';
-import { productCountries } from '../catalogue/product-countries.js';
+import { giftCardProductCountries } from '../catalogue/product-countries.js';
 import { SupplierAdapters } from './supplier-adapters.js';
 
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
@@ -104,7 +105,7 @@ export function offerChanged(
 }
 
 /** The admin's product filters (Catalog > Products). */
-export type ProductFilter = { category?: ProductCategory; country?: string; q?: string; supplier?: string; listed?: boolean };
+export type ProductFilter = { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; q?: string; supplier?: string; listed?: boolean };
 
 export type SupplierUpdate = Partial<{
   enabled: boolean;
@@ -361,7 +362,13 @@ export class SuppliersService {
       const found = new Set(existing.map(product => product.key));
       const fresh = keys.filter(key => !found.has(key));
       if (fresh.length) {
-        await this.prisma.product.createMany({ data: fresh.map(key => ({ key, ...productData(byKey.get(key)!) })), skipDuplicates: true });
+        await this.prisma.product.createMany({
+          data: fresh.map(key => {
+            const item = byKey.get(key)!;
+            return { key, ...productData(item), ...(item.category === 'gift_cards' ? inferGiftCardClassification(item) : {}) };
+          }),
+          skipDuplicates: true,
+        });
         for (const key of fresh) created.add(key);
         for (const row of await this.prisma.product.findMany({ where: { key: { in: fresh } }, select: { id: true, key: true } })) ids.set(row.key, row.id);
       }
@@ -378,10 +385,16 @@ export class SuppliersService {
   private productWhere(filter: ProductFilter): Prisma.ProductWhereInput {
     return {
       category: filter.category,
-      country: filter.country?.toUpperCase(),
+      giftCardCategories: filter.gift_category ? { has: filter.gift_category } : undefined,
+      giftCardRedemptionChannels: filter.redeemable ? { has: filter.redeemable } : undefined,
       ...(filter.supplier ? { supplierProducts: { some: { supplierCode: filter.supplier } } } : {}),
       ...(filter.listed === undefined ? {} : { listed: filter.listed }),
-      ...(filter.q ? { OR: [{ name: { contains: filter.q, mode: 'insensitive' } }, { brand: { contains: filter.q.toLowerCase() } }, { key: { contains: filter.q.toLowerCase() } }] } : {}),
+      AND: [
+        ...(filter.country ? [{ OR: filter.category === 'gift_cards' || filter.gift_category || filter.redeemable
+          ? [{ giftCardCountries: { has: filter.country.toUpperCase() } }, { country: filter.country.toUpperCase() }]
+          : [{ country: filter.country.toUpperCase() }] }] : []),
+        ...(filter.q ? [{ OR: [{ name: { contains: filter.q, mode: 'insensitive' as const } }, { brand: { contains: filter.q.toLowerCase() } }, { key: { contains: filter.q.toLowerCase() } }] }] : []),
+      ],
     };
   }
 
@@ -419,6 +432,12 @@ export class SuppliersService {
         image_url: product.imageUrl,
         card_url: cards.get(product.id) ?? null,
         face_currency: product.faceCurrency,
+        gift_card_primary_category: product.giftCardPrimaryCategory,
+        gift_card_categories: product.giftCardCategories,
+        gift_card_redemption_channels: product.giftCardRedemptionChannels,
+        gift_card_countries: product.giftCardCountries,
+        gift_card_redemption_scope: product.giftCardRedemptionScope,
+        gift_card_classification_status: product.giftCardClassificationStatus,
         active: product.active,
         /** Shown on BitoCard's own store. */
         listed: product.listed,
@@ -441,11 +460,16 @@ export class SuppliersService {
   }
 
   async giftCardCountries() {
-    const rows = await this.prisma.product.groupBy({ by: ['country'], where: { category: 'gift_cards' } });
-    return { object: 'list' as const, data: productCountries(rows) };
+    const rows = await this.prisma.product.findMany({ where: { category: 'gift_cards' }, select: { country: true, giftCardCountries: true, giftCardRedemptionScope: true } });
+    return { object: 'list' as const, data: giftCardProductCountries(rows) };
   }
 
-  async updateProduct(actorId: string | null, id: string, input: { active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }) {
+  async giftCardFacets() {
+    const rows = await this.prisma.product.findMany({ where: { category: 'gift_cards' }, select: { giftCardCategories: true, giftCardRedemptionChannels: true } });
+    return giftCardFacets(rows);
+  }
+
+  async updateProduct(actorId: string | null, id: string, input: { active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null; gift_card_primary_category?: GiftCardCategory | null; gift_card_categories?: GiftCardCategory[]; gift_card_redemption_channels?: GiftCardRedemptionChannel[]; gift_card_countries?: string[] }) {
     const before = await this.prisma.product.findUnique({ where: { id } });
     if (!before) throw notFound('product');
     const listing = input.listed === undefined || input.listed === before.listed ? {} : { listed: input.listed, listedAt: input.listed ? new Date() : null };
@@ -453,7 +477,31 @@ export class SuppliersService {
       const [problem] = await this.shareProblems({ id });
       if (problem) throw noResellerShare(problem);
     }
-    const after = await this.prisma.product.update({ where: { id }, data: { active: input.active, name: input.name, description: input.description, imageUrl: input.image_url, ...listing } });
+    const classification = input.gift_card_primary_category !== undefined || input.gift_card_categories !== undefined || input.gift_card_redemption_channels !== undefined || input.gift_card_countries !== undefined;
+    if (classification && before.category !== 'gift_cards') throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Gift card classification can only be set on a gift card.');
+    const countries = input.gift_card_countries ? [...new Set(input.gift_card_countries.map(country => country.toUpperCase()))] : undefined;
+    const categories = input.gift_card_categories
+      ? [...new Set([...input.gift_card_categories, ...(input.gift_card_primary_category ? [input.gift_card_primary_category] : [])])]
+      : input.gift_card_primary_category
+        ? [...new Set([...before.giftCardCategories, input.gift_card_primary_category])]
+        : undefined;
+    const after = await this.prisma.product.update({
+      where: { id },
+      data: {
+        active: input.active, name: input.name, description: input.description, imageUrl: input.image_url, ...listing,
+        giftCardPrimaryCategory: input.gift_card_primary_category,
+        giftCardCategories: categories,
+        giftCardRedemptionChannels: input.gift_card_redemption_channels,
+        giftCardCountries: countries,
+        ...(classification ? {
+          giftCardClassificationLocked: true,
+          giftCardClassificationStatus: 'reviewed',
+          giftCardClassifiedAt: new Date(),
+          giftCardClassifiedById: actorId,
+          ...(countries ? { giftCardRedemptionScope: countries.length > 1 ? 'multiple_countries' : countries.length === 1 ? 'single_country' : 'global' } : {}),
+        } : {}),
+      },
+    });
     await this.audit.record({ actorId, action: 'product.updated', targetType: 'product', targetId: id, before, after });
     return {
       object: 'admin_product' as const,
@@ -465,6 +513,11 @@ export class SuppliersService {
       active: after.active,
       listed: after.listed,
       listed_at: after.listedAt?.toISOString() ?? null,
+      gift_card_primary_category: after.giftCardPrimaryCategory,
+      gift_card_categories: after.giftCardCategories,
+      gift_card_redemption_channels: after.giftCardRedemptionChannels,
+      gift_card_countries: after.giftCardCountries,
+      gift_card_classification_status: after.giftCardClassificationStatus,
     };
   }
 
