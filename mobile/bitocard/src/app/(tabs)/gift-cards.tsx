@@ -9,6 +9,7 @@ import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 import { saleStatusOf } from '@/lib/gift-cards';
 import { formatMoney } from '@/lib/money';
+import { cataloguePath } from '@/lib/products';
 import type { GiftCardSale, Page as List, StoreProduct } from '@/lib/types';
 
 /**
@@ -29,7 +30,7 @@ export default function GiftCardsTab() {
   const [words, setWords] = useState('');
   const products = useQuery({
     queryKey: ['products', 'gift_cards', country, currency],
-    queryFn: () => api<List<StoreProduct>>(`/v1/store/products?category=gift_cards&market=${country}&currency=${currency}&limit=100&sort=popular`),
+    queryFn: () => api<List<StoreProduct>>(cataloguePath('gift_cards', country, currency)),
   });
   const sales = useQuery({ queryKey: ['gift-card-sales'], enabled: mode === 'sell', queryFn: () => api<{ data: GiftCardSale[] }>('/v1/store/gift-card-sales') });
   const query = words.trim().toLowerCase();

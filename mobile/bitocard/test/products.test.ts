@@ -5,7 +5,13 @@ import { test } from 'node:test';
 
 import { depositsPath, depositStatusWords } from '../src/lib/deposits.ts';
 import { canDispute, disputeOpen, disputeStatus } from '../src/lib/disputes.ts';
-import { emailsCodes, faceValueOf, recipientField, recipientLines, recipientOf, takesQuantity } from '../src/lib/products.ts';
+import { cataloguePath, emailsCodes, faceValueOf, recipientField, recipientLines, recipientOf, storeProductPageSize, takesQuantity } from '../src/lib/products.ts';
+
+test('catalogue requests stay within the production page limit', () => {
+  assert.equal(storeProductPageSize, 60);
+  assert.equal(cataloguePath('gift_cards', 'NG', 'NGN'), '/v1/store/products?category=gift_cards&market=NG&currency=NGN&limit=60&sort=popular');
+  assert.equal(cataloguePath('pay_tv', 'GH'), '/v1/store/products?category=pay_tv&market=GH&limit=60&sort=popular');
+});
 
 test('who a product goes to', () => {
   assert.equal(recipientField('meter')?.label, 'Meter number');

@@ -9,7 +9,7 @@ import { useAccount } from '@/lib/account';
 import { api, ApiError } from '@/lib/api';
 import { categoryRoute, productRoute } from '@/lib/links';
 import { formatMoney } from '@/lib/money';
-import { categoryLabels } from '@/lib/products';
+import { cataloguePath, categoryLabels } from '@/lib/products';
 import type { Page as List, StoreProduct } from '@/lib/types';
 
 /** bitocard.com's menu groups that hold more than one category the app lists here (Bills: electricity and pay-TV). */
@@ -32,7 +32,7 @@ export default function BrowseScreen() {
   const products = useQuery({
     queryKey: ['products', category, country, customer?.currency],
     enabled: own.pathname === '/browse',
-    queryFn: () => api<List<StoreProduct>>(`/v1/store/products?category=${category}&market=${country}${customer?.currency ? `&currency=${customer.currency}` : ''}&limit=100&sort=popular`),
+    queryFn: () => api<List<StoreProduct>>(cataloguePath(category, country, customer?.currency)),
   });
   // Gift cards, airtime and data open their tabs.
   if (own.pathname !== '/browse') return <Redirect href={own as Href} />;

@@ -7,6 +7,7 @@ import { Button, Chip, Field, Notice, Page, Segmented, T, useTheme } from '@/com
 import { useAccount } from '@/lib/account';
 import { api } from '@/lib/api';
 import { formatMoney, toMinor } from '@/lib/money';
+import { cataloguePath } from '@/lib/products';
 import type { NetworkDetection, Page as List, StoreProduct, StoreProductDetail } from '@/lib/types';
 
 type Kind = 'airtime' | 'data';
@@ -37,7 +38,7 @@ export default function MobileTab() {
 
   const products = useQuery({
     queryKey: ['products', kind, country, currency],
-    queryFn: () => api<List<StoreProduct>>(`/v1/store/products?category=${kind}&market=${country}&currency=${currency}&limit=100&sort=popular`),
+    queryFn: () => api<List<StoreProduct>>(cataloguePath(kind, country, currency)),
   });
   const brands = useMemo(() => {
     const seen = new Map<string, string>();

@@ -18,6 +18,21 @@ export const categoryLabels: Record<string, string> = {
   mobile_money: 'Mobile money',
 };
 
+/** Production accepts at most 60 storefront products per page. Keep every mobile catalogue request on that contract. */
+export const storeProductPageSize = 60;
+
+/** The first storefront page for one category in the customer's market. */
+export function cataloguePath(category: string, market: string, currency?: string | null) {
+  const params = [
+    `category=${encodeURIComponent(category)}`,
+    `market=${encodeURIComponent(market)}`,
+    ...(currency ? [`currency=${encodeURIComponent(currency)}`] : []),
+    `limit=${storeProductPageSize}`,
+    'sort=popular',
+  ];
+  return `/v1/store/products?${params.join('&')}`;
+}
+
 /** Several at a time: gift cards and software licences (up to 10). */
 export const takesQuantity = (category: string) => category === 'gift_cards' || category === 'software';
 
