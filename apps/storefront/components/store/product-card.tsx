@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { formatFace, type StoreBrand, type StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { BrandImage } from "./brand-image";
@@ -74,6 +74,7 @@ export function ProductCard({ product, base, search = "" }: { product: StoreProd
       <div className="flex flex-1 flex-col px-0.5 pt-2.5 @[14rem]:px-1 @[14rem]:pt-3">
         <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-navy-900 @[14rem]:text-lg">{product.name}</h3>
         <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 @[14rem]:text-sm">{product.description ?? `${product.category_label}${product.global ? "" : ` · ${product.country_name}`}`}</p>
+        {product.rating ? <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-600"><Star className="size-3.5 fill-amber-400 text-amber-500" aria-hidden="true" /> {product.rating.average.toFixed(1)} <span className="font-normal text-slate-400">({product.rating.count})</span></p> : null}
         <div className="mt-auto flex items-end justify-between gap-2 pt-2.5 @[14rem]:pt-3">
           <p className="min-w-0 text-sm text-slate-500">
             <span className="font-display text-base font-extrabold text-navy-900 @[14rem]:text-lg">{priceLabel(product)}</span>

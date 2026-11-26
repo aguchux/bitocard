@@ -181,6 +181,7 @@ function Products() {
   const [category, setCategory] = useState<"" | ProductCategory>("");
   const [giftCategory, setGiftCategory] = useState<GiftCardCategory | "">("");
   const [redeemable, setRedeemable] = useState<GiftCardRedemptionChannel | "">("");
+  const [rating, setRating] = useState("");
   const [supplier, setSupplier] = useState(linkedSupplier);
   const [listing, setListing] = useState<Listing>("");
   const [search, setSearch] = useState("");
@@ -196,6 +197,7 @@ function Products() {
     category: category || undefined,
     gift_category: giftCategory || undefined,
     redeemable: redeemable || undefined,
+    rating_min: rating ? Number(rating) : undefined,
     supplier: supplier || undefined,
     listed: listing === "" ? undefined : listing === "listed",
     q: q.length >= 2 ? q : undefined,
@@ -246,6 +248,7 @@ function Products() {
                 setCountry("");
                 setGiftCategory("");
                 setRedeemable("");
+                setRating("");
               }}
               options={[{ value: "", label: "All categories" }, ...productCategories.map(value => ({ value, label: categoryName(value) }))]}
             />
@@ -253,6 +256,7 @@ function Products() {
               <>
                 <FilterSelect id="gift-category" label="Gift card type" value={giftCategory} onChange={value => setGiftCategory(value as GiftCardCategory | "")} options={[{ value: "", label: "All gift card types" }, ...(giftCardFacets.data?.categories.map(item => ({ value: item.code, label: `${item.name} (${item.products})` })) ?? [])]} />
                 <FilterSelect id="redeemable" label="Redeemable" value={redeemable} onChange={value => setRedeemable(value as GiftCardRedemptionChannel | "")} options={[{ value: "", label: "Any redemption method" }, ...(giftCardFacets.data?.redemption_channels.map(item => ({ value: item.code, label: item.name })) ?? [])]} />
+                <FilterSelect id="rating" label="Rating" value={rating} onChange={setRating} options={[{ value: "", label: "Any rating" }, ...[4, 3, 2, 1].map(value => ({ value: String(value), label: `${value}+ stars` }))]} />
               </>
             ) : null}
             <FilterSelect

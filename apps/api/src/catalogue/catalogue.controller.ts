@@ -34,6 +34,10 @@ class CatalogueFilterDto extends PageDto {
   @IsOptional() @IsIn(giftCardRedemptionChannels)
   redeemable?: GiftCardRedemptionChannel;
 
+  @ApiPropertyOptional({ minimum: 1, maximum: 5 })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5)
+  rating_min?: number;
+
   @ApiPropertyOptional({ description: 'Search by name or brand.' })
   @IsOptional() @IsString() @Length(1, 60)
   q?: string;

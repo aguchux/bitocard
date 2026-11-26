@@ -46,6 +46,7 @@ class ProductFilterFields {
   @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
   @IsOptional() @IsIn(giftCardCategories) gift_category?: GiftCardCategory;
   @IsOptional() @IsIn(giftCardRedemptionChannels) redeemable?: GiftCardRedemptionChannel;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) rating_min?: number;
   @IsOptional() @IsString() @Length(1, 60) q?: string;
   /** Products with an offer from this supplier. */
   @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier?: string;
@@ -58,6 +59,7 @@ class ProductFilterDto extends PageDto {
   @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
   @IsOptional() @IsIn(giftCardCategories) gift_category?: GiftCardCategory;
   @IsOptional() @IsIn(giftCardRedemptionChannels) redeemable?: GiftCardRedemptionChannel;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) rating_min?: number;
   @IsOptional() @IsString() @Length(1, 60) q?: string;
   @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier?: string;
   @IsOptional() @Transform(toBoolean) @IsBoolean() listed?: boolean;

@@ -124,16 +124,20 @@ class StoreProductsQueryDto {
   @IsIn(giftCardRedemptionChannels)
   redeemable?: GiftCardRedemptionChannel;
 
+  @ApiPropertyOptional({ minimum: 1, maximum: 5, description: 'Minimum verified-purchase rating; products need at least three ratings.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5)
+  rating_min?: number;
+
   @ApiPropertyOptional({ description: 'Words to match in names, brands and the companies behind them.' })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   q?: string;
 
-  @ApiPropertyOptional({ enum: ['popular', 'name', 'new'], default: 'popular' })
+  @ApiPropertyOptional({ enum: ['popular', 'name', 'new', 'rating'], default: 'popular' })
   @IsOptional()
-  @IsIn(['popular', 'name', 'new'])
-  sort?: 'popular' | 'name' | 'new';
+  @IsIn(['popular', 'name', 'new', 'rating'])
+  sort?: 'popular' | 'name' | 'new' | 'rating';
 
   @ApiPropertyOptional({ minimum: 1, maximum: 60, default: 24 })
   @IsOptional()

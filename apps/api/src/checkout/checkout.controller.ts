@@ -54,6 +54,14 @@ class CodeDto {
   code: string;
 }
 
+class GiftCardReviewDto {
+  @IsInt() @Min(1) @Max(5)
+  rating: number;
+
+  @IsOptional() @IsString() @Length(1, 1000)
+  review?: string;
+}
+
 class ProfilePhoneDto {
   @IsString() @Length(6, 25)
   phone: string;
@@ -442,6 +450,13 @@ export class CheckoutController {
   @Get('checkouts/:id')
   get(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.checkout.get(caller.customer, id);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('checkouts/:id/gift-card-review')
+  @HttpCode(HttpStatus.OK)
+  reviewGiftCard(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: GiftCardReviewDto) {
+    return this.checkout.reviewGiftCard(caller.customer, id, body);
   }
 
   /** The customer gave up on the payment page. */

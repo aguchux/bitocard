@@ -756,6 +756,13 @@ describe('checkout on bitocard.com (live)', () => {
     const done = (await shopper.get(`/v1/store/checkouts/${started.json.id}`)).json;
     assert.deepEqual([done.status, done.order.status, done.order.deliveries.map(item => item.code)], ['completed', 'completed', ['LIVE-CODE-0001']]);
     assert.match(done.order.receipt_number, /^BC-\d{6}$/);
+    const reviewed = await shopper.post(`/v1/store/checkouts/${started.json.id}/gift-card-review`, { rating: 5, review: 'Redeemed quickly.' });
+    assert.equal(reviewed.status, 200, JSON.stringify(reviewed.json));
+    assert.deepEqual([(await shopper.get(`/v1/store/checkouts/${started.json.id}`)).json.gift_card_review.rating, reviewed.json.review], [5, 'Redeemed quickly.']);
+    const ratedProduct = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+    assert.deepEqual([Number(ratedProduct.giftCardRatingAverage), ratedProduct.giftCardRatingCount], [5, 1]);
+    const stranger = await customer();
+    assert.equal((await stranger.post(`/v1/store/checkouts/${started.json.id}/gift-card-review`, { rating: 1 })).status, 404);
     const seller = await prisma.reseller.findFirstOrThrow({ where: { house: true, country: 'NG' } });
     assert.equal(await balance(seller.id, 'live', 'customer_payments'), 0n);
     assert.ok(!(await prisma.event.findMany({ where: { resellerId: seller.id } })).some(event => event.type.startsWith('top_up.')), 'checkout payments are not top-ups');

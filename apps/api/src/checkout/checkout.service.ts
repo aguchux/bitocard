@@ -9,7 +9,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
 import { FxService } from '../fx/fx.service.js';
-import { type Checkout, type CheckoutStatus, type Order, type OrderDelivery, type Payment, Prisma, type Product, type ProductCategory, type Store } from '../generated/prisma/client.js';
+import { type Checkout, type CheckoutStatus, type GiftCardReview, type Order, type OrderDelivery, type Payment, Prisma, type Product, type ProductCategory, type Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
@@ -42,6 +42,7 @@ type CheckoutFull = Checkout & {
   payment: Payment | null;
   quote: { product: Product; faceValueMinor: bigint; faceCurrency: string; quantity: number; taxMinor: bigint; taxName: string | null; recipient: unknown };
   order: (Order & { product: Product; deliveries: OrderDelivery[] }) | null;
+  giftCardReview: GiftCardReview | null;
 };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such order.');
@@ -124,11 +125,12 @@ export class CheckoutService implements OnModuleInit {
   private load(where: { id: string } | { paymentId: string } | { orderId: string }) {
     return this.prisma.checkout.findFirst({ where, include: { payment: true } }).then(async checkout => {
       if (!checkout) return null;
-      const [quote, order] = await Promise.all([
+      const [quote, order, giftCardReview] = await Promise.all([
         this.prisma.quote.findUniqueOrThrow({ where: { id: checkout.quoteId }, include: { product: true } }),
         checkout.orderId ? this.prisma.order.findUnique({ where: { id: checkout.orderId }, include: { product: true, deliveries: true } }) : null,
+        this.prisma.giftCardReview.findUnique({ where: { checkoutId: checkout.id } }),
       ]);
-      return { ...checkout, quote, order } as CheckoutFull;
+      return { ...checkout, quote, order, giftCardReview } as CheckoutFull;
     });
   }
 
@@ -162,6 +164,7 @@ export class CheckoutService implements OnModuleInit {
           : { object: 'payment_method' as const, id: checkout.gateway, label: 'Sandbox', description: 'Simulated payment', networks: [] as string[] },
       checkout_url: checkout.status === 'awaiting_payment' && checkout.payment?.status === 'pending' ? checkout.payment.checkoutUrl : null,
       recipient: checkout.quote.recipient ?? null,
+      gift_card_review: checkout.giftCardReview ? { rating: checkout.giftCardReview.rating, review: checkout.giftCardReview.review, updated_at: checkout.giftCardReview.updatedAt.toISOString() } : null,
       order: checkout.order
         ? {
             id: checkout.order.id,
@@ -571,6 +574,23 @@ export class CheckoutService implements OnModuleInit {
       checkout = (await this.load({ id }))!;
     }
     return this.present(checkout, true);
+  }
+
+  /** A verified-purchase rating: only the customer who received a live, completed gift-card order can leave one. */
+  async reviewGiftCard(customer: CustomerWithStore, id: string, input: { rating: number; review?: string }) {
+    const checkout = await this.load({ id });
+    if (!checkout || checkout.customerId !== customer.id) throw notFound();
+    if (checkout.mode !== 'live' || checkout.status !== 'completed' || checkout.quote.product.category !== 'gift_cards') {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'review_unavailable', 'Only a delivered gift card can be rated.');
+    }
+    const saved = await this.prisma.giftCardReview.upsert({
+      where: { checkoutId: id },
+      create: { checkoutId: id, customerId: customer.id, productId: checkout.quote.product.id, rating: input.rating, review: input.review?.trim() || null },
+      update: { rating: input.rating, review: input.review?.trim() || null },
+    });
+    const aggregate = await this.prisma.giftCardReview.aggregate({ where: { productId: saved.productId }, _avg: { rating: true }, _count: { rating: true } });
+    await this.prisma.product.update({ where: { id: saved.productId }, data: { giftCardRatingAverage: aggregate._avg.rating, giftCardRatingCount: aggregate._count.rating } });
+    return { object: 'gift_card_review' as const, rating: saved.rating, review: saved.review, updated_at: saved.updatedAt.toISOString() };
   }
 
   /**

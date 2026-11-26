@@ -105,7 +105,7 @@ export function offerChanged(
 }
 
 /** The admin's product filters (Catalog > Products). */
-export type ProductFilter = { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; q?: string; supplier?: string; listed?: boolean };
+export type ProductFilter = { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; rating_min?: number; q?: string; supplier?: string; listed?: boolean };
 
 export type SupplierUpdate = Partial<{
   enabled: boolean;
@@ -387,6 +387,8 @@ export class SuppliersService {
       category: filter.category,
       giftCardCategories: filter.gift_category ? { has: filter.gift_category } : undefined,
       giftCardRedemptionChannels: filter.redeemable ? { has: filter.redeemable } : undefined,
+      giftCardRatingAverage: filter.rating_min ? { gte: filter.rating_min } : undefined,
+      giftCardRatingCount: filter.rating_min ? { gte: 3 } : undefined,
       ...(filter.supplier ? { supplierProducts: { some: { supplierCode: filter.supplier } } } : {}),
       ...(filter.listed === undefined ? {} : { listed: filter.listed }),
       AND: [
@@ -438,6 +440,7 @@ export class SuppliersService {
         gift_card_countries: product.giftCardCountries,
         gift_card_redemption_scope: product.giftCardRedemptionScope,
         gift_card_classification_status: product.giftCardClassificationStatus,
+        rating: product.giftCardRatingAverage ? { average: Number(product.giftCardRatingAverage), count: product.giftCardRatingCount } : null,
         active: product.active,
         /** Shown on BitoCard's own store. */
         listed: product.listed,
@@ -465,7 +468,7 @@ export class SuppliersService {
   }
 
   async giftCardFacets() {
-    const rows = await this.prisma.product.findMany({ where: { category: 'gift_cards' }, select: { giftCardCategories: true, giftCardRedemptionChannels: true } });
+    const rows = await this.prisma.product.findMany({ where: { category: 'gift_cards' }, select: { giftCardCategories: true, giftCardRedemptionChannels: true, giftCardRatingAverage: true, giftCardRatingCount: true } });
     return giftCardFacets(rows);
   }
 

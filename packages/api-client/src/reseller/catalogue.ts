@@ -7,7 +7,7 @@ export const catalogueCategories = ['gift_cards', 'airtime', 'data', 'bills', 'p
 export type CatalogueCategory = (typeof catalogueCategories)[number];
 export type GiftCardCategory = 'online_marketplaces' | 'travel' | 'food_groceries' | 'restaurants_delivery' | 'gaming' | 'gasoline_automotive' | 'transportation' | 'electronics' | 'fashion' | 'privacy_tools' | 'ai' | 'department_stores' | 'multi_brand' | 'entertainment' | 'music_streaming' | 'home_diy' | 'health_beauty' | 'sports_outdoors' | 'gifts_experiences' | 'kids' | 'crypto_payments' | 'app_stores_mobile' | 'books_learning';
 export type GiftCardRedemptionChannel = 'online' | 'in_store' | 'app' | 'phone';
-export type GiftCardFacets = { object: 'gift_card_facets'; categories: Array<{ code: GiftCardCategory; name: string; products: number }>; redemption_channels: Array<{ code: GiftCardRedemptionChannel; name: string; products: number }>; unclassified: number };
+export type GiftCardFacets = { object: 'gift_card_facets'; categories: Array<{ code: GiftCardCategory; name: string; products: number }>; redemption_channels: Array<{ code: GiftCardRedemptionChannel; name: string; products: number }>; ratings: Array<{ minimum: number; products: number }>; unclassified: number };
 
 /** What the customer must give when buying: a phone number, a smartcard or IUC number, a meter number, or nothing. */
 export type RecipientType = 'phone' | 'smartcard' | 'meter' | 'account' | 'none';
@@ -37,6 +37,7 @@ export type Product = {
   gift_card_redemption_channels: GiftCardRedemptionChannel[];
   gift_card_countries: string[];
   gift_card_redemption_scope: 'single_country' | 'multiple_countries' | 'global' | 'unknown' | null;
+  rating: { average: number; count: number } | null;
   logo_url: string | null;
   /** A picture for the product: its own image, else its brand's gift card design. */
   image_url: string | null;
@@ -48,7 +49,7 @@ export type Product = {
 
 /** The catalogue pages on `next_cursor`: products that cannot be priced are left out, so the last item is not always the cursor. */
 export type ProductList = List<Product> & { next_cursor: string | null };
-export type ProductFilter = { category?: CatalogueCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; q?: string; listed?: boolean; limit?: number };
+export type ProductFilter = { category?: CatalogueCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; rating_min?: number; q?: string; listed?: boolean; limit?: number };
 export type ProductCountry = { code: string; name: string };
 
 export type QuoteStatus = 'open' | 'used' | 'expired';

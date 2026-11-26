@@ -133,12 +133,13 @@ export default function CataloguePage() {
   const [country, setCountry] = useState("");
   const [giftCategory, setGiftCategory] = useState<GiftCardCategory | "">("");
   const [redeemable, setRedeemable] = useState<GiftCardRedemptionChannel | "">("");
+  const [rating, setRating] = useState("");
   const [listing, setListingFilter] = useState<Listing>("");
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim());
   const giftCardCountries = useGiftCardCountriesQuery(undefined, { skip: category !== "gift_cards" });
   const giftCardFacets = useGiftCardFacetsQuery(undefined, { skip: category !== "gift_cards" });
-  const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, gift_category: giftCategory || undefined, redeemable: redeemable || undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
+  const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, gift_category: giftCategory || undefined, redeemable: redeemable || undefined, rating_min: rating ? Number(rating) : undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
   const rows = query.data?.pages.flatMap(page => page.data);
   const [opened, setOpen] = useState<Product | null>(null);
   const [pricing, setPricing] = useState<Product | null>(null);
@@ -179,6 +180,7 @@ export default function CataloguePage() {
             setCountry("");
             setGiftCategory("");
             setRedeemable("");
+            setRating("");
           }}
           options={[{ value: "", label: "All categories" }, ...catalogueCategories.map(value => ({ value, label: categoryName(value) }))]}
         />
@@ -187,6 +189,7 @@ export default function CataloguePage() {
           <>
             <FilterSelect id="gift-category" label="Gift card type" value={giftCategory} onChange={value => setGiftCategory(value as GiftCardCategory | "")} options={[{ value: "", label: "All gift card types" }, ...(giftCardFacets.data?.categories.map(item => ({ value: item.code, label: `${item.name} (${item.products})` })) ?? [])]} />
             <FilterSelect id="redeemable" label="Redeemable" value={redeemable} onChange={value => setRedeemable(value as GiftCardRedemptionChannel | "")} options={[{ value: "", label: "Any redemption method" }, ...(giftCardFacets.data?.redemption_channels.map(item => ({ value: item.code, label: item.name })) ?? [])]} />
+            <FilterSelect id="rating" label="Rating" value={rating} onChange={setRating} options={[{ value: "", label: "Any rating" }, ...[4, 3, 2, 1].map(value => ({ value: String(value), label: `${value}+ stars` }))]} />
           </>
         ) : null}
         <FilterSelect

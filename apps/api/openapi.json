@@ -18330,6 +18330,63 @@
             }
           },
           {
+            "name": "gift_category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "online_marketplaces",
+                "travel",
+                "food_groceries",
+                "restaurants_delivery",
+                "gaming",
+                "gasoline_automotive",
+                "transportation",
+                "electronics",
+                "fashion",
+                "privacy_tools",
+                "ai",
+                "department_stores",
+                "multi_brand",
+                "entertainment",
+                "music_streaming",
+                "home_diy",
+                "health_beauty",
+                "sports_outdoors",
+                "gifts_experiences",
+                "kids",
+                "crypto_payments",
+                "app_stores_mobile",
+                "books_learning"
+              ]
+            }
+          },
+          {
+            "name": "redeemable",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "online",
+                "in_store",
+                "app",
+                "phone"
+              ]
+            }
+          },
+          {
+            "name": "rating_min",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 5,
+              "type": "number"
+            }
+          },
+          {
             "name": "q",
             "required": false,
             "in": "query",
@@ -18558,6 +18615,182 @@
           }
         ],
         "summary": "List products",
+        "tags": [
+          "Catalogue"
+        ],
+        "x-bitocard-scopes": [
+          "catalogue:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/catalogue/gift-card-countries": {
+      "get": {
+        "operationId": "CatalogueController_giftCardCountries",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List gift card redemption countries",
+        "tags": [
+          "Catalogue"
+        ],
+        "x-bitocard-scopes": [
+          "catalogue:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/catalogue/gift-card-facets": {
+      "get": {
+        "operationId": "CatalogueController_giftCardFacets",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List gift card category and redemption facets",
         "tags": [
           "Catalogue"
         ],
@@ -25834,6 +26067,66 @@
             }
           },
           {
+            "name": "gift_category",
+            "required": false,
+            "in": "query",
+            "description": "Gift-card merchandising category.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "online_marketplaces",
+                "travel",
+                "food_groceries",
+                "restaurants_delivery",
+                "gaming",
+                "gasoline_automotive",
+                "transportation",
+                "electronics",
+                "fashion",
+                "privacy_tools",
+                "ai",
+                "department_stores",
+                "multi_brand",
+                "entertainment",
+                "music_streaming",
+                "home_diy",
+                "health_beauty",
+                "sports_outdoors",
+                "gifts_experiences",
+                "kids",
+                "crypto_payments",
+                "app_stores_mobile",
+                "books_learning"
+              ]
+            }
+          },
+          {
+            "name": "redeemable",
+            "required": false,
+            "in": "query",
+            "description": "How the gift card can be redeemed.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "online",
+                "in_store",
+                "app",
+                "phone"
+              ]
+            }
+          },
+          {
+            "name": "rating_min",
+            "required": false,
+            "in": "query",
+            "description": "Minimum verified-purchase rating; products need at least three ratings.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 5,
+              "type": "number"
+            }
+          },
+          {
             "name": "q",
             "required": false,
             "in": "query",
@@ -25852,7 +26145,8 @@
               "enum": [
                 "popular",
                 "name",
-                "new"
+                "new",
+                "rating"
               ]
             }
           },
@@ -26027,6 +26321,154 @@
           }
         },
         "summary": "List products",
+        "tags": [
+          "Storefront"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/store/gift-card-countries": {
+      "get": {
+        "operationId": "StorefrontController_giftCardCountries",
+        "parameters": [
+          {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List gift card redemption countries",
+        "tags": [
+          "Storefront"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/store/gift-card-facets": {
+      "get": {
+        "operationId": "StorefrontController_giftCardFacets",
+        "parameters": [
+          {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List gift card category and redemption facets",
         "tags": [
           "Storefront"
         ],

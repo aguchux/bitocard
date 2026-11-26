@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, ExternalLink, KeyRound, LifeBuoy, MessageSquareWarning } from "lucide-react";
+import { ChevronLeft, ExternalLink, KeyRound, LifeBuoy, MessageSquareWarning, Star } from "lucide-react";
 import { formatFace, type StoreCheckout, type StoreVpn } from "@bitocard/api-client/storefront";
 import { CopyValue, VpnAccess } from "@/components/store/vpn-access";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
-import { cancelCheckout, simulateCheckout } from "@/lib/account-actions";
+import { cancelCheckout, rateGiftCard, simulateCheckout } from "@/lib/account-actions";
 import { cancelErrorText } from "@/lib/cancel-payment";
 import { canDispute } from "@/lib/disputes";
 
@@ -15,9 +15,9 @@ export const metadata: Metadata = { title: "Your order", robots: { index: false,
 const detailLabels: Record<string, string> = { duration: "Licence term", expires_at: "Expires", redemption_url: "Redeem at" };
 
 /** One order: its status, the codes once delivered, and the payment page while it is waiting for payment. */
-export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cancel_error?: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cancel_error?: string; rating_error?: string }> }) {
   const { id } = await params;
-  const { cancel_error: cancelError } = await searchParams;
+  const { cancel_error: cancelError, rating_error: ratingError } = await searchParams;
   if (!(await currentCustomer())) redirect(`/signin?next=${encodeURIComponent(`/account/orders/${id}`)}`);
   const result = await customerApi<StoreCheckout>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}`);
   if (!result.ok) notFound();
@@ -148,6 +148,30 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       ) : null}
 
       {vpn?.ok && vpn.data.vpn_subscription ? <VpnAccess source={{ checkout: order.id }} vpn={vpn.data.vpn_subscription} store="the store" /> : null}
+
+      {order.mode === "live" && order.status === "completed" && order.product.category === "gift_cards" ? (
+        <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm" aria-labelledby="rate-card">
+          <h2 id="rate-card" className="font-display flex items-center gap-2 text-xl font-bold"><Star className="size-5 text-amber-500" aria-hidden="true" /> Rate this gift card</h2>
+          <p className="mt-1 text-sm text-slate-600">Your rating is marked as a verified purchase and helps other customers choose.</p>
+          <form action={rateGiftCard} className="mt-4 space-y-4">
+            <input type="hidden" name="id" value={order.id} />
+            <fieldset>
+              <legend className="sr-only">Rating from one to five stars</legend>
+              <div className="flex flex-wrap gap-2">
+                {[5, 4, 3, 2, 1].map(value => (
+                  <label key={value} className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-xl border border-slate-200 px-3 has-checked:border-amber-500 has-checked:bg-amber-50">
+                    <input type="radio" name="rating" value={value} defaultChecked={order.gift_card_review?.rating === value || (!order.gift_card_review && value === 5)} className="sr-only" />
+                    {value} <Star className="size-4 fill-amber-400 text-amber-500" aria-hidden="true" />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label className="block text-sm font-semibold text-navy-900">Review <span className="font-normal text-slate-500">(optional)</span><textarea name="review" maxLength={1000} defaultValue={order.gift_card_review?.review ?? ""} className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+            {ratingError ? <p className="text-sm text-red-700" role="alert">We could not save your rating. Please try again.</p> : null}
+            <button type="submit" className="inline-flex min-h-11 items-center rounded-xl bg-navy-900 px-4 font-semibold text-white">{order.gift_card_review ? "Update rating" : "Submit rating"}</button>
+          </form>
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <Link

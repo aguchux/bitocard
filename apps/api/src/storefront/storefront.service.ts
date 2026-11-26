@@ -40,8 +40,9 @@ export type StoreProductFilter = {
   tag?: string;
   gift_category?: GiftCardCategory;
   redeemable?: GiftCardRedemptionChannel;
+  rating_min?: number;
   q?: string;
-  sort?: 'popular' | 'name' | 'new';
+  sort?: 'popular' | 'name' | 'new' | 'rating';
   limit?: number;
   offset?: number;
 };
@@ -328,6 +329,7 @@ export class StorefrontService {
       gift_card_redemption_channels: product.giftCardRedemptionChannels,
       gift_card_countries: product.giftCardCountries,
       gift_card_redemption_scope: product.giftCardRedemptionScope,
+      rating: product.giftCardRatingAverage ? { average: Number(product.giftCardRatingAverage), count: product.giftCardRatingCount } : null,
       /** The admin's product image, else the brand's logo from BitoCard's own files: never the supplier's (it would name them). */
       logo_url: product.imageUrl ?? this.presentBrand(product.brand, brand).logo_url,
       brand: this.presentBrand(product.brand, brand),
@@ -418,6 +420,7 @@ export class StorefrontService {
     if (filter.brand) and.push({ brand: filter.brand });
     if (filter.gift_category) and.push({ category: 'gift_cards', giftCardCategories: { has: filter.gift_category } });
     if (filter.redeemable) and.push({ category: 'gift_cards', giftCardRedemptionChannels: { has: filter.redeemable } });
+    if (filter.rating_min) and.push({ category: 'gift_cards', giftCardRatingAverage: { gte: filter.rating_min }, giftCardRatingCount: { gte: 3 } });
     return and.length ? { AND: and } : {};
   }
 
@@ -457,7 +460,11 @@ export class StorefrontService {
       const ordered = ids.map(id => page.find(row => row.id === id)).filter((row): row is Product => Boolean(row));
       return { object: 'list' as const, data: await this.present(ordered), has_more: total > offset + limit, total };
     }
-    const orderBy: Prisma.ProductOrderByWithRelationInput[] = filter.sort === 'new' ? [{ createdAt: 'desc' }, { name: 'asc' }] : [{ name: 'asc' }, { key: 'asc' }];
+    const orderBy: Prisma.ProductOrderByWithRelationInput[] = filter.sort === 'new'
+      ? [{ createdAt: 'desc' }, { name: 'asc' }]
+      : filter.sort === 'rating'
+        ? [{ giftCardRatingAverage: 'desc' }, { giftCardRatingCount: 'desc' }, { name: 'asc' }]
+        : [{ name: 'asc' }, { key: 'asc' }];
     const rows = await this.prisma.product.findMany({ where: scope, orderBy, skip: offset, take: limit });
     return { object: 'list' as const, data: await this.present(rows), has_more: total > offset + limit, total };
   }
@@ -472,7 +479,7 @@ export class StorefrontService {
     const { where } = await this.availability();
     const rows = await this.prisma.product.findMany({
       where: { AND: [where, { category: 'gift_cards' }] },
-      select: { giftCardCategories: true, giftCardRedemptionChannels: true },
+      select: { giftCardCategories: true, giftCardRedemptionChannels: true, giftCardRatingAverage: true, giftCardRatingCount: true },
     });
     return giftCardFacets(rows);
   }

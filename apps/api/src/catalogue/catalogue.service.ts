@@ -38,6 +38,7 @@ export function presentProductBase(product: Product, logoUrl: string | null) {
     gift_card_redemption_channels: product.giftCardRedemptionChannels,
     gift_card_countries: product.giftCardCountries,
     gift_card_redemption_scope: product.giftCardRedemptionScope,
+    rating: product.giftCardRatingAverage ? { average: Number(product.giftCardRatingAverage), count: product.giftCardRatingCount } : null,
     logo_url: logoUrl,
   };
 }
@@ -79,7 +80,7 @@ export class CatalogueService {
     };
   }
 
-  async list(resellerId: string, mode: LedgerMode, filter: { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; q?: string; listed?: boolean; limit?: number; starting_after?: string }) {
+  async list(resellerId: string, mode: LedgerMode, filter: { category?: ProductCategory; country?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; rating_min?: number; q?: string; listed?: boolean; limit?: number; starting_after?: string }) {
     const ctx = await this.pricing.context(resellerId, mode);
     const limit = filter.limit ?? 25;
     const categories = ctx.country.categories.filter(c => c.enabled).map(c => c.category);
@@ -89,6 +90,8 @@ export class CatalogueService {
         category: filter.category ? { in: categories.includes(filter.category) ? [filter.category] : [] } : { in: categories },
         giftCardCategories: filter.gift_category ? { has: filter.gift_category } : undefined,
         giftCardRedemptionChannels: filter.redeemable ? { has: filter.redeemable } : undefined,
+        giftCardRatingAverage: filter.rating_min ? { gte: filter.rating_min } : undefined,
+        giftCardRatingCount: filter.rating_min ? { gte: 3 } : undefined,
         ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
         AND: [
           // BitoCard's offers, or the reseller's own.
@@ -139,7 +142,7 @@ export class CatalogueService {
         supplierProducts: { some: { available: true } },
         ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
       },
-      select: { giftCardCategories: true, giftCardRedemptionChannels: true },
+      select: { giftCardCategories: true, giftCardRedemptionChannels: true, giftCardRatingAverage: true, giftCardRatingCount: true },
     });
     return summarizeGiftCardFacets(rows);
   }

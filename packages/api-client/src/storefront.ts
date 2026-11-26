@@ -14,7 +14,7 @@ export type GiftCardRedemptionChannel = 'online' | 'in_store' | 'app' | 'phone';
 export const giftCardCategories = ['online_marketplaces', 'travel', 'food_groceries', 'restaurants_delivery', 'gaming', 'gasoline_automotive', 'transportation', 'electronics', 'fashion', 'privacy_tools', 'ai', 'department_stores', 'multi_brand', 'entertainment', 'music_streaming', 'home_diy', 'health_beauty', 'sports_outdoors', 'gifts_experiences', 'kids', 'crypto_payments', 'app_stores_mobile', 'books_learning'] as const satisfies readonly GiftCardCategory[];
 export const giftCardRedemptionChannels = ['online', 'in_store', 'app', 'phone'] as const satisfies readonly GiftCardRedemptionChannel[];
 export type GiftCardFacet = { code: string; name: string; products: number };
-export type GiftCardFacets = { object: 'gift_card_facets'; categories: Array<GiftCardFacet & { code: GiftCardCategory }>; redemption_channels: Array<GiftCardFacet & { code: GiftCardRedemptionChannel }>; unclassified: number };
+export type GiftCardFacets = { object: 'gift_card_facets'; categories: Array<GiftCardFacet & { code: GiftCardCategory }>; redemption_channels: Array<GiftCardFacet & { code: GiftCardRedemptionChannel }>; ratings: Array<{ minimum: number; products: number }>; unclassified: number };
 
 export const categoryLabels: Record<ProductCategory, string> = {
   gift_cards: 'Gift cards',
@@ -34,11 +34,6 @@ export type StoreBrand = {
   name: string;
   company: string | null;
   description: string | null;
-  gift_card_primary_category: GiftCardCategory | null;
-  gift_card_categories: GiftCardCategory[];
-  gift_card_redemption_channels: GiftCardRedemptionChannel[];
-  gift_card_countries: string[];
-  gift_card_redemption_scope: 'single_country' | 'multiple_countries' | 'global' | 'unknown' | null;
   logo_url: string | null;
   image_url: string | null;
   color: string | null;
@@ -67,6 +62,12 @@ export type StoreProduct = {
   /** The face values in the signed-in customer's currency (asked with `currency`), or null. */
   price: StoreLocalPrice | null;
   description: string | null;
+  gift_card_primary_category: GiftCardCategory | null;
+  gift_card_categories: GiftCardCategory[];
+  gift_card_redemption_channels: GiftCardRedemptionChannel[];
+  gift_card_countries: string[];
+  gift_card_redemption_scope: 'single_country' | 'multiple_countries' | 'global' | 'unknown' | null;
+  rating: { average: number; count: number } | null;
   logo_url: string | null;
   brand: StoreBrand;
 };
@@ -634,6 +635,7 @@ export type StoreCheckout = {
   method: StorePaymentMethod;
   checkout_url: string | null;
   recipient: Record<string, string> | null;
+  gift_card_review: { rating: number; review: string | null; updated_at: string } | null;
   order: {
     id: string;
     status: 'processing' | 'completed' | 'failed' | 'refunded';

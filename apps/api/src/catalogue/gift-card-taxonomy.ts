@@ -82,7 +82,7 @@ export function giftCardCategorySearch(query: string): GiftCardCategory | null {
   return giftCardCategories.find(category => category === term || giftCardCategoryLabels[category].toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') === term) ?? aliases[term] ?? null;
 }
 
-export function giftCardFacets(rows: readonly { giftCardCategories: string[]; giftCardRedemptionChannels: string[] }[]) {
+export function giftCardFacets(rows: readonly { giftCardCategories: string[]; giftCardRedemptionChannels: string[]; giftCardRatingAverage?: unknown; giftCardRatingCount?: number }[]) {
   const categoryCounts = new Map<GiftCardCategory, number>();
   const channelCounts = new Map<GiftCardRedemptionChannel, number>();
   for (const row of rows) {
@@ -93,6 +93,7 @@ export function giftCardFacets(rows: readonly { giftCardCategories: string[]; gi
     object: 'gift_card_facets' as const,
     categories: giftCardCategories.map(code => ({ code, name: giftCardCategoryLabels[code], products: categoryCounts.get(code) ?? 0 })),
     redemption_channels: giftCardRedemptionChannels.map(code => ({ code, name: giftCardRedemptionChannelLabels[code], products: channelCounts.get(code) ?? 0 })),
+    ratings: [4, 3, 2, 1].map(minimum => ({ minimum, products: rows.filter(row => row.giftCardRatingCount && row.giftCardRatingCount >= 3 && Number(row.giftCardRatingAverage) >= minimum).length })),
     unclassified: rows.filter(row => row.giftCardCategories.length === 0).length,
   };
 }

@@ -210,6 +210,16 @@ export async function simulateCheckout(form: FormData) {
   revalidatePath(`/account/orders/${id}`);
 }
 
+export async function rateGiftCard(form: FormData) {
+  const id = text(form, "id");
+  const result = await customerApi("POST", `/v1/store/checkouts/${encodeURIComponent(id)}/gift-card-review`, {
+    rating: Number(text(form, "rating")),
+    review: text(form, "review") || undefined,
+  });
+  revalidatePath(`/account/orders/${id}`);
+  if (!result.ok) redirect(`/account/orders/${encodeURIComponent(id)}?rating_error=${encodeURIComponent(result.code ?? "unavailable")}`);
+}
+
 type Verification = { url?: string | null; status: string };
 
 /**

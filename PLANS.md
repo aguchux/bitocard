@@ -41,7 +41,7 @@ All **Decided**. BitoCard's own retail store (the parent store) is on the main s
 
 | Category | Notes | Status |
 |---|---|---|
-| Gift cards (buy) | Denominations and countries vary; a supplier-independent taxonomy gives each card a primary and secondary type, redemption channels and one, several or global redemption countries; customer, admin and SHQ catalogues filter on those reviewed attributes; verified-purchase ratings follow as a separate phase and supplier reliability stays internal | Decided; country discovery built 25 November 2026; taxonomy foundation and catalogue filters built 25 November 2026 |
+| Gift cards (buy) | Denominations and countries vary; a supplier-independent taxonomy gives each card a primary and secondary type, redemption channels and one, several or global redemption countries; customer, admin and SHQ catalogues filter on those reviewed attributes; ratings come only from completed verified purchases and supplier reliability stays internal | Decided; country discovery built 25 November 2026; taxonomy, catalogue filters and verified-purchase ratings built 26 November 2026 |
 | Gift cards (sell and trade) | By storefront customers only, never resellers; quote, verification, settlement only after the source accepts; a trade is a linked accepted sale plus a new purchase | Decided |
 | Airtime and data | | Decided |
 | Electricity and utility bills | Validate meter/customer number; deliver receipts and electricity tokens | Decided; suppliers to confirm |

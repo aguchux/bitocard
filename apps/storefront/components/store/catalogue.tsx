@@ -9,7 +9,7 @@ import { SubmitOnChange } from "./submit-on-change";
 
 export const pageSize = 24;
 
-export type CatalogueParams = { q?: string; country?: string; brand?: string; tag?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; sort?: string; page?: string };
+export type CatalogueParams = { q?: string; country?: string; brand?: string; tag?: string; gift_category?: GiftCardCategory; redeemable?: GiftCardRedemptionChannel; rating_min?: string; sort?: string; page?: string };
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -20,6 +20,7 @@ export function readParams(search: Record<string, string | string[] | undefined>
   const page = one(search.page);
   const giftCategory = one(search.gift_category);
   const redeemable = one(search.redeemable);
+  const rating = one(search.rating_min);
   return {
     q: one(search.q)?.trim().slice(0, 100) || undefined,
     country: country && /^([a-z]{2}|global)$/.test(country) ? country : undefined,
@@ -27,7 +28,8 @@ export function readParams(search: Record<string, string | string[] | undefined>
     tag: one(search.tag)?.toLowerCase().slice(0, 40) || undefined,
     gift_category: giftCardCategories.includes(giftCategory as GiftCardCategory) ? giftCategory as GiftCardCategory : undefined,
     redeemable: giftCardRedemptionChannels.includes(redeemable as GiftCardRedemptionChannel) ? redeemable as GiftCardRedemptionChannel : undefined,
-    sort: sort === "name" || sort === "new" ? sort : undefined,
+    rating_min: rating && /^[1-5]$/.test(rating) ? rating : undefined,
+    sort: sort === "name" || sort === "new" || sort === "rating" ? sort : undefined,
     page: page && /^\d{1,3}$/.test(page) && Number(page) > 1 ? page : undefined,
   };
 }
@@ -36,7 +38,7 @@ export function readParams(search: Record<string, string | string[] | undefined>
 export async function loadCatalogue(base: { category?: string; group?: string }, params: CatalogueParams) {
   const page = Number(params.page ?? 1);
   const result = await storeApi<StoreList<StoreProduct>>(
-    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, gift_category: params.gift_category, redeemable: params.redeemable, sort: params.sort, limit: pageSize, offset: (page - 1) * pageSize })}`),
+    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, gift_category: params.gift_category, redeemable: params.redeemable, rating_min: params.rating_min, sort: params.sort, limit: pageSize, offset: (page - 1) * pageSize })}`),
   );
   return { page, result };
 }
@@ -85,12 +87,22 @@ function Filters({ path, params, countries, giftCardFacets, compact = false }: {
           </select>
         </label>
       ) : null}
+      {giftCardFacets ? (
+        <label className="min-w-0 text-sm">
+          <span className={label}>Rating</span>
+          <select name="rating_min" defaultValue={params.rating_min ?? ""} className={`${field} px-3`}>
+            <option value="">Any rating</option>
+            {[4, 3, 2, 1].map(value => <option key={value} value={value}>{value}+ stars</option>)}
+          </select>
+        </label>
+      ) : null}
       <label className="min-w-0 text-sm">
         <span className={label}>Sort by</span>
         <select name="sort" defaultValue={params.sort ?? ""} className={`${field} px-3`}>
           <option value="">Most popular</option>
           <option value="name">Name</option>
           <option value="new">Newest</option>
+          {giftCardFacets ? <option value="rating">Highest rated</option> : null}
         </select>
       </label>
       <button type="submit" className="min-h-11 rounded-xl bg-navy-900 px-4 font-semibold text-white group-data-auto:hidden hover:bg-navy-800">
@@ -135,6 +147,7 @@ export function CatalogueView({
     params.tag ? { label: params.tag.charAt(0).toUpperCase() + params.tag.slice(1), change: { tag: undefined } } : null,
     params.gift_category ? { label: giftCardFacets?.categories.find(item => item.code === params.gift_category)?.name ?? params.gift_category, change: { gift_category: undefined } } : null,
     params.redeemable ? { label: giftCardFacets?.redemption_channels.find(item => item.code === params.redeemable)?.name ?? params.redeemable, change: { redeemable: undefined } } : null,
+    params.rating_min ? { label: `${params.rating_min}+ stars`, change: { rating_min: undefined } } : null,
   ].filter(Boolean) as Array<{ label: string; change: Partial<CatalogueParams> }>;
 
   return (
@@ -182,9 +195,10 @@ export function CatalogueView({
             <div className="mt-5 border-t border-slate-200 pt-4">
               <p className="px-2 text-xs font-bold tracking-wide text-slate-500 uppercase">Gift card type</p>
               <ul className="mt-2 space-y-0.5">
-                <li><Link href={hrefWith(path, params, { gift_category: undefined })} className={`block rounded-md px-2 py-1.5 text-sm ${!params.gift_category ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}>All Gift Cards</Link></li>
+                <li><Link href={hrefWith(path, params, { gift_category: undefined, sort: undefined })} className={`block rounded-md px-2 py-1.5 text-sm ${!params.gift_category && params.sort !== "new" ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}>All Gift Cards</Link></li>
+                <li><Link href={hrefWith(path, params, { gift_category: undefined, sort: "new" })} className={`block rounded-md px-2 py-1.5 text-sm ${params.sort === "new" && !params.gift_category ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}>Recently Added</Link></li>
                 {giftCardFacets.categories.filter(item => item.products > 0).map(item => (
-                  <li key={item.code}><Link href={hrefWith(path, params, { gift_category: item.code })} className={`flex justify-between rounded-md px-2 py-1.5 text-sm ${params.gift_category === item.code ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}><span>{item.name}</span><span className="text-xs text-slate-400">{item.products}</span></Link></li>
+                  <li key={item.code}><Link href={hrefWith(path, params, { gift_category: item.code, sort: undefined })} className={`flex justify-between rounded-md px-2 py-1.5 text-sm ${params.gift_category === item.code ? "bg-slate-100 font-semibold text-navy-900" : "text-slate-600 hover:bg-slate-50"}`}><span>{item.name}</span><span className="text-xs text-slate-400">{item.products}</span></Link></li>
                 ))}
               </ul>
             </div>
@@ -231,8 +245,9 @@ export function CatalogueView({
         </ul>
         {active === "gift_cards" && giftCardFacets ? (
           <ul aria-label="Gift card types" className={`mt-3 lg:hidden ${chipRow}`}>
-            <li className="shrink-0"><Link href={hrefWith(path, params, { gift_category: undefined })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${!params.gift_category ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>All Gift Cards</Link></li>
-            {giftCardFacets.categories.filter(item => item.products > 0).map(item => <li key={item.code} className="shrink-0"><Link href={hrefWith(path, params, { gift_category: item.code })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${params.gift_category === item.code ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>{item.name}</Link></li>)}
+            <li className="shrink-0"><Link href={hrefWith(path, params, { gift_category: undefined, sort: undefined })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${!params.gift_category && params.sort !== "new" ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>All Gift Cards</Link></li>
+            <li className="shrink-0"><Link href={hrefWith(path, params, { gift_category: undefined, sort: "new" })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${params.sort === "new" && !params.gift_category ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>Recently Added</Link></li>
+            {giftCardFacets.categories.filter(item => item.products > 0).map(item => <li key={item.code} className="shrink-0"><Link href={hrefWith(path, params, { gift_category: item.code, sort: undefined })} className={`inline-flex min-h-10 items-center rounded-full border px-3 text-sm whitespace-nowrap ${params.gift_category === item.code ? "border-navy-900 bg-navy-900 font-semibold text-white" : "border-slate-200 bg-white"}`}>{item.name}</Link></li>)}
           </ul>
         ) : null}
         <div className="mt-3 lg:hidden">
@@ -261,6 +276,7 @@ export function CatalogueView({
             {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
             {params.gift_category ? <input type="hidden" name="gift_category" value={params.gift_category} /> : null}
             {params.redeemable ? <input type="hidden" name="redeemable" value={params.redeemable} /> : null}
+            {params.rating_min ? <input type="hidden" name="rating_min" value={params.rating_min} /> : null}
             {params.sort ? <input type="hidden" name="sort" value={params.sort} /> : null}
                   <label htmlFor="catalogue-search" className="sr-only">{`Search ${title.toLowerCase()}`}</label>
             <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />

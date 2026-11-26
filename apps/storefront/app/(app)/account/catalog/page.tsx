@@ -18,7 +18,7 @@ import { storeNavigation } from "@/lib/navigation";
 
 export const metadata: Metadata = { title: "Catalog" };
 
-type Search = { q?: string; group?: string; brand?: string; country?: string; gift_category?: string; redeemable?: string; sell?: string };
+type Search = { q?: string; group?: string; brand?: string; country?: string; gift_category?: string; redeemable?: string; rating_min?: string; sell?: string };
 
 const products = async (params: Record<string, string | number | undefined>) => {
   const result = await storeApi<StoreList<StoreProduct>>(await inMarket(`/v1/store/products${query(params)}`));
@@ -59,20 +59,21 @@ function BrandTile({ brand }: { brand: StoreBrand }) {
  * brands, so a long catalogue stays easy to scan on a phone. With a search, group or brand: a grid of matches.
  */
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { q = "", group = "", brand = "", country = "", gift_category = "", redeemable = "", sell = "" } = await searchParams;
+  const { q = "", group = "", brand = "", country = "", gift_category = "", redeemable = "", rating_min = "", sell = "" } = await searchParams;
   const navigation = await storeNavigation();
   const groups = navigation.groups.filter(item => item.on_sale);
   const giftCards = group === giftCardGroup;
   const selectedCountry = /^[A-Za-z]{2}$/.test(country) ? country.toUpperCase() : "";
   const giftCategory = giftCardCategories.includes(gift_category as GiftCardCategory) ? gift_category as GiftCardCategory : "";
   const redemption = giftCardRedemptionChannels.includes(redeemable as GiftCardRedemptionChannel) ? redeemable as GiftCardRedemptionChannel : "";
-  const filtered = Boolean(q || group || brand || selectedCountry || giftCategory || redemption);
-  const href = (next: Search) => `/account/catalog${query({ q: next.q, group: next.group, brand: next.brand, country: next.country, gift_category: next.gift_category, redeemable: next.redeemable, sell: next.sell })}`;
+  const rating = /^[1-5]$/.test(rating_min) ? rating_min : "";
+  const filtered = Boolean(q || group || brand || selectedCountry || giftCategory || redemption || rating);
+  const href = (next: Search) => `/account/catalog${query({ q: next.q, group: next.group, brand: next.brand, country: next.country, gift_category: next.gift_category, redeemable: next.redeemable, rating_min: next.rating_min, sell: next.sell })}`;
 
   const [rails, brands, matches, giftCardCountries, giftCardFacets] = await Promise.all([
     filtered ? Promise.resolve([]) : Promise.all(groups.map(async item => ({ group: item, products: await products({ group: item.key, sort: "popular", limit: 12 }) }))),
     storeApi<StoreList<StoreBrand>>(await inMarket(`/v1/store/brands${query({ limit: 24 })}`)).then(result => (result.ok ? result.data.data : [])),
-    filtered ? products({ q: q || undefined, group: group || undefined, brand: brand || undefined, country: selectedCountry || undefined, gift_category: giftCategory || undefined, redeemable: redemption || undefined, sort: "popular", limit: 60 }) : Promise.resolve([]),
+    filtered ? products({ q: q || undefined, group: group || undefined, brand: brand || undefined, country: selectedCountry || undefined, gift_category: giftCategory || undefined, redeemable: redemption || undefined, rating_min: rating || undefined, sort: "popular", limit: 60 }) : Promise.resolve([]),
     giftCards ? storeApi<StoreList<ProductCountry>>(await inMarket('/v1/store/gift-card-countries')).then(result => (result.ok ? result.data.data : [])) : Promise.resolve([]),
     giftCards ? storeApi<GiftCardFacets>(await inMarket('/v1/store/gift-card-facets')).then(result => (result.ok ? result.data : undefined)) : Promise.resolve(undefined),
   ]);
@@ -128,6 +129,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               {giftCardFacets?.categories.filter(item => item.products > 0).map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
             </select>
           </label>
+          <label className="min-w-36 flex-1 text-sm font-semibold text-navy-900">
+            Rating
+            <select name="rating_min" defaultValue={rating} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal sm:text-sm">
+              <option value="">Any rating</option>
+              {[4, 3, 2, 1].map(value => <option key={value} value={value}>{value}+ stars</option>)}
+            </select>
+          </label>
           <label className="min-w-48 flex-1 text-sm font-semibold text-navy-900">
             Redeemable
             <select name="redeemable" defaultValue={redemption} className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-normal sm:text-sm">
@@ -146,12 +154,12 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               {q ? `Results for “${q}”` : brandName ? brandName : (groups.find(item => item.key === group)?.label ?? "Products")}
             </h2>
             {q ? (
-              <Chip href={href({ group, brand, country: selectedCountry, gift_category: giftCategory, redeemable: redemption, sell })} active={false}>
+              <Chip href={href({ group, brand, country: selectedCountry, gift_category: giftCategory, redeemable: redemption, rating_min: rating, sell })} active={false}>
                 “{q}” <X className="size-4" aria-label="Clear search" />
               </Chip>
             ) : null}
             {brand ? (
-              <Chip href={href({ q, group, country: selectedCountry, gift_category: giftCategory, redeemable: redemption, sell })} active={false}>
+              <Chip href={href({ q, group, country: selectedCountry, gift_category: giftCategory, redeemable: redemption, rating_min: rating, sell })} active={false}>
                 {brandName} <X className="size-4" aria-label="Clear brand" />
               </Chip>
             ) : null}
