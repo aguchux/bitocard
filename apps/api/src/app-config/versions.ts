@@ -14,9 +14,9 @@ export function compareVersions(a: string, b: string): number {
 
 export type UpdateState = 'none' | 'available' | 'required';
 
-/** Whether an app at `version` must update (below `min`), may update (below `latest`) or is fine. */
+/** Whether an app at `version` must update. Every published newer version is mandatory. */
 export function updateState(version: string, min?: string | null, latest?: string | null): UpdateState {
   if (min && compareVersions(version, min) < 0) return 'required';
-  if (latest && compareVersions(version, latest) < 0) return 'available';
+  if (latest && compareVersions(version, latest) < 0) return 'required';
   return 'none';
 }

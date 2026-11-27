@@ -10,10 +10,12 @@ import {
   resendCode,
   resetPassword,
   setCountry,
+  setTransactionPin,
   signIn,
   signUp,
   startVerification,
   updateName,
+  unlockTransactionPin,
   verifyEmail,
 } from "@/lib/account-actions";
 import type { Market } from "@/lib/countries";
@@ -325,6 +327,18 @@ export function PasswordForm() {
       <TextField label="Current password" name="current_password" type="password" autoComplete="current-password" required state={state} />
       <TextField label="New password" name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={128} state={state} hint={passwordHint} />
       <Submit pending={pending}>Change password</Submit>
+    </form>
+  );
+}
+
+export function TransactionPinForm({ configured }: { configured: boolean }) {
+  const [state, action, pending] = useActionState(configured ? unlockTransactionPin : setTransactionPin, empty);
+  return (
+    <form action={action} className="space-y-3">
+      <FormMessage state={state} />
+      {!configured ? <TextField label="Current account password" name="current_password" type="password" autoComplete="current-password" required state={state} /> : null}
+      <TextField label={configured ? "Transaction PIN" : "New transaction PIN"} name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Six digits. Five wrong attempts lock transactions for 15 minutes." />
+      <Submit pending={pending}>{configured ? "Unlock transactions" : "Set transaction PIN"}</Submit>
     </form>
   );
 }

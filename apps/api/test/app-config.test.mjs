@@ -1,5 +1,5 @@
 // BitoCard's mobile app (docs/BITOCARD_MOBILE_APP_PLAN.md, phase 4): GET /v1/app/config says whether the app's version
-// must update, may update or is fine, with the store page and the legal documents, from the Mobile app integration.
+// must update or is current, with the store page and the legal documents, from the Mobile app integration.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { compareVersions, updateState } from '../dist/app-config/versions.js';
@@ -14,9 +14,10 @@ describe('versions', () => {
     assert.equal(compareVersions('2.0.0', '2.0.0'), 0);
   });
 
-  test('required below the lowest, available below the newest, else none', () => {
+  test('required below either configured floor or the newest published version, else none', () => {
     assert.equal(updateState('1.0.0', '1.1.0', '1.4.0'), 'required');
-    assert.equal(updateState('1.2.0', '1.1.0', '1.4.0'), 'available');
+    assert.equal(updateState('1.2.0', '1.1.0', '1.4.0'), 'required');
+    assert.equal(updateState('1.2.0', null, '1.4.0'), 'required');
     assert.equal(updateState('1.4.0', '1.1.0', '1.4.0'), 'none');
     assert.equal(updateState('0.1.0', null, null), 'none');
   });
@@ -69,8 +70,8 @@ describe('GET /v1/app/config', () => {
     });
   });
 
-  test('Android below the newest may update; with no versions set, nobody is asked', async () => {
-    assert.equal((await read('platform=android&version=1.2.0')).body.update, 'available');
+  test('Android below the newest must update; with no versions set, nobody is asked', async () => {
+    assert.equal((await read('platform=android&version=1.2.0')).body.update, 'required');
     const fine = (await read('platform=android&version=1.3.0')).body;
     assert.deepEqual([fine.update, fine.min_version, fine.store_url], ['none', null, null]);
   });

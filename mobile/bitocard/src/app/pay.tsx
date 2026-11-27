@@ -43,7 +43,7 @@ export default function Pay() {
     mutationFn: async () => {
       if (!quote || !chosen) throw new Error('No price to pay yet.');
       if (!(await confirmOnPhone(`Pay ${formatMoney(chosen.amount, chosen.currency)}`))) return null;
-      return api<Checkout>('/v1/store/checkouts', { body: { ...order, quote_id: quote.quote_id, wallet_currency: chosen.currency }, idempotencyKey: key.current() });
+      return api<Checkout>('/v1/store/checkouts', { body: { ...order, quote_id: quote.quote_id, wallet_currency: chosen.currency }, idempotencyKey: key.current(), transaction: true });
     },
     onSuccess: checkout => {
       if (!checkout) return;

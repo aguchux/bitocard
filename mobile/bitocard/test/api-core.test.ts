@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { ApiError, appHeader, appTag, buildRequest, networkError, request, sessionHeader } from '../src/lib/api-core.ts';
+import { ApiError, appHeader, appTag, buildRequest, networkError, request, sessionHeader, transactionPinHeader } from '../src/lib/api-core.ts';
 
 const key = () => 'new-key';
 
@@ -19,8 +19,9 @@ test('GETs carry the session and no key; POSTs always carry one', () => {
   assert.equal(post.init.body, '{"amount":500}');
   assert.equal((post.init.headers as Record<string, string>)[sessionHeader], undefined);
 
-  const money = buildRequest('https://api.bitocard.com', '/v1/store/checkouts', { body: {}, idempotencyKey: 'kept' }, key);
+  const money = buildRequest('https://api.bitocard.com', '/v1/store/checkouts', { body: {}, idempotencyKey: 'kept', transactionPin: '246802' }, key);
   assert.equal((money.init.headers as Record<string, string>)['Idempotency-Key'], 'kept');
+  assert.equal((money.init.headers as Record<string, string>)[transactionPinHeader], '246802');
 });
 
 test('the app names itself in BitoCard-App and words a lost connection as BitoCard', () => {

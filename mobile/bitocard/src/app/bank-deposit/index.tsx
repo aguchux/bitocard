@@ -26,7 +26,7 @@ export default function BankDepositStart() {
     mutationFn: () => {
       const minor = toMinor(amount, currency);
       if (!minor) throw new Error('Enter the amount you will pay.');
-      return api<BankDeposit>('/v1/store/wallet/bank-deposits', { body: { amount: minor, currency, account_id: chosen ?? undefined } });
+      return api<BankDeposit>('/v1/store/wallet/bank-deposits', { body: { amount: minor, currency, account_id: chosen ?? undefined }, transaction: true });
     },
     onSuccess: deposit => router.replace({ pathname: '/bank-deposit/[id]', params: { id: deposit.id } }),
   });

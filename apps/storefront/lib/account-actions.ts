@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseMoney, type StoreWalletOption } from "@bitocard/api-client/storefront";
-import { type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
+import { type Customer, customerApi, dropSession, keepSession, keepTransactionPin, safeNext, siteOrigin } from "@/lib/customer";
 import { forgetSignedIn, rememberSignedIn } from "@/lib/handoff";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
@@ -143,6 +143,27 @@ export async function changePassword(_state: FormState, form: FormData): Promise
     password: String(form.get("password") ?? ""),
   });
   return result.ok ? { notice: "Your password has changed. Other devices have been signed out." } : failed(result);
+}
+
+/** Sets/replaces the transaction PIN and unlocks it for this encrypted web session. */
+export async function setTransactionPin(_state: FormState, form: FormData): Promise<FormState> {
+  const pin = text(form, "pin");
+  const result = await customerApi<{ object: "transaction_pin" }>("POST", "/v1/store/account/transaction-pin", {
+    current_password: text(form, "current_password"),
+    pin,
+  });
+  if (!result.ok) return failed(result);
+  if (!(await keepTransactionPin(pin))) return { error: "The secure PIN cookie is not configured. Ask support to configure it." };
+  revalidatePath("/account", "layout");
+  return { notice: "Transaction PIN saved and unlocked on this device." };
+}
+
+/** Unlocks an existing transaction PIN without changing it or signing out other devices. */
+export async function unlockTransactionPin(_state: FormState, form: FormData): Promise<FormState> {
+  const pin = text(form, "pin");
+  const result = await customerApi<{ object: "transaction_pin_verified" }>("POST", "/v1/store/account/transaction-pin/verify", {}, { headers: { "bitocard-transaction-pin": pin } });
+  if (!result.ok) return failed(result);
+  return (await keepTransactionPin(pin)) ? { notice: "Transactions are unlocked on this device." } : { error: "The secure PIN cookie is not configured. Ask support to configure it." };
 }
 
 type Checkout = { object: "checkout"; id: string; mode: "test" | "live"; checkout_url: string | null };

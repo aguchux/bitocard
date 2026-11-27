@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { setRequest } from "./request";
-import { safeNext, shopperHeader, siteOrigin } from "@/lib/customer";
+import { request, setRequest } from "./request";
+import { customerFetch, keepTransactionPin, safeNext, shopperHeader, siteOrigin } from "@/lib/customer";
 import { customDomain, storeSubdomain } from "@/lib/store";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -87,5 +87,30 @@ describe("shopperHeader", () => {
     vi.stubEnv("STORE_SERVER_SECRET", secret);
     setRequest({ "x-forwarded-for": "not an address" });
     expect(await shopperHeader()).toEqual({});
+  });
+});
+
+describe("transaction PIN cookie", () => {
+  test("is encrypted, bound to the customer session, HttpOnly, and forwarded only by the store server", async () => {
+    vi.stubEnv("STORE_SERVER_SECRET", "store-server-secret-for-tests-0123456789");
+    setRequest({ host: "bitocard.com" }, { bc_customer: "bcc_session_one" });
+    expect(await keepTransactionPin("246802")).toBe(true);
+    const written = request.set.find(item => item.name === "bc_transaction_pin");
+    expect(written?.value).not.toContain("246802");
+    expect(written?.options).toMatchObject({ httpOnly: true, sameSite: "lax" });
+
+    let headers = new Headers();
+    vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+      headers = new Headers(init?.headers);
+      return new Response(JSON.stringify({ object: "ok" }), { status: 200 });
+    });
+    await customerFetch("POST", "/v1/store/checkouts", {});
+    expect(headers.get("bitocard-transaction-pin")).toBe("246802");
+
+    // Copying the ciphertext to another customer session cannot decrypt it.
+    const sealed = request.cookies.get("bc_transaction_pin")!;
+    setRequest({ host: "bitocard.com" }, { bc_customer: "bcc_session_two", bc_transaction_pin: sealed });
+    await customerFetch("POST", "/v1/store/checkouts", {});
+    expect(headers.get("bitocard-transaction-pin")).toBeNull();
   });
 });

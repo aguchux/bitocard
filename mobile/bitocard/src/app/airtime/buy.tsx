@@ -53,7 +53,7 @@ export default function BuyAirtime() {
     mutationFn: async () => {
       if (!quote) return null;
       if (!(await confirmOnPhone(`Pay ${formatMoney(quote.price, quote.currency)}`))) return null;
-      return api<AirtimePurchase>('/v1/store/airtime/purchases', { body: { ...order(), expected_price: quote.price }, idempotencyKey: key.current() });
+      return api<AirtimePurchase>('/v1/store/airtime/purchases', { body: { ...order(), expected_price: quote.price }, idempotencyKey: key.current(), transaction: true });
     },
     onMutate: () => setProblem(null),
     onSuccess: purchase => {

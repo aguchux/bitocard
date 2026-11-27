@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { appUrl } from "@bitocard/ui/site";
@@ -11,7 +11,9 @@ import { customDomain, storeSubdomain } from "./store";
  * sends it to the API in a header. Browsers never see the API or the token (the cookie is httpOnly).
  */
 export const customerCookie = "bc_customer";
+const transactionPinCookie = "bc_transaction_pin";
 const sessionHeader = "bitocard-customer-session";
+const transactionPinHeader = "bitocard-transaction-pin";
 /** Names a reseller's store to the API (accounts belong to one store); none is bitocard.com. */
 const storeHeader = "bitocard-store";
 /** The shopper's address, signed (the API's `client-ip.ts`). */
@@ -19,7 +21,7 @@ const clientHeader = "bitocard-client";
 const thirtyDays = 60 * 60 * 24 * 30;
 
 /** `country` is chosen at sign-up and fixed (null for older accounts until they choose); prices and the wallet are in its `currency`. */
-export type Customer = { object: "customer"; id: string; email: string; name: string; email_verified: boolean; phone: string | null; phone_verified: boolean; phone_verification_available: boolean; country: string | null; currency: string | null; created_at: string };
+export type Customer = { object: "customer"; id: string; email: string; name: string; email_verified: boolean; phone: string | null; phone_verified: boolean; phone_verification_available: boolean; transaction_pin_set: boolean; country: string | null; currency: string | null; created_at: string };
 
 export type CustomerResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
 
@@ -53,7 +55,9 @@ export async function customerFetch(
   body?: unknown,
   options: { idempotencyKey?: string; headers?: Record<string, string> } = {},
 ): Promise<Response | null> {
-  const token = (await cookies()).get(customerCookie)?.value;
+  const jar = await cookies();
+  const token = jar.get(customerCookie)?.value;
+  const transactionPin = token ? openTransactionPin(jar.get(transactionPinCookie)?.value, token) : null;
   const store = await storeSubdomain();
   const form = body instanceof FormData;
   try {
@@ -64,6 +68,7 @@ export async function customerFetch(
         accept: "application/json",
         ...(body !== undefined && !form ? { "content-type": "application/json" } : {}),
         ...(token ? { [sessionHeader]: token } : {}),
+        ...(transactionPin ? { [transactionPinHeader]: transactionPin } : {}),
         ...(store ? { [storeHeader]: store } : {}),
         ...(await shopperHeader()),
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
@@ -103,7 +108,45 @@ export async function keepSession(session: { token: string }) {
 }
 
 export async function dropSession() {
-  (await cookies()).delete(customerCookie);
+  const jar = await cookies();
+  jar.delete(customerCookie);
+  jar.delete(transactionPinCookie);
+}
+
+function pinCookieKey() {
+  const secret = process.env.CUSTOMER_PIN_COOKIE_SECRET ?? process.env.STORE_SERVER_SECRET;
+  return secret ? createHash("sha256").update(secret).digest() : null;
+}
+
+/** Encrypts a web PIN for this one customer session. The browser only receives an HttpOnly ciphertext. */
+export async function keepTransactionPin(pin: string) {
+  const jar = await cookies();
+  const session = jar.get(customerCookie)?.value;
+  const key = pinCookieKey();
+  if (!session || !key) return false;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  cipher.setAAD(Buffer.from(session));
+  const ciphertext = Buffer.concat([cipher.update(pin, "utf8"), cipher.final()]);
+  const sealed = Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString("base64url");
+  jar.set(transactionPinCookie, sealed, { maxAge: 60 * 60 * 12, path: "/", sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  return true;
+}
+
+function openTransactionPin(value: string | undefined, session: string) {
+  const key = pinCookieKey();
+  if (!value || !key) return null;
+  try {
+    const sealed = Buffer.from(value, "base64url");
+    if (sealed.length < 29) return null;
+    const decipher = createDecipheriv("aes-256-gcm", key, sealed.subarray(0, 12));
+    decipher.setAAD(Buffer.from(session));
+    decipher.setAuthTag(sealed.subarray(12, 28));
+    const pin = Buffer.concat([decipher.update(sealed.subarray(28)), decipher.final()]).toString("utf8");
+    return /^\d{6}$/.test(pin) ? pin : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

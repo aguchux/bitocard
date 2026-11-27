@@ -1,34 +1,20 @@
 import type { PrismaService } from '../database/prisma.service.js';
 import type { MfaMethod } from '../generated/prisma/client.js';
-import { switchDefault } from '../settings/settings.service.js';
 
 export const mfaMethods: readonly MfaMethod[] = ['authenticator', 'email', 'sms'];
+export const resellerMfaMethods: readonly MfaMethod[] = ['authenticator', 'email'];
 
 /** The switch that makes two-step sign-in required (global, a market or one reseller). */
 export const twoStepSwitch = 'reseller_two_step' as const;
 
-/**
- * Whether a person must use two-step sign-in: the switch is on for any reseller account they belong to (its own value,
- * else its market's, else the global one). A person with no account yet follows the global switch.
- */
-export async function twoStepRequired(prisma: PrismaService, userId: string) {
-  const [memberships, switches] = await Promise.all([
-    prisma.resellerMember.findMany({ where: { userId }, select: { resellerId: true, reseller: { select: { country: true } } } }),
-    prisma.featureSwitch.findMany({ where: { key: twoStepSwitch } }),
-  ]);
-  const global = switches.find(row => row.countryCode === null && row.resellerId === null)?.enabled ?? switchDefault(twoStepSwitch);
-  if (!memberships.length) return global;
-  return memberships.some(
-    item => switches.find(row => row.resellerId === item.resellerId)?.enabled ?? switches.find(row => row.countryCode !== null && row.countryCode === item.reseller.country)?.enabled ?? global,
-  );
+/** Every SHQ account requires two-step sign-in. The old feature switch remains readable for migration compatibility. */
+export async function twoStepRequired(_prisma: PrismaService, _userId: string) {
+  return true;
 }
 
-/** The methods a person may choose: those any of their accounts' markets allows (every method before they have one). */
-export async function twoStepAllowed(prisma: PrismaService, userId: string): Promise<MfaMethod[]> {
-  const memberships = await prisma.resellerMember.findMany({ where: { userId }, select: { reseller: { select: { country: true } } } });
-  const countries = [...new Set(memberships.map(item => item.reseller.country).filter((code): code is string => Boolean(code)))];
-  const markets = countries.length ? await prisma.country.findMany({ where: { code: { in: countries } }, select: { resellerMfaMethods: true } }) : [];
-  return markets.length ? mfaMethods.filter(method => markets.some(market => market.resellerMfaMethods.includes(method))) : [...mfaMethods];
+/** SHQ permits only an authenticator app or codes sent to the account's email. */
+export async function twoStepAllowed(_prisma: PrismaService, _userId: string): Promise<MfaMethod[]> {
+  return [...resellerMfaMethods];
 }
 
 /**

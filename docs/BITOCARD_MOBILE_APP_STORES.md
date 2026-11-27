@@ -76,8 +76,9 @@ Functionality, Fraud Prevention. No tracking. No data used for advertising.
 2. **Push:** add Firebase's `google-services.json` to the app (`android.googleServicesFile` in `app.json`), and in
    admin Settings > Integrations > Phone push: the Firebase service account, and the APNs key ID, team ID, `.p8` key
    and topic `com.golojan.bitocard.ios` (Development builds off for TestFlight and the App Store).
-3. **The update gate:** admin Settings > Integrations > Mobile app: the store links and the lowest and latest versions.
+3. **The update gate:** admin Settings > Integrations > Mobile app: save each store link, then set its newest version only after that build is live. Every older app is forced to update.
 4. **Try it on phones** in a development build against the live API: sign in, buy airtime in the sandbox, a
    notification arriving and opening its order, a bitocard.com order link opening the app.
-5. **Build:** only on the owner's go: `EAS_NO_VCS=1 npx eas-cli build -p android --profile production` (and `-p ios`) from
+5. **Version:** from `mobile/bitocard`, run `npm run version:bump -- patch` (or `minor`, `major`, or an explicit version such as `1.2.0`). It updates both manifests, the lock file, and both native store build numbers.
+6. **Build:** only on the owner's go: `EAS_NO_VCS=1 npx eas-cli build -p android --profile production` (and `-p ios`) from
    `mobile/bitocard`.

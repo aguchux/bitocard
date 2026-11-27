@@ -2515,6 +2515,11 @@ model Customer {
   name                         String
   /// Argon2id. Null for an Afrippa trader who signed up with Google, until they set one with Forgot password.
   passwordHash                 String?                       @map("password_hash")
+  /// Six-digit transaction PIN, Argon2id. Required for customer financial mutations; never returned or logged.
+  transactionPinHash          String?                       @map("transaction_pin_hash")
+  transactionPinFailures      Int                           @default(0) @map("transaction_pin_failures")
+  transactionPinLockedUntil   DateTime?                     @map("transaction_pin_locked_until")
+  transactionPinUpdatedAt     DateTime?                     @map("transaction_pin_updated_at")
   /// Afrippa's traders who signed up with Google: the Google account's subject (one account per store). Never set by
   /// matching an email: a Google account never links itself to a password account.
   googleSubject                String?                       @map("google_subject")

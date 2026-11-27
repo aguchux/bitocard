@@ -51,7 +51,7 @@ export default function SellAirtime() {
     onError: error => setProblem(error.message),
   });
   const start = useMutation({
-    mutationFn: () => api<AirtimeSale>('/v1/store/airtime/sales', { body: order(false), idempotencyKey: key.current() }),
+    mutationFn: () => api<AirtimeSale>('/v1/store/airtime/sales', { body: order(false), idempotencyKey: key.current(), transaction: true }),
     onMutate: () => setProblem(null),
     onSuccess: sale => {
       key.settle();

@@ -44,6 +44,7 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
     phone: customer.phone,
     phone_verified: customer.phoneVerifiedAt !== null,
     phone_verification_available: Boolean(customer.market?.smsProvider),
+    transaction_pin_set: Boolean(customer.transactionPinHash),
     /** Chosen at sign-up and then fixed: the wallet, checkouts and prices are in its currency. Null until chosen (older accounts). */
     country: customer.country,
     currency: customer.market?.currency ?? null,

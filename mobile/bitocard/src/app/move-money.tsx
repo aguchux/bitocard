@@ -42,6 +42,7 @@ export default function MoveMoney() {
       return api<Conversion>('/v1/store/wallet/conversions', {
         body: { from: quote.from.currency, to: quote.to.currency, amount: quote.from.amount, expected_amount: quote.to.amount },
         idempotencyKey: key.current(),
+        transaction: true,
       });
     },
     onSuccess: done => {

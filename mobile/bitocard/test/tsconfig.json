@@ -6,7 +6,8 @@
     ]
   },
   "include": [
-    "*.ts"
+    "*.ts",
+    "../scripts/*.ts"
   ],
   "exclude": []
 }

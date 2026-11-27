@@ -250,11 +250,19 @@ export async function adminCode(server, browser) {
 }
 
 /** A newly signed-up reseller owner. */
-export async function resellerClient(server, { country = 'NG', name = 'Ada Obi', business = 'Ada Digital' } = {}) {
+export async function resellerClient(server, { country = 'NG', name = 'Ada Obi', business = 'Ada Digital', mfa = true } = {}) {
   const browser = client(server.base, { autoIdempotency: true });
   const email = `owner${(adminCounter += 1)}-${Date.now()}@example.com`;
   const { status, json } = await browser.post('/v1/auth/signup', { name, email, password: 'correct horse battery', country, business_name: business });
   if (status !== 201) throw new Error(`Sign-up failed: ${JSON.stringify(json)}`);
+  // Most tests are about reseller business behaviour, not the mandatory SHQ sign-in ceremony. Complete the email
+  // method once for their fixture owner; the dedicated two-step tests ask for `mfa: false` and exercise setup itself.
+  if (mfa) {
+    const setup = await browser.post('/v1/auth/two-step/setup', { method: 'email' });
+    if (setup.status !== 200) throw new Error(`Two-step setup failed: ${JSON.stringify(setup.json)}`);
+    const confirmed = await browser.post('/v1/auth/two-step/setup/confirm', { code: await lastEmailCode(server.app, email) });
+    if (confirmed.status !== 200) throw new Error(`Two-step confirmation failed: ${JSON.stringify(confirmed.json)}`);
+  }
   return { browser, email, userId: json.user.id, resellerId: json.memberships[0].reseller.id };
 }
 

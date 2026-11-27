@@ -13,7 +13,7 @@ import { SmsService } from '../notifications/sms.service.js';
 import { twoStepChangedEmail, twoStepCodeEmail } from '../notifications/templates.js';
 import { recordFailedSignIn } from './auth.service.js';
 import { CodesService } from './codes.service.js';
-import { mfaMethods, twoStepAllowed, twoStepPending, twoStepRequired } from './mfa-policy.js';
+import { resellerMfaMethods, twoStepAllowed, twoStepPending, twoStepRequired } from './mfa-policy.js';
 import { claimTotpStep, newTotpSecret, totpFor, totpStep } from './totp.js';
 
 /** Emailed and texted codes work for 10 minutes, and a method being set up waits as long for its first code. */
@@ -41,11 +41,9 @@ const maskPhone = (phone: string) => `•••• ${phone.slice(-4)}`;
 type Person = User & { totp: TotpCredential | null };
 
 /**
- * Resellers' two-step sign-in in SHQ, chosen per person: an authenticator app, a code emailed to their primary address,
- * or a code texted to their primary confirmed mobile number, each with 10 one-time recovery codes. Required where an
- * admin switches `reseller_two_step` on (global, a market or one reseller); methods are limited by the markets of the
- * person's accounts (`countries.reseller_mfa_methods`). A session stays pending (only this and signing out work, see the
- * guard) until the person finishes the second step on it, or, when it is required, sets a method up.
+ * Resellers' mandatory two-step sign-in in SHQ, chosen per person: an authenticator app or a code emailed to their
+ * primary address, each with 10 one-time recovery codes. A session stays pending (only this and signing out work, see
+ * the guard) until the person finishes the second step on it, or sets a method up.
  */
 @Injectable()
 export class TwoStepService {
@@ -88,7 +86,7 @@ export class TwoStepService {
       /** Where the emailed or texted codes go, shown masked. */
       sent_to: user.mfaMethod ? this.target(user, user.mfaMethod).hint : null,
       recovery_codes_left: user.mfaMethod ? user.mfaRecoveryCodeHashes.length : 0,
-      methods: mfaMethods.map(method => {
+      methods: resellerMfaMethods.map(method => {
         const reason = !allowed.includes(method) ? ('not_allowed' as const) : method === 'sms' && !user.phoneVerifiedAt ? ('phone_required' as const) : method === 'sms' && !smsReady ? ('sms_unavailable' as const) : null;
         return { method, available: reason === null, reason };
       }),

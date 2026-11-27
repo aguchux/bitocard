@@ -8,6 +8,7 @@ import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUrl, Matches, Max, Min 
 import { Public } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { TransactionPinGuard } from '../customers/transaction-pin.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Country, type LedgerMode, type Payment, type ReservedAccount, type Reseller, type Store } from '../generated/prisma/client.js';
@@ -584,6 +585,7 @@ export class CustomerWalletController {
   }
 
   @Post('conversions')
+  @UseGuards(TransactionPinGuard)
   @HttpCode(HttpStatus.OK)
   convert(@CurrentCustomer() caller: CustomerCaller, @Body() body: ConversionDto) {
     return this.wallets.convert(caller.customer, body);
@@ -595,6 +597,7 @@ export class CustomerWalletController {
   }
 
   @Post('top-ups')
+  @UseGuards(TransactionPinGuard)
   topUp(@CurrentCustomer() caller: CustomerCaller, @Body() body: TopUpDto) {
     return this.wallets.topUp(caller.customer, body);
   }
@@ -618,6 +621,7 @@ export class CustomerWalletController {
   }
 
   @Post('reserved-accounts')
+  @UseGuards(TransactionPinGuard)
   @HttpCode(HttpStatus.OK)
   reservedAccounts(@CurrentCustomer() caller: CustomerCaller, @Body() body: ReservedAccountDto) {
     return this.wallets.createReservedAccounts(caller.customer, body);

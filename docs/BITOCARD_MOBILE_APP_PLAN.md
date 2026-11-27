@@ -16,6 +16,10 @@ data, and buy and sell gift cards. The approved screens are the design canvas "B
 - **Same API, no private shortcuts.** It uses the `/v1/store/*` routes bitocard.com's server uses, with the
   customer's session in `BitoCard-Customer-Session`. The session is kept in the phone's secure store and never logged.
   Every POST carries an `Idempotency-Key`; a money step keeps its key until it succeeds or is refused.
+- **Locked and transaction-protected.** Every signed-in customer sets a six-digit transaction PIN. The API verifies
+  its slow hash for every financial mutation and locks attempts for 15 minutes after five failures. The app locks on
+  launch and whenever it leaves the foreground; Face ID, fingerprint/device security, or the PIN unlocks the secure
+  on-device copy. A new device must enter the server-verified PIN once.
 - **Look:** bitocard.com's navy `#070f4c` and pink `#ff2382`, Inter, the "b" mark. Light first; dark follows the phone.
 - **Five tabs:** Home, Mobile, Gift cards, Wallet and Orders. Account, Notifications and Search open from Home's
   header.
@@ -124,7 +128,7 @@ From phase 4:
 - **Chat and ticket attachments** sent by BitoCard's team show as "(sent a file)": the app cannot open them yet (`GET /v1/store/support/chat/:id/files/:file` with the session).
 - **Settings:** Face ID before every payment is always on; a switch to skip it for small amounts is not built.
 - **Spin and win's wheel** is checked in tests with reduced motion only; watch the turn on a phone.
-- **The update gate** blocks only once admins set the minimum versions (Settings > Integrations > Mobile app); set them and the store links before the first store build.
+- **The update gate** blocks every installed app below the newest version admins publish in Settings > Integrations > Mobile app. Set a newest version only after that build is live in its store, and set the matching store link first. The minimum-version fields remain as legacy emergency floors.
 
 ## Build progress
 
@@ -209,7 +213,7 @@ From phase 4:
     - **Search** (`/search`, from Home): gift cards open in the app, airtime and data on the Mobile tab, anything else on bitocard.com.
     - **Settings** (`/settings`): push on or off, which notices are pushed (security ones locked), the theme (phone, light or dark, kept on the phone), mobile numbers, terms and privacy, the version, and **Delete your account** (`/delete-account`: what stands in the way, else the password and DELETE typed; then signed out).
     - **Spin and win** (`/spin`, from Home's card): the wheel stops on what the server decided (`landingRotation` in `src/lib/spin.ts`), still for reduced motion; rewards moved to a wallet at the amount shown first.
-    - **The update gate** (`UpdateGate`): blocks below the minimum version, offers the update below the latest.
+    - **The update gate** (`UpdateGate`): blocks below the newest published version and opens the matching store page; legacy `available` responses are also treated as mandatory.
     - Tests: `test/links.test.ts`, `test/spin.test.ts`, `test/screens/staying.test.tsx`, `test/screens/delete-account.test.tsx`.
 - **Phase 5 built (19 November 2026), everything but the builds:**
   - **Opening bitocard.com links in the app:** bitocard.com serves `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` (`apps/storefront/lib/app-links.ts`), only on bitocard.com and only once `BITOCARD_IOS_APP_IDS`, `BITOCARD_ANDROID_PACKAGE` and `BITOCARD_ANDROID_CERT_SHA256` are set (404 before, and always on resellers' stores). They claim only pages the app has screens for: orders, wallet and deposits, gift card sales, the airtime exchange, help, the identity check, notifications and gift card pages (`/p/gift_cards…`). The app's `associatedDomains` and Android intent filters (`app.json`) list the same, checked by `apps/storefront/test/app-links.test.ts`; `+native-intent.tsx` turns each link into its screen (`incomingRoute` in `src/lib/links.ts`), anything else Home.

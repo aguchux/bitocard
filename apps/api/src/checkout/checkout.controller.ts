@@ -8,6 +8,7 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { HandoffService } from '../customers/handoff.service.js';
+import { TransactionPinGuard, TransactionPinService } from '../customers/transaction-pin.js';
 import { StoreKey } from '../customers/store-key.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { PageDto } from '../ledger/wallet.controller.js';
@@ -95,6 +96,14 @@ class ChangePasswordDto {
 
   @IsString() @Length(passwordLength.min, passwordLength.max)
   password: string;
+}
+
+class TransactionPinDto {
+  @IsString() @Length(1, passwordLength.max)
+  current_password: string;
+
+  @Matches(/^\d{6}$/, { message: 'pin must be six digits' })
+  pin: string;
 }
 
 class CheckoutListDto extends PageDto {
@@ -229,6 +238,7 @@ export class CustomerAccountController {
     private readonly stores: StoreSellers,
     private readonly identity: IdentityService,
     private readonly handoffs: HandoffService,
+    private readonly transactionPins: TransactionPinService,
   ) {}
 
   /** Returns the session token, so it is never stored for replay. */
@@ -303,6 +313,26 @@ export class CustomerAccountController {
   @HttpCode(HttpStatus.OK)
   changePassword(@CurrentCustomer() caller: CustomerCaller, @Body() body: ChangePasswordDto) {
     return this.customers.changePassword(caller.customer, caller.sessionId, body);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Get('transaction-pin')
+  transactionPin(@CurrentCustomer() caller: CustomerCaller) {
+    return this.transactionPins.status(caller.customer);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('transaction-pin')
+  @HttpCode(HttpStatus.OK)
+  setTransactionPin(@CurrentCustomer() caller: CustomerCaller, @Body() body: TransactionPinDto) {
+    return this.transactionPins.set(caller.customer, caller.sessionId, body.current_password, body.pin);
+  }
+
+  @UseGuards(CustomerGuard, TransactionPinGuard)
+  @Post('transaction-pin/verify')
+  @HttpCode(HttpStatus.OK)
+  verifyTransactionPin() {
+    return { object: 'transaction_pin_verified' as const };
   }
 
   @UseGuards(CustomerGuard)
@@ -434,7 +464,7 @@ export class CheckoutController {
     return this.checkout.rateFor(await this.stores.resolve(store), key, query.country);
   }
 
-  @UseGuards(CustomerGuard)
+  @UseGuards(CustomerGuard, TransactionPinGuard)
   @Post('checkouts')
   start(@CurrentCustomer() caller: CustomerCaller, @Body() body: StartCheckoutDto) {
     return this.checkout.start(caller.customer, body);

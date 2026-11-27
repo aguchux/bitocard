@@ -9,8 +9,8 @@ import { TwoStepService } from './two-step.service.js';
 const sessionOf = (caller: Caller) => (caller.kind === 'session' ? caller.sessionId : '');
 
 /**
- * Two-step sign-in for SHQ: each person's own setting (an authenticator app, emailed codes or text messages), required
- * where BitoCard switches it on. These routes work on a session still waiting for its second step. They skip idempotency
+ * Mandatory two-step sign-in for SHQ: each person uses an authenticator app or emailed codes. These routes work on a
+ * session still waiting for its second step. They skip idempotency
  * keys: their answers carry secrets (an authenticator secret, recovery codes) that must never be stored for replay.
  */
 @ApiTags('Authentication')
@@ -33,7 +33,7 @@ export class TwoStepController {
   @ApiOperation({
     summary: 'Start setting up a two-step method',
     description:
-      'An authenticator app gets a new secret to scan (`otpauth_uri`); email and SMS get a 6-digit code sent to your primary address or confirmed mobile number (10 minutes). Changing an existing method needs a code from it (`current_code`). Confirm with `POST /v1/auth/two-step/setup/confirm`.',
+      'An authenticator app gets a new secret to scan (`otpauth_uri`); email gets a 6-digit code sent to your primary address (10 minutes). Changing an existing method needs a code from it (`current_code`). Confirm with `POST /v1/auth/two-step/setup/confirm`.',
   })
   @Post('setup')
   @HttpCode(HttpStatus.OK)

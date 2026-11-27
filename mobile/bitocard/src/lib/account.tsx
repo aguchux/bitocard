@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, ApiError } from '@/lib/api';
 import { clearSession, readSession, saveSession } from '@/lib/session';
 import type { Customer, SessionReply } from '@/lib/types';
+import { forgetTransactionPin } from '@/lib/transaction-pin';
 
 type AccountState = {
   /** Undefined while the phone's secure store is read; null signed out. */
@@ -63,6 +64,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await api('/v1/store/account/signout', { body: {} }).catch(() => undefined);
     await clearSession();
+    await forgetTransactionPin();
     setHasSession(false);
     queries.clear();
   }, [queries]);

@@ -1,23 +1,20 @@
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useRef, useState } from 'react';
 
 import { newIdempotencyKey } from '@/lib/api';
 import { keepKey } from '@/lib/money';
+import { activeTransactionPin, authenticateDevice, savedTransactionPin, setActiveTransactionPin } from '@/lib/transaction-pin';
 
 /**
- * Face ID, the fingerprint or the phone's own PIN before money leaves the wallet. A phone with no lock set up asks
- * nothing more: the confirm screen that names the amount is the confirmation, and the API checks every rule.
+ * Face ID, fingerprint or device passcode before money leaves the wallet. It fails closed. The server still checks the
+ * transaction PIN; successful device authentication unlocks the encrypted copy saved when the customer set that PIN.
  */
 export async function confirmOnPhone(reason: string) {
-  try {
-    const level = await LocalAuthentication.getEnrolledLevelAsync();
-    if (level === LocalAuthentication.SecurityLevel.NONE) return true;
-    const result = await LocalAuthentication.authenticateAsync({ promptMessage: reason, cancelLabel: 'Cancel', disableDeviceFallback: false });
-    return result.success;
-  } catch {
-    // The phone could not ask (an emulator, a broken sensor): the confirm screen already named the amount.
-    return true;
-  }
+  if (activeTransactionPin()) return true;
+  if (!(await authenticateDevice(reason))) return false;
+  const pin = await savedTransactionPin();
+  if (!pin) return false;
+  setActiveTransactionPin(pin);
+  return true;
 }
 
 /** A money step's Idempotency-Key: made once per attempt and kept until it succeeds or is refused (`keepKey`). */

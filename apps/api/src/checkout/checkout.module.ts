@@ -8,6 +8,7 @@ import { CustomerGuard } from '../customers/customer-session.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { CustomerNotificationsController } from '../notifications/customer-notifications.controller.js';
 import { HandoffService } from '../customers/handoff.service.js';
+import { TransactionPinGuard, TransactionPinService } from '../customers/transaction-pin.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
@@ -25,7 +26,7 @@ import { StoreSellers } from './store-sellers.js';
 @Module({
   imports: [AuthModule, CatalogueModule, FeesModule, FxModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule, StoresModule],
   controllers: [CustomerNotificationsController, CustomerAccountController, AccountDeletionController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController],
-  providers: [CustomersService, AccountDeletionService, HandoffService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
-  exports: [CheckoutService, HouseService, CustomersService, StoreSellers, CustomerWalletsService],
+  providers: [CustomersService, AccountDeletionService, HandoffService, CustomerGuard, TransactionPinService, TransactionPinGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
+  exports: [CheckoutService, HouseService, CustomersService, StoreSellers, CustomerWalletsService, TransactionPinService, TransactionPinGuard],
 })
 export class CheckoutModule {}

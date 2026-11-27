@@ -6,6 +6,7 @@ import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, re
 import { Mode } from '../ledger/mode.js';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { TransactionPinGuard } from '../customers/transaction-pin.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { ProductOnly } from '../products/product.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -76,6 +77,7 @@ export class CustomerAirtimeController {
   }
 
   @Post('sales')
+  @UseGuards(TransactionPinGuard)
   sell(@CurrentCustomer() caller: CustomerCaller, @Body() body: SellDto) {
     return this.airtime.sell(caller.customer, body);
   }
@@ -92,6 +94,7 @@ export class CustomerAirtimeController {
   }
 
   @Post('sales/:id/sent')
+  @UseGuards(TransactionPinGuard)
   @HttpCode(HttpStatus.OK)
   sent(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.airtime.markSent(caller.customer, id);
@@ -116,6 +119,7 @@ export class CustomerAirtimeController {
   }
 
   @Post('purchases')
+  @UseGuards(TransactionPinGuard)
   buy(@CurrentCustomer() caller: CustomerCaller, @Body() body: BuyDto) {
     return this.airtime.buy(caller.customer, body);
   }

@@ -58,7 +58,7 @@ export default function SpinScreen() {
   const exchange = useMutation({
     mutationFn: (confirm: boolean): Promise<SpinExchange | SpinExchangePreview> =>
       confirm && preview
-        ? api<SpinExchange>('/v1/store/spins/exchange', { body: { currency: preview.currency, expected_amount: preview.amount } })
+        ? api<SpinExchange>('/v1/store/spins/exchange', { body: { currency: preview.currency, expected_amount: preview.amount }, transaction: true })
         : api<SpinExchangePreview>('/v1/store/spins/exchange', { body: { currency: currency ?? state.data?.rewards.exchange_currencies[0], preview: true } }),
     onSuccess: (result, confirm) => {
       if (result.object === 'spin_exchange_preview') return setPreview(result);

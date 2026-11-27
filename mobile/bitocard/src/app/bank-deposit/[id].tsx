@@ -24,7 +24,7 @@ export default function BankDepositScreen() {
       what === 'sent'
         ? sender.trim().length < 2
           ? Promise.reject(new Error('Enter the name on the payment.'))
-          : api<BankDeposit>(`/v1/store/wallet/bank-deposits/${id}/sent`, { body: { method, sender_name: sender.trim() } })
+          : api<BankDeposit>(`/v1/store/wallet/bank-deposits/${id}/sent`, { body: { method, sender_name: sender.trim() }, transaction: true })
         : api<BankDeposit>(`/v1/store/wallet/bank-deposits/${id}/cancel`, { body: {} }),
     onSuccess: () => {
       void deposit.refetch();

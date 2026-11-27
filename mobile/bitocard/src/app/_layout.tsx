@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { AppState, Platform, useColorScheme } from 'react-native';
 
 import { PushListener } from '@/components/push-listener';
+import { AppLock } from '@/components/app-lock';
 import { inter, useTheme } from '@/components/ui';
 import { UpdateGate } from '@/components/update-gate';
 import { AccountProvider } from '@/lib/account';
@@ -42,7 +43,9 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
         <UpdateGate>
-          <ThemedApp />
+          <AppLock>
+            <ThemedApp />
+          </AppLock>
         </UpdateGate>
         <PushListener />
       </AccountProvider>

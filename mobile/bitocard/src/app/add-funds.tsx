@@ -34,6 +34,7 @@ export default function AddFunds() {
       const topUp = await api<TopUp>('/v1/store/wallet/top-ups', {
         body: { amount: minor, method: chosen ?? undefined, currency, return_url: `${siteUrl}/account/wallet` },
         idempotencyKey: key.current(),
+        transaction: true,
       });
       if (topUp.checkout_url) await WebBrowser.openBrowserAsync(topUp.checkout_url).catch(() => undefined);
       return topUp;

@@ -64,7 +64,7 @@ export default function SellCard() {
           body.append('photos', { uri: await preparePhoto(photo), name: `card-${index + 1}.jpg`, type: 'image/jpeg' } as unknown as Blob);
         }
       }
-      return apiUpload<GiftCardSale>('/v1/store/gift-card-sales', body, moneyKey.current());
+      return apiUpload<GiftCardSale>('/v1/store/gift-card-sales', body, moneyKey.current(), true);
     },
     onSuccess: sale => {
       moneyKey.settle();

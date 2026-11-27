@@ -5,6 +5,7 @@ import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, 
 import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { TransactionPinGuard } from '../customers/transaction-pin.js';
 import { ProductOnly } from '../products/product.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { BankDepositsService, maxDepositMinor, minDepositMinor } from './bank-deposits.service.js';
@@ -102,6 +103,7 @@ export class CustomerBankDepositsController {
   }
 
   @Post()
+  @UseGuards(TransactionPinGuard)
   create(@CurrentCustomer() caller: CustomerCaller, @Body() body: CreateDto) {
     return this.deposits.create(caller.customer, body);
   }
@@ -112,6 +114,7 @@ export class CustomerBankDepositsController {
   }
 
   @Post(':id/sent')
+  @UseGuards(TransactionPinGuard)
   @HttpCode(HttpStatus.OK)
   sent(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SentDto) {
     return this.deposits.markSent(caller.customer, id, body);

@@ -3,6 +3,7 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Matches, Min } from 'class-validator';
 import { AdminRoles, Public, RealmOnly } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { TransactionPinGuard } from '../customers/transaction-pin.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { SpinsService } from './spins.service.js';
 import { StoreKey } from '../customers/store-key.js';
@@ -63,6 +64,7 @@ export class CustomerSpinsController {
 
   /** Exchanges the customer's spin rewards into their store wallet (`preview: true` only quotes). */
   @Post('exchange')
+  @UseGuards(TransactionPinGuard)
   @HttpCode(HttpStatus.OK)
   exchange(@CurrentCustomer() caller: CustomerCaller, @Body() body: SpinExchangeDto) {
     return this.spins.exchange(caller.customer, body);

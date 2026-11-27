@@ -1,9 +1,10 @@
 /* Screen tests: the API, navigation and the phone's stores are stand-ins; each test says what the API answers. */
 
 jest.mock('expo-secure-store', () => {
-  const store = new Map<string, string>();
+  const store = new Map<string, string>([['bitocard_transaction_pin_v1', '246802']]);
   return {
     WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1,
+    WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: 3,
     getItemAsync: jest.fn(async (key: string) => store.get(key) ?? null),
     setItemAsync: jest.fn(async (key: string, value: string) => void store.set(key, value)),
     deleteItemAsync: jest.fn(async (key: string) => void store.delete(key)),

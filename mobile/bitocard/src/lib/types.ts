@@ -8,6 +8,7 @@ export type Customer = {
   email_verified: boolean;
   phone: string | null;
   phone_verified: boolean;
+  transaction_pin_set: boolean;
   /** Fixed at sign-up: the wallet, checkouts and prices are in its currency. Null for older accounts until chosen. */
   country: string | null;
   currency: string | null;

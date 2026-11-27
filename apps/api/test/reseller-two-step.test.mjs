@@ -1,11 +1,10 @@
-// Resellers' two-step sign-in: an authenticator app, emailed codes or text messages per person; required where admins
-// switch `reseller_two_step` on; a pending session can only finish signing in.
+// SHQ two-step sign-in is mandatory for every reseller and permits only an authenticator app or emailed codes.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { Secret, TOTP } from 'otpauth';
 import { PrismaService } from '../dist/database/prisma.service.js';
-import { adminClient, client, lastEmailCode, lastSmsCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, client, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 import { responseChecker } from './openapi-docs.mjs';
 
 const password = 'correct horse battery';
@@ -33,12 +32,6 @@ async function awayFromStepEdge() {
   if (left < 3000) await new Promise(resolve => setTimeout(resolve, left + 100));
 }
 
-/** Lets the next code be sent at once (codes are at most one a minute), as if the last one were sent two minutes ago. */
-async function codeAgain(email) {
-  const user = await prisma.user.findFirstOrThrow({ where: { realm: 'reseller', email } });
-  await prisma.verificationCode.updateMany({ where: { userId: user.id, purpose: 'mfa_sign_in' }, data: { createdAt: new Date(Date.now() - 120_000) } });
-}
-
 async function signIn(email) {
   const browser = client(server.base, { autoIdempotency: true });
   const res = await browser.post('/v1/auth/signin', { identifier: email, password });
@@ -57,25 +50,29 @@ async function withAuthenticator(browser, email) {
 }
 
 describe('reseller two-step sign-in', () => {
-  test('off by default: sign-in is one step and the session says so', async () => {
-    const { browser, email } = await resellerClient(server);
+  test('mandatory by default: a new SHQ account must choose app or email before using SHQ', async () => {
+    const { browser, email } = await resellerClient(server, { mfa: false });
     const session = await browser.get('/v1/auth/session');
     check('GET /v1/auth/session', 200, session.json);
-    assert.deepEqual(session.json.two_step, { pending: false, setup_required: false, method: null });
+    assert.deepEqual(session.json.two_step, { pending: true, setup_required: true, method: null });
     const settings = await browser.get('/v1/auth/two-step');
     check('GET /v1/auth/two-step', 200, settings.json);
-    assert.deepEqual([settings.json.method, settings.json.required, settings.json.pending], [null, false, false]);
+    assert.deepEqual([settings.json.method, settings.json.required, settings.json.pending], [null, true, true]);
     assert.deepEqual(
       settings.json.methods.map(item => [item.method, item.available, item.reason]),
-      [['authenticator', true, null], ['email', true, null], ['sms', false, 'phone_required']],
+      [['authenticator', true, null], ['email', true, null]],
     );
+    assert.equal((await browser.get('/v1/account')).json.error.code, 'mfa_required');
+    assert.equal((await browser.post('/v1/auth/two-step/setup', { method: 'email' })).status, 200);
+    assert.equal((await browser.post('/v1/auth/two-step/setup/confirm', { code: await lastEmailCode(server.app, email) })).status, 200);
+    assert.equal((await browser.get('/v1/account')).status, 200);
     const again = await signIn(email);
-    assert.equal(again.session.two_step.pending, false);
-    assert.equal((await again.browser.get('/v1/account')).status, 200);
+    assert.equal(again.session.two_step.pending, true);
+    assert.equal((await again.browser.get('/v1/account')).status, 401);
   });
 
   test('an authenticator: set up with its first code, then every sign-in waits for a code', async () => {
-    const { browser, email, userId } = await resellerClient(server);
+    const { browser, email, userId } = await resellerClient(server, { mfa: false });
     await awayFromStepEdge();
     const setup = await browser.post('/v1/auth/two-step/setup', { method: 'authenticator' });
     check('POST /v1/auth/two-step/setup', 200, setup.json);
@@ -125,7 +122,7 @@ describe('reseller two-step sign-in', () => {
   });
 
   test('emailed codes: one a minute, the sign-in code finishes it, and wrong codes lock the account', async () => {
-    const { browser, email } = await resellerClient(server);
+    const { browser, email } = await resellerClient(server, { mfa: false });
     const setup = await browser.post('/v1/auth/two-step/setup', { method: 'email' });
     assert.deepEqual([setup.status, setup.json.secret, setup.json.sent_to.endsWith('@example.com')], [200, null, true]);
     assert.equal((await browser.post('/v1/auth/two-step/setup/confirm', { code: await lastEmailCode(server.app, email) })).status, 200);
@@ -150,32 +147,14 @@ describe('reseller two-step sign-in', () => {
     assert.equal(signInLocked.json.error.code, 'account_locked', 'the same lockout as wrong passwords');
   });
 
-  test('text messages need a confirmed mobile number, then work like emailed codes', async () => {
-    const { browser, email } = await resellerClient(server);
-    const phone = `+234803${String(Math.floor(Math.random() * 1e7)).padStart(7, '0')}`;
-    assert.equal((await browser.post('/v1/auth/two-step/setup', { method: 'sms' })).json.error.code, 'two_step_method_unavailable');
-    assert.equal((await browser.post('/v1/auth/phones', { phone })).status, 202);
-    assert.equal((await browser.post('/v1/auth/phones/verify', { code: await lastSmsCode(server.app, phone) })).status, 200);
-    const setup = await browser.post('/v1/auth/two-step/setup', { method: 'sms' });
-    assert.deepEqual([setup.status, setup.json.sent_to], [200, `•••• ${phone.slice(-4)}`]);
-    assert.equal((await browser.post('/v1/auth/two-step/setup/confirm', { code: await lastSmsCode(server.app, phone) })).status, 200);
-
-    const { browser: next } = await signIn(email);
-    assert.equal((await next.post('/v1/auth/two-step/challenge')).json.sent, true);
-    assert.equal((await next.post('/v1/auth/two-step/verify', { code: await lastSmsCode(server.app, phone) })).status, 200);
-
-    // Changing the method needs a code from the current one.
-    assert.equal((await next.post('/v1/auth/two-step/setup', { method: 'email' })).json.error.code, 'parameter_missing');
-    await codeAgain(email);
-    assert.equal((await next.post('/v1/auth/two-step/challenge')).json.sent, true);
-    const changed = await next.post('/v1/auth/two-step/setup', { method: 'email', current_code: await lastSmsCode(server.app, phone) });
-    assert.equal(changed.status, 200, JSON.stringify(changed.json));
-    assert.equal((await next.post('/v1/auth/two-step/setup/confirm', { code: await lastEmailCode(server.app, email) })).status, 200);
-    assert.equal((await next.get('/v1/auth/two-step')).json.method, 'email');
+  test('text messages are refused; SHQ allows only app or email', async () => {
+    const { browser } = await resellerClient(server, { mfa: false });
+    const refused = await browser.post('/v1/auth/two-step/setup', { method: 'sms' });
+    assert.deepEqual([refused.status, refused.json.error.code], [400, 'two_step_method_unavailable']);
   });
 
-  test('required by the switch: set up at the next request, and it cannot be turned off', async () => {
-    const { browser, email, resellerId } = await resellerClient(server, { country: 'GH' });
+  test('the legacy switch cannot weaken mandatory SHQ two-step or turn it off', async () => {
+    const { browser, email, resellerId } = await resellerClient(server, { country: 'GH', mfa: false });
     assert.equal((await admin.put('/v1/admin/switches/reseller_two_step', { country_code: 'GH', enabled: true })).status, 200);
     try {
       const blocked = await browser.get('/v1/account');
@@ -188,44 +167,40 @@ describe('reseller two-step sign-in', () => {
       const off = await browser.post('/v1/auth/two-step/disable', { code: '123456' });
       assert.deepEqual([off.status, off.json.error.code], [409, 'two_step_enforced']);
 
-      // A reseller's own switch wins over its market's.
+      // A reseller-level legacy off value no longer weakens the mandatory policy.
       await admin.put('/v1/admin/switches/reseller_two_step', { reseller_id: resellerId, enabled: false });
-      await codeAgain(email);
-      assert.equal((await browser.post('/v1/auth/two-step/challenge')).json.sent, true);
-      const disabled = await browser.post('/v1/auth/two-step/disable', { code: await lastEmailCode(server.app, email) });
-      check('POST /v1/auth/two-step/disable', 200, disabled.json);
-      assert.equal((await signIn(email)).session.two_step.pending, false);
+      const disabled = await browser.post('/v1/auth/two-step/disable', { code: '123456' });
+      assert.deepEqual([disabled.status, disabled.json.error.code], [409, 'two_step_enforced']);
     } finally {
       await admin.put('/v1/admin/switches/reseller_two_step', { country_code: 'GH', enabled: null });
     }
   });
 
-  test('a market can limit the methods resellers based there may choose', async () => {
+  test('legacy market settings cannot remove app or email from SHQ', async () => {
     const updated = await admin.patch('/v1/admin/countries/KE', { reseller_two_step_methods: ['email', 'authenticator', 'email'] });
     assert.equal(updated.status, 400, 'each method once');
     const saved = await admin.patch('/v1/admin/countries/KE', { reseller_two_step_methods: ['email', 'authenticator'] });
     assert.deepEqual(saved.json.reseller_two_step_methods, ['authenticator', 'email'], 'kept in a fixed order');
     try {
       assert.equal((await admin.patch('/v1/admin/countries/KE', { reseller_two_step_methods: ['authenticator'] })).status, 200);
-      const { browser } = await resellerClient(server, { country: 'KE' });
+      const { browser } = await resellerClient(server, { country: 'KE', mfa: false });
       const settings = await browser.get('/v1/auth/two-step');
-      assert.deepEqual(settings.json.methods.find(item => item.method === 'email'), { method: 'email', available: false, reason: 'not_allowed' });
-      const refused = await browser.post('/v1/auth/two-step/setup', { method: 'email' });
-      assert.deepEqual([refused.status, refused.json.error.code], [400, 'two_step_method_unavailable']);
+      assert.deepEqual(settings.json.methods.find(item => item.method === 'email'), { method: 'email', available: true, reason: null });
+      assert.equal((await browser.post('/v1/auth/two-step/setup', { method: 'email' })).status, 200);
     } finally {
       await admin.patch('/v1/admin/countries/KE', { reseller_two_step_methods: ['authenticator', 'email', 'sms'] });
     }
   });
 
   test('admins reset a member who lost their method: it is off and they are signed out everywhere', async () => {
-    const { browser, email, userId, resellerId } = await resellerClient(server);
+    const { browser, email, userId, resellerId } = await resellerClient(server, { mfa: false });
     await withAuthenticator(browser, email);
     const detail = await admin.get(`/v1/admin/resellers/${resellerId}`);
     assert.equal(detail.json.members.find(member => member.user_id === userId).two_step, 'authenticator');
 
     const support = await adminClient(server, ['support']);
     assert.equal((await support.post(`/v1/admin/resellers/${resellerId}/members/${userId}/two-step/reset`, { reason: 'Lost phone' })).status, 403, 'operations only');
-    const stranger = (await resellerClient(server)).resellerId;
+    const stranger = (await resellerClient(server, { mfa: false })).resellerId;
     assert.equal((await admin.post(`/v1/admin/resellers/${stranger}/members/${userId}/two-step/reset`, { reason: 'Lost phone' })).status, 404, 'only on their own team');
     const reset = await admin.post(`/v1/admin/resellers/${resellerId}/members/${userId}/two-step/reset`, { reason: 'Lost phone, called in' });
     assert.equal(reset.status, 200, JSON.stringify(reset.json));
@@ -233,11 +208,11 @@ describe('reseller two-step sign-in', () => {
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'reseller.two_step_reset', targetId: userId } }));
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { totp: true } });
     assert.deepEqual([user.mfaMethod, user.totp, user.mfaRecoveryCodeHashes], [null, null, []]);
-    assert.equal((await signIn(email)).session.two_step.pending, false);
+    assert.deepEqual((await signIn(email)).session.two_step, { pending: true, setup_required: true, method: null });
   });
 
   test('public routes treat a pending session as signed out', async () => {
-    const { browser, email } = await resellerClient(server);
+    const { browser, email } = await resellerClient(server, { mfa: false });
     await withAuthenticator(browser, email);
     const { browser: next } = await signIn(email);
     assert.equal((await next.get('/v1/countries')).status, 200);

@@ -25,7 +25,7 @@ export default function AirtimeSaleScreen() {
     refetchInterval: query => (query.state.data && saleMoving(query.state.data.status) ? 10_000 : false),
   });
   const step = useMutation({
-    mutationFn: (what: 'sent' | 'cancel') => api<AirtimeSale>(`/v1/store/airtime/sales/${id}/${what}`, { body: {} }),
+    mutationFn: (what: 'sent' | 'cancel') => api<AirtimeSale>(`/v1/store/airtime/sales/${id}/${what}`, { body: {}, transaction: what === 'sent' }),
     onSuccess: next => {
       queries.setQueryData(['airtime-sales', id], next);
       void queries.invalidateQueries({ queryKey: ['airtime-trades'] });

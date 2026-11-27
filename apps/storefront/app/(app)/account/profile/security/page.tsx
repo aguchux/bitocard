@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import { LogOut } from "lucide-react";
 import { accountCard, AccountScreen } from "@/components/app/account-menu";
-import { PasswordForm } from "@/components/store/account-forms";
+import { PasswordForm, TransactionPinForm } from "@/components/store/account-forms";
 import { signOut } from "@/lib/account-actions";
+import { currentCustomer } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Security" };
 
 /** Security: changing the password (the current one is asked first) and signing out of this device. */
-export default function SecurityPage() {
+export default async function SecurityPage() {
+  const customer = await currentCustomer();
   return (
     <AccountScreen title="Security" lead="Keep your account safe: use a password you use nowhere else.">
       <section aria-labelledby="password" className={accountCard}>
@@ -16,6 +18,14 @@ export default function SecurityPage() {
         </h2>
         <div className="max-w-md">
           <PasswordForm />
+        </div>
+      </section>
+
+      <section aria-labelledby="transaction-pin" className={accountCard}>
+        <h2 id="transaction-pin" className="mb-2 text-lg font-bold">Transaction PIN</h2>
+        <p className="mb-4 text-sm text-slate-500">Required before payments, wallet movements and other financial transactions. The unlocked PIN is encrypted, bound to this sign-in and kept in an HttpOnly cookie.</p>
+        <div className="max-w-md">
+          <TransactionPinForm configured={Boolean(customer?.transaction_pin_set)} />
         </div>
       </section>
 

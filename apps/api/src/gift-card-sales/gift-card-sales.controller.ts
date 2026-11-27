@@ -10,6 +10,7 @@ import { Mode } from '../ledger/mode.js';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
+import { TransactionPinGuard } from '../customers/transaction-pin.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
@@ -88,6 +89,7 @@ export class CustomerGiftCardSalesController {
   }
 
   @Post()
+  @UseGuards(TransactionPinGuard)
   @UseInterceptors(photoUpload)
   create(@CurrentCustomer() caller: CustomerCaller, @Body() body: SaleDto, @UploadedFiles() files: Photo[] = []) {
     return this.sales.create(

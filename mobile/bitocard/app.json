@@ -2,13 +2,14 @@
   "expo": {
     "name": "BitoCard",
     "slug": "bitocard",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bitocard",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.golojan.bitocard.ios",
+      "buildNumber": "4",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
@@ -20,6 +21,7 @@
     },
     "android": {
       "package": "com.golojan.bitocard.android",
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#002b85",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

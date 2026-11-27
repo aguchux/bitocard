@@ -291,13 +291,13 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     id: 'mobile_app',
     name: 'Mobile app',
     description:
-      'BitoCard’s iPhone and Android app asks GET /v1/app/config when it opens. Below the lowest version it shows Update the app and nothing else; below the newest it offers the update. Leave a version empty to ask nobody. The store pages are where Update opens.',
+      'BitoCard’s iPhone and Android app asks GET /v1/app/config when it opens. Every app below the newest version is stopped until it updates. Leave a version empty to ask nobody. Set a newest version only after it is live in that store, and set the matching store page so Update can open it.',
     fields: [
-      field('APP_IOS_MIN_VERSION', 'iPhone: lowest version allowed', { required: false, help: 'Three numbers, for example 1.0.0. Raise it only when older apps can no longer work, as everyone below it is stopped.' }),
-      field('APP_IOS_LATEST_VERSION', 'iPhone: newest version', { required: false, help: 'The version live on the App Store. Older apps offer the update without stopping.' }),
+      field('APP_IOS_MIN_VERSION', 'iPhone: lowest version allowed', { required: false, help: 'Legacy emergency floor. Three numbers, for example 1.0.0. The newest-version field already forces every older app to update.' }),
+      field('APP_IOS_LATEST_VERSION', 'iPhone: newest version', { required: false, help: 'The version live on the App Store. Every older iPhone app is stopped until it updates.' }),
       field('APP_IOS_STORE_URL', 'App Store page', { kind: 'url', required: false, help: 'App Store Connect > your app > App Information: the App Store link.' }),
-      field('APP_ANDROID_MIN_VERSION', 'Android: lowest version allowed', { required: false, help: 'Three numbers, for example 1.0.0.' }),
-      field('APP_ANDROID_LATEST_VERSION', 'Android: newest version', { required: false, help: 'The version live on Google Play.' }),
+      field('APP_ANDROID_MIN_VERSION', 'Android: lowest version allowed', { required: false, help: 'Legacy emergency floor. The newest-version field already forces every older app to update.' }),
+      field('APP_ANDROID_LATEST_VERSION', 'Android: newest version', { required: false, help: 'The version live on Google Play. Every older Android app is stopped until it updates.' }),
       field('APP_ANDROID_STORE_URL', 'Google Play page', { kind: 'url', required: false, help: 'https://play.google.com/store/apps/details?id=com.golojan.bitocard.android' }),
     ],
   },

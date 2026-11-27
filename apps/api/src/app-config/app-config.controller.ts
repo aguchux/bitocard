@@ -16,8 +16,8 @@ const legalsUrl = 'https://legals.bitocard.com';
 
 /**
  * What BitoCard's mobile app asks when it opens (docs/BITOCARD_MOBILE_APP_PLAN.md, phase 4): whether this version must
- * update (`required`: the app shows only Update the app), may update (`available`) or is fine, with the store page to
- * open, the site's address and the legal documents. Admins set the versions in Settings > Integrations > Mobile app.
+ * update (`required`: the app shows only Update the app) or is current, with the store page to open, the site's address
+ * and the legal documents. Admins set the published versions in Settings > Integrations > Mobile app.
  */
 @ApiExcludeController()
 @Public()
