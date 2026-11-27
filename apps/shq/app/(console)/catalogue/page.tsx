@@ -72,7 +72,7 @@ function ProductDialog({ product, manage, onClose, onPrice }: { product: Product
             </Button>
             <Link href={`/orders/new?product=${product.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">
               <ShoppingCart className="size-4" aria-hidden />
-              Sell this
+              Order product
             </Link>
           </span>
         ) : null

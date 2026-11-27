@@ -11,7 +11,10 @@ import { answers, renderScreen } from './helpers';
 
 const wallet = {
   object: 'customer_wallet', mode: 'live', country: 'NG', currency: 'NGN', enabled: true, balance: 4825000,
-  top_up_methods: [{ object: 'payment_method', id: 'paystack', label: 'Card, bank or USSD', description: 'Pay on Paystack', networks: [] }],
+  top_up_methods: [
+    { object: 'payment_method', id: 'paystack', label: 'Card, bank or USSD', description: 'Pay on Paystack', networks: ['Visa', 'USSD'] },
+    { object: 'payment_method', id: 'flutterwave', label: 'Card, bank or mobile money', description: 'Pay on Flutterwave', networks: ['Visa', 'Mobile money'] },
+  ],
   reserved_accounts: [], reserved_accounts_available: true, reserved_account_needs_bvn: true,
   wallets: [{ currency: 'NGN', primary: true, balance: 4825000, removable: false }, { currency: 'USD', primary: false, balance: 1240, removable: false }],
 };
@@ -48,12 +51,15 @@ test('Add funds opens the provider’s page and follows the top-up until it is c
   answers({
     'GET /v1/store/wallet': wallet,
     'POST /v1/store/wallet/top-ups': (body: unknown) => (
-      expect(body).toEqual({ amount: 2000000, method: 'paystack', currency: 'NGN', return_url: 'https://bitocard.com/account/wallet' }),
-      { object: 'customer_top_up', id: 't1', mode: 'live', status: 'pending', amount: 2000000, currency: 'NGN', method: { id: 'paystack', label: 'Card' }, checkout_url: 'https://checkout.example/t1', failure_reason: null }
+      expect(body).toEqual({ amount: 2000000, method: 'flutterwave', currency: 'NGN', return_url: 'https://bitocard.com/account/wallet' }),
+      { object: 'customer_top_up', id: 't1', mode: 'live', status: 'pending', amount: 2000000, currency: 'NGN', method: { id: 'flutterwave', label: 'Card' }, checkout_url: 'https://checkout.example/t1', failure_reason: null }
     ),
     'GET /v1/store/wallet/top-ups/t1': () => ({ object: 'customer_top_up', id: 't1', mode: 'live', status: ++checks > 0 ? 'succeeded' : 'pending', amount: 2000000, currency: 'NGN', method: { id: 'paystack', label: 'Card' }, checkout_url: null, failure_reason: null }),
   });
   await renderScreen(<AddFunds />);
+  expect(await screen.findByText('Paystack')).toBeTruthy();
+  expect(screen.getByText('Flutterwave')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('radio', { name: /Flutterwave/ }));
   await fireEvent.changeText(screen.getByLabelText('Amount (NGN)'), '20,000');
   await fireEvent.press(await screen.findByRole('button', { name: 'Continue to pay' }));
   await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://checkout.example/t1'));

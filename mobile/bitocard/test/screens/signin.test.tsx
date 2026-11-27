@@ -15,6 +15,20 @@ const customer = { object: 'customer', id: 'c1', email: 'ada@example.com', name:
 
 beforeEach(() => jest.clearAllMocks());
 
+test('passwords can be shown and hidden without changing their value', async () => {
+  await renderScreen(<SignIn />);
+  const password = screen.getByLabelText('Password');
+  await fireEvent.changeText(password, 'correct horse');
+  expect(password).toHaveProp('secureTextEntry', true);
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Show password' }));
+  expect(screen.getByLabelText('Password')).toHaveProp('secureTextEntry', false);
+  expect(screen.getByLabelText('Password')).toHaveProp('value', 'correct horse');
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Hide password' }));
+  expect(screen.getByLabelText('Password')).toHaveProp('secureTextEntry', true);
+});
+
 test('signs in with email and password, then goes home', async () => {
   answers({
     'POST /v1/store/account/signin': (body: unknown) => (expect(body).toEqual({ email: 'ada@example.com', password: 'correct horse' }), { customer, session: { token: 'bcc_1', expires_at: '' } }),

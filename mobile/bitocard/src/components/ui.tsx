@@ -1,5 +1,6 @@
-import { type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
+import { type ReactNode, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View, type TextInputProps, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { darkPalette, lightPalette, type Palette } from '@/lib/palette';
@@ -35,9 +36,14 @@ export function Page({ children, header = true, style }: { children: ReactNode; 
   const theme = useTheme();
   return (
     <SafeAreaView edges={header ? ['left', 'right'] : ['top', 'left', 'right']} style={{ flex: 1, backgroundColor: theme.background }}>
-      <ScrollView contentContainerStyle={[styles.page, style]} keyboardShouldPersistTaps="handled">
-        {children}
-      </ScrollView>
+      <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={[styles.page, style]}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled">
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -68,17 +74,32 @@ export function Button({ label, onPress, kind = 'primary', busy, disabled }: { l
 }
 
 /** A labelled text field; the label is its accessible name. */
-export function Field({ label, hint, error, ...input }: TextInputProps & { label: string; hint?: string; error?: string | null }) {
+export function Field({ label, hint, error, secureTextEntry, style, ...input }: TextInputProps & { label: string; hint?: string; error?: string | null }) {
   const theme = useTheme();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const isPassword = Boolean(secureTextEntry);
   return (
     <View style={{ gap: 6 }}>
       <T kind="label">{label}</T>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={theme.textSecondary}
-        style={[styles.input, { borderColor: error ? theme.bad : theme.field, color: theme.text, backgroundColor: theme.card }]}
-        {...input}
-      />
+      <View style={styles.inputShell}>
+        <TextInput
+          accessibilityLabel={label}
+          placeholderTextColor={theme.textSecondary}
+          secureTextEntry={isPassword && !passwordVisible}
+          style={[styles.input, isPassword && styles.passwordInput, { borderColor: error ? theme.bad : theme.field, color: theme.text, backgroundColor: theme.card }, style]}
+          {...input}
+        />
+        {isPassword ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${passwordVisible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+            hitSlop={8}
+            onPress={() => setPasswordVisible(value => !value)}
+            style={styles.passwordToggle}>
+            {passwordVisible ? <EyeOff size={21} color={theme.textSecondary} /> : <Eye size={21} color={theme.textSecondary} />}
+          </Pressable>
+        ) : null}
+      </View>
       {error ? <T kind="small" color={theme.bad}>{error}</T> : hint ? <T kind="small" muted>{hint}</T> : null}
     </View>
   );
@@ -145,6 +166,7 @@ export function Line({ label, value, strong }: { label: string; value: string; s
 }
 
 export const styles = StyleSheet.create({
+  keyboardView: { flex: 1 },
   chip: { minHeight: 48, paddingHorizontal: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontFamily: inter.bold, fontSize: 15 },
   segmented: { flexDirection: 'row', padding: 4, borderRadius: 14, gap: 4 },
@@ -154,5 +176,8 @@ export const styles = StyleSheet.create({
   button: { minHeight: 54, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   buttonText: { fontFamily: inter.bold, fontSize: 16 },
   input: { minHeight: 52, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, fontFamily: inter.regular, fontSize: 16 },
+  inputShell: { position: 'relative' },
+  passwordInput: { paddingRight: 52 },
+  passwordToggle: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 52, alignItems: 'center', justifyContent: 'center' },
   notice: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
 });

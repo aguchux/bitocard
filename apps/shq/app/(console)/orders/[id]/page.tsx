@@ -34,6 +34,15 @@ const orderPollMs = 5000;
 
 const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", vpn_account: "VPN access" };
 
+const externalUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
 /** A secret (code, PIN, token): masked until revealed, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {
   const [shown, setShown] = useState(false);
@@ -81,7 +90,23 @@ function Delivery({ delivery, index, count }: { delivery: OrderDelivery; index: 
           <span className="font-mono">{delivery.serial}</span>
         </p>
       ) : null}
-      {details.length ? <KeyValue items={details.map(([key, value]) => ({ label: humanise(key), value }))} /> : null}
+      {details.length ? (
+        <KeyValue
+          items={details.map(([key, value]) => {
+            const url = externalUrl(value);
+            return {
+              label: humanise(key),
+              value: url ? (
+                <a href={url} target="_blank" rel="noreferrer noopener" aria-label={`Open ${humanise(key)}`} className="inline-flex items-center gap-1.5 font-semibold text-brand-600 underline-offset-2 hover:underline">
+                  Open link <ExternalLink className="size-3.5" aria-hidden />
+                </a>
+              ) : (
+                value
+              ),
+            };
+          })}
+        />
+      ) : null}
       {delivery.kind === "confirmation" && !delivery.code && !details.length ? <p className="text-sm text-muted">Delivered to the recipient. There is no code to pass on.</p> : null}
     </li>
   );
@@ -387,7 +412,7 @@ export default function OrderPage() {
           </div>
 
           <Card>
-            <CardHeader title="Delivered" description="Codes, PINs and tokens are secret. Pass them only to your customer." />
+            <CardHeader title="Delivered" description="Reveal and copy codes, PINs and tokens here. Redemption and claim links open in a new tab." />
             <div className="p-5 sm:p-6">
               {order.deliveries.length ? (
                 <ul className="space-y-3">

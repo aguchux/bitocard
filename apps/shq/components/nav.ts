@@ -73,7 +73,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     title: "Orders",
     items: [
       { label: "All orders", href: "/orders", icon: ListOrdered },
-      { label: "New order", href: "/orders/new", icon: Sparkles },
+      { label: "Order product", href: "/orders/new", icon: Sparkles },
       { label: "Disputes", href: "/disputes", icon: MessageSquareWarning },
       { label: "Cards sold to you", href: "/gift-card-sales", icon: Gift },
       { label: "Airtime trades", href: "/airtime-trades", icon: Smartphone },

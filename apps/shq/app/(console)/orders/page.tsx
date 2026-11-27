@@ -38,12 +38,12 @@ export default function OrdersPage() {
     <ShqShell section="orders" current="/orders" crumbs={[{ label: "Orders", href: "/orders" }, { label: "All orders" }]}>
       <PageHeader
         title="Orders"
-        description={mode === "test" ? "Sandbox orders, newest first. Nothing here is real." : "Every order from your store and your API, newest first."}
+        description={mode === "test" ? "Sandbox orders, newest first. Nothing here is real." : "Every order placed in SHQ, through your store or through your API, newest first."}
         actions={
           canOrder ? (
             <Link href="/orders/new" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">
               <Plus className="size-4" aria-hidden />
-              New order
+              Order product
             </Link>
           ) : null
         }

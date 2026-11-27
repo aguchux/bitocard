@@ -30,7 +30,7 @@ function ProductPicker({ onPick }: { onPick: (product: Product) => void }) {
   const rows = query.data?.pages.flatMap(page => page.data);
   return (
     <Card>
-      <CardHeader title="Choose a product" description="Products you can sell, with your price." />
+      <CardHeader title="Choose a product" description="Every product available to your reseller account, whether it is listed on your store or not." />
       <div className="flex flex-wrap gap-3 p-5 sm:p-6">
         <FilterSelect
           id="category"
@@ -144,7 +144,7 @@ function QuoteCard({ quote, product, onPlaced, onRequote, requoting }: { quote: 
           {[
             ["Face value", `${formatMoney(quote.face_value, quote.face_currency)}${quote.quantity > 1 ? ` × ${quote.quantity}` : ""}`],
             ...recipient.map(([key, value]) => [humanise(key), key === "transaction_type" ? humanise(String(value)) : String(value)]),
-            ["Customer pays", money(quote.price)],
+            ["Your selling price", money(quote.price)],
             ...(quote.tax ? [[`${quote.tax.name} (${quote.tax.rate_percent}%)`, money(quote.tax.amount)]] : []),
             ...(quote.source === "own" && quote.bitocard_fee
               ? [
@@ -154,7 +154,7 @@ function QuoteCard({ quote, product, onPlaced, onRequote, requoting }: { quote: 
                 ]
               : [
                   ["Wholesale", money(quote.wholesale)],
-                  ["Taken from your wallet", money(quote.wholesale + (quote.tax?.amount ?? 0))],
+                  ["Pay from your wallet", money(quote.wholesale + (quote.tax?.amount ?? 0))],
                 ]),
             ["Your profit", money(quote.reseller_profit)],
           ].map(([label, value]) => (
@@ -186,7 +186,7 @@ function QuoteCard({ quote, product, onPlaced, onRequote, requoting }: { quote: 
               </Field>
             ) : null}
             <Button className="w-full sm:w-auto" icon={<ShoppingCart className="size-4" aria-hidden />} loading={placeState.isLoading} onClick={submit}>
-              {quote.source === "own" && quote.bitocard_fee ? `Place order · fee up to ${money(quote.bitocard_fee.max)}` : `Place order · ${money(quote.wholesale + (quote.tax?.amount ?? 0))} from wallet`}
+              {quote.source === "own" && quote.bitocard_fee ? `Pay fee up to ${money(quote.bitocard_fee.max)} from wallet` : `Pay ${money(quote.wholesale + (quote.tax?.amount ?? 0))} from wallet`}
             </Button>
             <p className="text-xs text-muted">The amount is held from your wallet and taken only when the order completes.</p>
           </div>
@@ -334,7 +334,7 @@ function OrderForm({ product, onChange }: { product: Product; onChange: () => vo
             </Field>
           ) : null}
 
-          <Field label="Customer reference (optional)" htmlFor={`${id}-reference`} hint="Your own reference for the customer or sale.">
+          <Field label="Sale reference (optional)" htmlFor={`${id}-reference`} hint="Your own reference for this customer or counter sale.">
             <Input id={`${id}-reference`} autoComplete="off" maxLength={100} value={reference} onChange={event => changed(setReference)(event.target.value)} />
           </Field>
 
@@ -352,7 +352,7 @@ function OrderForm({ product, onChange }: { product: Product; onChange: () => vo
         ) : (
           <Card className="p-5 text-sm text-muted sm:p-6">
             <p className="font-semibold text-ink">How it works</p>
-            <p className="mt-1">A quote locks the price for 10 minutes. Placing the order holds the wholesale cost and any tax from your wallet.</p>
+            <p className="mt-1">A quote locks the price for 10 minutes. Paying holds the wholesale cost and any tax from your reseller wallet, then opens the order details.</p>
             {product.redeem_instructions ? <p className="mt-3">{product.redeem_instructions}</p> : null}
           </Card>
         )}
@@ -398,10 +398,10 @@ function NewOrder() {
 
 export default function NewOrderPage() {
   return (
-    <ShqShell section="orders" current="/orders/new" crumbs={[{ label: "Orders", href: "/orders" }, { label: "New order" }]}>
+    <ShqShell section="orders" current="/orders/new" crumbs={[{ label: "Orders", href: "/orders" }, { label: "Order product" }]}>
       <PageHeader
-        title="New order"
-        description="Place an order by hand, for example for a customer in your shop."
+        title="Order product"
+        description="Make an in-person or assisted sale from SHQ. Choose any available product and pay from your reseller wallet; it does not need to be listed on your customer store."
         actions={
           <Link href="/orders" className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted hover:bg-canvas hover:text-ink">
             <ArrowLeft className="size-4" aria-hidden />

@@ -4,7 +4,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, Card, Chip, Field, Notice, Page, T } from '@/components/ui';
+import { PaymentMethodOption } from '@/components/payment-method';
+import { Button, Card, Field, Notice, Page, T } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useMoneyKey } from '@/lib/biometrics';
 import { siteUrl } from '@/lib/config';
@@ -94,12 +95,11 @@ export default function AddFunds() {
       <Field label={`Amount (${currency})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="5,000" />
       {wallet.data ? (
         wallet.data.top_up_methods.length ? (
-          <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel="How you'll pay">
-            <T kind="label">How you&apos;ll pay</T>
+          <View style={{ gap: 10 }} accessibilityRole="radiogroup" accessibilityLabel="Pay with">
+            <T kind="label">Pay with</T>
             {wallet.data.top_up_methods.map(item => (
-              <Chip key={item.id} ring selected={item.id === chosen} label={item.label} onPress={() => setMethod(item.id)} />
+              <PaymentMethodOption key={item.id} method={item} selected={item.id === chosen} onPress={() => setMethod(item.id)} />
             ))}
-            {wallet.data.top_up_methods.find(item => item.id === chosen)?.description ? <T kind="small" muted>{wallet.data.top_up_methods.find(item => item.id === chosen)!.description}</T> : null}
           </View>
         ) : (
           <Notice>No card or mobile money payments here right now. Use your account number or a bank deposit instead.</Notice>
