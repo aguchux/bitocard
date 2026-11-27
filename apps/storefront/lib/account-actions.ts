@@ -148,6 +148,7 @@ export async function changePassword(_state: FormState, form: FormData): Promise
 /** Sets/replaces the transaction PIN and unlocks it for this encrypted web session. */
 export async function setTransactionPin(_state: FormState, form: FormData): Promise<FormState> {
   const pin = text(form, "pin");
+  if (pin !== text(form, "pin_confirmation")) return { error: "The two PINs are not the same.", field: "pin_confirmation" };
   const result = await customerApi<{ object: "transaction_pin" }>("POST", "/v1/store/account/transaction-pin", {
     code: text(form, "code"),
     pin,

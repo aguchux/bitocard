@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useId, useState, type ReactNode } from "react";
-import { AlertCircle, CheckCircle2, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, X } from "lucide-react";
 import {
   changePassword,
   type FormState,
@@ -136,11 +137,11 @@ export function TextField({
   );
 }
 
-export function Submit({ pending, children, className = "" }: { pending: boolean; children: ReactNode; className?: string }) {
+export function Submit({ pending, disabled = false, children, className = "" }: { pending: boolean; disabled?: boolean; children: ReactNode; className?: string }) {
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60 ${className}`}
     >
       {pending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
@@ -332,34 +333,110 @@ export function PasswordForm() {
   );
 }
 
-export function TransactionPinForm({ configured }: { configured: boolean }) {
+const pinDialogClass = "fixed inset-0 z-[70] m-auto max-h-[92vh] w-[min(92vw,34rem)] overflow-y-auto rounded-3xl bg-white p-0 text-navy-900 shadow-2xl backdrop:bg-navy-950/80";
+
+export function TransactionPinDialog({ configured, required = false, id }: { configured: boolean; required?: boolean; id: string }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const router = useRouter();
   const [state, action, pending] = useActionState(setTransactionPin, empty);
   const [sent, send, sending] = useActionState(sendTransactionPinCode, empty);
-  const [unlocked, unlock, unlocking] = useActionState(unlockTransactionPin, empty);
+  const [pin, setPin] = useState("");
+  const [again, setAgain] = useState("");
+  const mismatch = again.length > 0 && again !== pin;
+  useEffect(() => {
+    if (required && !dialog.current?.open) dialog.current?.showModal();
+  }, [required]);
+  useEffect(() => {
+    if (!state.notice) return;
+    dialog.current?.close();
+    router.refresh();
+    const clear = window.setTimeout(() => {
+      setPin("");
+      setAgain("");
+    }, 0);
+    return () => window.clearTimeout(clear);
+  }, [router, state.notice]);
+  const close = () => {
+    if (!required) dialog.current?.close();
+  };
   return (
-    <div className="space-y-6">
-      {configured ? (
-        <form action={unlock} className="space-y-3 rounded-xl border border-slate-200 p-4">
-          <h3 className="font-semibold">Unlock transactions on this device</h3>
-          <FormMessage state={unlocked} />
-          <TextField label="Current transaction PIN" name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={unlocked} />
-          <Submit pending={unlocking}>Unlock transactions</Submit>
-        </form>
+    <>
+      {!required ? (
+        <button type="button" aria-haspopup="dialog" aria-controls={id} onClick={() => dialog.current?.showModal()} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
+          <KeyRound className="size-5" aria-hidden="true" /> {configured ? "Change PIN" : "Create PIN"}
+        </button>
       ) : null}
-      <div className="space-y-3 rounded-xl border border-slate-200 p-4">
-        <h3 className="font-semibold">{configured ? "Change transaction PIN" : "Create transaction PIN"}</h3>
-        <form action={send}>
-          <FormMessage state={sent} />
-          <Submit pending={sending}>{sent.notice ? "Send a new email code" : "Email me a code"}</Submit>
-        </form>
-        <form action={action} className="space-y-3">
-          <FormMessage state={state} />
-          <TextField label="Email code" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" minLength={6} maxLength={6} required state={state} />
-          <TextField label="New transaction PIN" name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Six digits. Five wrong attempts lock transactions for 15 minutes." />
-          <Submit pending={pending}>{configured ? "Change transaction PIN" : "Create transaction PIN"}</Submit>
-        </form>
-      </div>
+      <dialog
+        ref={dialog}
+        id={id}
+        aria-labelledby={`${id}-title`}
+        className={pinDialogClass}
+        onCancel={event => {
+          if (required) event.preventDefault();
+        }}
+        onClick={event => {
+          if (event.target === dialog.current) close();
+        }}
+      >
+        <div className="p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid size-12 place-items-center rounded-2xl bg-pink-50 text-brand-500"><KeyRound className="size-6" aria-hidden="true" /></span>
+            {!required ? <button type="button" onClick={close} className="grid size-11 place-items-center rounded-full bg-slate-100 hover:bg-slate-200" aria-label="Close"><X className="size-5" aria-hidden="true" /></button> : null}
+          </div>
+          <h2 id={`${id}-title`} className="mt-5 text-2xl font-extrabold">{configured ? "Change transaction PIN" : "Create transaction PIN"}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{configured ? "We will email a one-time code before your PIN can be changed." : "Create a six-digit PIN to protect payments, wallet movements and other transactions."}</p>
+          <div className="mt-6 space-y-4">
+            <form action={send} className="space-y-3">
+              <FormMessage state={sent} />
+              <Submit pending={sending}>{sent.notice ? "Send a new email code" : "Email me a code"}</Submit>
+            </form>
+            <form action={action} className="space-y-4">
+              <FormMessage state={state} />
+              <TextField label="Email OTP" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" minLength={6} maxLength={6} required state={state} />
+              <TextField label="New transaction PIN" name="pin" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Choose six digits that are not repeated or consecutive." />
+              <TextField label="Confirm transaction PIN" name="pin_confirmation" value={again} onChange={event => setAgain(event.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required aria-invalid={mismatch || undefined} hint={mismatch ? "The two PINs are not the same." : undefined} />
+              <Submit pending={pending} disabled={pin.length !== 6 || again !== pin}>{configured ? "Change transaction PIN" : "Create transaction PIN"}</Submit>
+            </form>
+          </div>
+        </div>
+      </dialog>
+    </>
+  );
+}
+
+function UnlockTransactionPinDialog() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [unlocked, unlock, unlocking] = useActionState(unlockTransactionPin, empty);
+  useEffect(() => {
+    if (unlocked.notice) dialog.current?.close();
+  }, [unlocked.notice]);
+  return (
+    <>
+      <button type="button" aria-haspopup="dialog" onClick={() => dialog.current?.showModal()} className="inline-flex min-h-12 items-center rounded-xl bg-white px-5 font-semibold text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300">Unlock this device</button>
+      <dialog ref={dialog} aria-labelledby="unlock-pin-title" className={pinDialogClass} onClick={event => event.target === dialog.current && dialog.current?.close()}>
+        <div className="p-6 sm:p-8">
+          <div className="flex justify-end"><button type="button" onClick={() => dialog.current?.close()} className="grid size-11 place-items-center rounded-full bg-slate-100 hover:bg-slate-200" aria-label="Close"><X className="size-5" aria-hidden="true" /></button></div>
+          <h2 id="unlock-pin-title" className="text-2xl font-extrabold">Unlock transactions</h2>
+          <p className="mt-2 text-sm text-slate-600">Enter your current PIN to approve transactions from this browser.</p>
+          <form action={unlock} className="mt-6 space-y-4">
+            <FormMessage state={unlocked} />
+            <TextField label="Current transaction PIN" name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={unlocked} />
+            <Submit pending={unlocking}>Unlock transactions</Submit>
+          </form>
+        </div>
+      </dialog>
+    </>
+  );
+}
+
+export function TransactionPinForm({ configured }: { configured: boolean }) {
+  return configured ? (
+    <div className="flex flex-wrap gap-3">
+      <UnlockTransactionPinDialog />
+      <TransactionPinDialog configured id="change-transaction-pin" />
     </div>
+  ) : (
+    <TransactionPinDialog configured={false} id="create-transaction-pin" />
   );
 }
 

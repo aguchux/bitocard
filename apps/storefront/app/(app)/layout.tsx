@@ -12,6 +12,7 @@ import { ChatWidget } from "@/components/app/chat-widget";
 import { SubRail } from "@/components/app/sub-rail";
 import { SubTabs } from "@/components/app/sub-tabs";
 import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog";
+import { TransactionPinDialog } from "@/components/store/account-forms";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
@@ -119,6 +120,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ChatWidget store={name} aboveNav />
       </Suspense>
       <PublicSpinClaimDialog initial={publicSpinClaim} />
+      {!customer.transaction_pin_set ? <TransactionPinDialog configured={false} required id="required-transaction-pin" /> : null}
       {/* bitocard.com and its country stores ask to be installed as an app where an admin switched it on; resellers' stores never. */}
       <InstallPrompt enabled={app?.install_prompt === true} appName={brand.name} />
     </div>
