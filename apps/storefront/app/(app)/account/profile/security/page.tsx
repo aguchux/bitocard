@@ -23,7 +23,7 @@ export default async function SecurityPage() {
 
       <section aria-labelledby="transaction-pin" className={accountCard}>
         <h2 id="transaction-pin" className="mb-2 text-lg font-bold">Transaction PIN</h2>
-        <p className="mb-4 text-sm text-slate-500">Required before payments, wallet movements and other financial transactions. The unlocked PIN is encrypted, bound to this sign-in and kept in an HttpOnly cookie.</p>
+        <p className="mb-4 text-sm text-slate-500">Required before payments, wallet movements and other financial transactions. Creating or changing it requires a one-time code sent to your email. The unlocked PIN is encrypted, bound to this sign-in and kept in an HttpOnly cookie.</p>
         <div className="max-w-md">
           <TransactionPinForm configured={Boolean(customer?.transaction_pin_set)} />
         </div>

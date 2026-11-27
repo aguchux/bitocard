@@ -19,7 +19,9 @@ data, and buy and sell gift cards. The approved screens are the design canvas "B
 - **Locked and transaction-protected.** Every signed-in customer sets a six-digit transaction PIN. The API verifies
   its slow hash for every financial mutation and locks attempts for 15 minutes after five failures. The app locks on
   launch and whenever it leaves the foreground; Face ID, fingerprint/device security, or the PIN unlocks the secure
-  on-device copy. A new device must enter the server-verified PIN once.
+  on-device copy. A customer without a PIN is prompted immediately after the next login and must confirm creation
+  with a single-use code emailed to the account. Changing the PIN in Security also requires a new emailed code. A new
+  device must enter the server-verified PIN once.
 - **Look:** bitocard.com's navy `#070f4c` and pink `#ff2382`, Inter, the "b" mark. Light first; dark follows the phone.
 - **Five tabs:** Home, Mobile, Gift cards, Wallet and Orders. Account, Notifications and Search open from Home's
   header.

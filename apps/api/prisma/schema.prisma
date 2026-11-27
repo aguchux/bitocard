@@ -2696,6 +2696,8 @@ enum CustomerCodePurpose {
   email_verification
   phone_verification
   password_reset
+  /// Confirms setting or changing the customer's transaction PIN.
+  transaction_pin
   /// Afrippa's two-step sign-in: the first code of an emailed or texted method, and each sign-in's code.
   mfa_setup
   mfa_sign_in

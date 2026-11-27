@@ -24,7 +24,7 @@ function AppLockSession({ children, configured, enrolling, refresh }: { children
   const [locked, setLocked] = useState(true);
   const [pin, setPin] = useState('');
   const [pinAgain, setPinAgain] = useState('');
-  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const trying = useRef(false);
 
   const unlockDevice = useCallback(async () => {
@@ -68,25 +68,29 @@ function AppLockSession({ children, configured, enrolling, refresh }: { children
   });
 
   const enroll = useMutation({
-    mutationFn: () => api('/v1/store/account/transaction-pin', { body: { current_password: password, pin } }),
+    mutationFn: () => api('/v1/store/account/transaction-pin', { body: { code, pin } }),
     onSuccess: async () => {
       await rememberTransactionPin(pin);
       await refresh();
     },
   });
+  const sendCode = useMutation({ mutationFn: () => api<{ sent_to: string }>('/v1/store/account/transaction-pin/code', { body: {} }) });
 
   if (enrolling) {
     return (
       <SafeAreaView style={[styles.page, { backgroundColor: theme.background }]}>
         <Image source={require('@/assets/images/mark.png')} style={styles.mark} accessibilityIgnoresInvertColors />
         <T kind="title" style={styles.centre} accessibilityRole="header">Secure your BitoCard app</T>
-        <T muted style={styles.centre}>Set a six-digit transaction PIN before using BitoCard. It protects the app and every financial transaction.</T>
+        <T muted style={styles.centre}>Set a six-digit transaction PIN before using BitoCard. We will email a one-time code to confirm it is you.</T>
         <Card style={styles.card}>
-          <Field label="Current account password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" textContentType="password" />
+          <Button kind="secondary" label={sendCode.isSuccess ? 'Send a new email code' : 'Email me a code'} busy={sendCode.isPending} onPress={() => sendCode.mutate()} />
+          {sendCode.isSuccess ? <Notice tone="good">Code sent to {sendCode.data.sent_to}. It expires in 30 minutes.</Notice> : null}
+          {sendCode.isError ? <Notice tone="bad">{sendCode.error instanceof ApiError ? sendCode.error.message : 'Could not send the code. Try again.'}</Notice> : null}
+          <Field label="Email code" value={code} onChangeText={value => setCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={6} />
           <Field label="New transaction PIN" value={pin} onChangeText={value => setPin(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" secureTextEntry maxLength={6} />
           <Field label="New transaction PIN again" value={pinAgain} onChangeText={value => setPinAgain(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" secureTextEntry maxLength={6} error={pinAgain.length > 0 && pinAgain !== pin ? 'The two PINs are not the same.' : null} />
           {enroll.isError ? <Notice tone="bad">{enroll.error instanceof ApiError ? enroll.error.message : 'Could not secure BitoCard. Try again.'}</Notice> : null}
-          <Button label="Set PIN and continue" busy={enroll.isPending} disabled={!password || pin.length !== 6 || pin !== pinAgain} onPress={() => enroll.mutate()} />
+          <Button label="Set PIN and continue" busy={enroll.isPending} disabled={code.length !== 6 || pin.length !== 6 || pin !== pinAgain} onPress={() => enroll.mutate()} />
         </Card>
       </SafeAreaView>
     );

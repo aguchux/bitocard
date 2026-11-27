@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { PrismaService } from '../dist/database/prisma.service.js';
-import { startApp } from './helpers.mjs';
+import { lastEmailCode, startApp } from './helpers.mjs';
 
 const password = 'correct horse battery';
 const pinHeader = { 'bitocard-transaction-pin': '246802' };
@@ -45,9 +45,12 @@ describe('customer transaction PIN', () => {
     assert.deepEqual((await primary.get('/v1/store/account/transaction-pin')).json, {
       object: 'transaction_pin', set: false, locked_until: null, updated_at: null,
     });
-    assert.equal((await primary.post('/v1/store/account/transaction-pin', { current_password: 'wrong password', pin: '246802' })).json.error.code, 'password_incorrect');
-
-    const set = await primary.post('/v1/store/account/transaction-pin', { current_password: password, pin: '246802' });
+    const sent = await primary.post('/v1/store/account/transaction-pin/code');
+    assert.equal(sent.status, 200, JSON.stringify(sent.json));
+    assert.match(sent.json.sent_to, /^p•••@example\.com$/);
+    const code = await lastEmailCode(server.app, email);
+    assert.equal((await primary.post('/v1/store/account/transaction-pin', { code: '000000', pin: '246802' })).json.error.code, 'code_invalid');
+    const set = await primary.post('/v1/store/account/transaction-pin', { code, pin: '246802' });
     assert.equal(set.status, 200, JSON.stringify(set.json));
     assert.equal(set.json.set, true);
     const stored = await prisma.customer.findFirstOrThrow({ where: { email } });
@@ -56,6 +59,13 @@ describe('customer transaction PIN', () => {
 
     const missing = await primary.post('/v1/store/account/transaction-pin/verify');
     assert.deepEqual([missing.status, missing.json.error.code], [403, 'transaction_pin_required']);
+    assert.equal((await primary.post('/v1/store/account/transaction-pin/verify', {}, pinHeader)).status, 200);
+
+    assert.equal((await primary.post('/v1/store/account/transaction-pin/code')).status, 200, 'changing the PIN sends a fresh OTP too');
+    const changeCode = await lastEmailCode(server.app, email);
+    assert.equal((await primary.post('/v1/store/account/transaction-pin', { code: changeCode, pin: '864209' })).status, 200);
+    assert.equal((await primary.post('/v1/store/account/transaction-pin/verify', {}, pinHeader)).json.error.code, 'transaction_pin_incorrect', 'the old PIN stops immediately');
+    pinHeader['bitocard-transaction-pin'] = '864209';
     assert.equal((await primary.post('/v1/store/account/transaction-pin/verify', {}, pinHeader)).status, 200);
 
     for (let attempt = 1; attempt <= 4; attempt += 1) {

@@ -462,6 +462,20 @@ export function customerCodeEmail(to: string, input: { store: string; code: stri
   };
 }
 
+/** Confirms creating or changing a customer transaction PIN. */
+export function transactionPinCodeEmail(to: string, input: { store: string; code: string; changing: boolean }): EmailMessage {
+  const heading = input.changing ? 'Change your transaction PIN' : 'Create your transaction PIN';
+  const paragraphs = [
+    `Enter this code to ${input.changing ? 'change' : 'create'} the transaction PIN for your ${input.store} account. It expires in 30 minutes.`,
+    'If you did not request this, do not share the code. Change your password and contact support.',
+  ];
+  return {
+    to,
+    subject: `${input.code} confirms your ${input.store} transaction PIN`,
+    ...layout(heading, paragraphs, input.code),
+  };
+}
+
 /** The code an admin enters to confirm their own manual top-up, naming exactly what it adds and to whom. */
 export function manualTopUpCodeEmail(to: string, input: { code: string; number: string; amount: string; target: string; source: 'received' | 'goodwill'; sandbox: boolean }): EmailMessage {
   const heading = `Confirm manual top-up ${input.number}`;

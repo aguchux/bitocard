@@ -16,7 +16,7 @@ export default function SecurityScreen() {
   const [current, setCurrent] = useState('');
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
-  const [pinPassword, setPinPassword] = useState('');
+  const [pinCode, setPinCode] = useState('');
   const [pin, setPinValue] = useState('');
   const [pinAgain, setPinAgain] = useState('');
   const change = useMutation({
@@ -30,15 +30,16 @@ export default function SecurityScreen() {
   const mismatch = again.length > 0 && again !== password;
   const notSet = change.error instanceof ApiError && change.error.code === 'password_not_set';
   const savePin = useMutation({
-    mutationFn: () => api('/v1/store/account/transaction-pin', { body: { current_password: pinPassword, pin } }),
+    mutationFn: () => api('/v1/store/account/transaction-pin', { body: { code: pinCode, pin } }),
     onSuccess: async () => {
       await rememberTransactionPin(pin).catch(() => undefined);
-      setPinPassword('');
+      setPinCode('');
       setPinValue('');
       setPinAgain('');
       await refresh();
     },
   });
+  const sendPinCode = useMutation({ mutationFn: () => api<{ sent_to: string }>('/v1/store/account/transaction-pin/code', { body: {} }) });
   const pinMismatch = pinAgain.length > 0 && pinAgain !== pin;
   return (
     <Page>
@@ -54,13 +55,16 @@ export default function SecurityScreen() {
       </Card>
       <Card>
         <T kind="heading">{customer?.transaction_pin_set ? 'Change transaction PIN' : 'Set transaction PIN'}</T>
-        <T muted>This six-digit PIN protects payments, wallet movements and other financial transactions. Face ID, fingerprint or your device passcode can unlock it on this phone.</T>
-        <Field label="Current account password" value={pinPassword} onChangeText={setPinPassword} secureTextEntry autoComplete="current-password" textContentType="password" />
+        <T muted>This six-digit PIN protects payments, wallet movements and other financial transactions. An emailed one-time code is required to {customer?.transaction_pin_set ? 'change' : 'create'} it.</T>
+        <Button kind="secondary" label={sendPinCode.isSuccess ? 'Send a new email code' : 'Email me a code'} busy={sendPinCode.isPending} onPress={() => sendPinCode.mutate()} />
+        {sendPinCode.isSuccess ? <Notice tone="good">Code sent to {sendPinCode.data.sent_to}. It expires in 30 minutes.</Notice> : null}
+        {sendPinCode.isError ? <Notice tone="bad">{sendPinCode.error instanceof ApiError ? sendPinCode.error.message : 'Code not sent. Try again.'}</Notice> : null}
+        <Field label="Email code" value={pinCode} onChangeText={value => setPinCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={6} />
         <Field label="New transaction PIN" value={pin} onChangeText={value => setPinValue(value.replace(/\D/g, '').slice(0, 6))} secureTextEntry keyboardType="number-pad" maxLength={6} />
         <Field label="New transaction PIN again" value={pinAgain} onChangeText={value => setPinAgain(value.replace(/\D/g, '').slice(0, 6))} secureTextEntry keyboardType="number-pad" maxLength={6} error={pinMismatch ? 'The two PINs are not the same.' : null} />
         {savePin.isSuccess ? <Notice tone="good">Transaction PIN saved. Your other signed-in devices were locked out.</Notice> : null}
         {savePin.isError ? <Notice tone="bad">{savePin.error instanceof ApiError ? savePin.error.message : 'PIN not saved. Try again.'}</Notice> : null}
-        <Button label={customer?.transaction_pin_set ? 'Change transaction PIN' : 'Set transaction PIN'} busy={savePin.isPending} disabled={!pinPassword || pin.length !== 6 || pin !== pinAgain} onPress={() => savePin.mutate()} />
+        <Button label={customer?.transaction_pin_set ? 'Change transaction PIN' : 'Set transaction PIN'} busy={savePin.isPending} disabled={pinCode.length !== 6 || pin.length !== 6 || pin !== pinAgain} onPress={() => savePin.mutate()} />
       </Card>
       <Button
         kind="secondary"

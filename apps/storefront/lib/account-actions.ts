@@ -149,13 +149,18 @@ export async function changePassword(_state: FormState, form: FormData): Promise
 export async function setTransactionPin(_state: FormState, form: FormData): Promise<FormState> {
   const pin = text(form, "pin");
   const result = await customerApi<{ object: "transaction_pin" }>("POST", "/v1/store/account/transaction-pin", {
-    current_password: text(form, "current_password"),
+    code: text(form, "code"),
     pin,
   });
   if (!result.ok) return failed(result);
   if (!(await keepTransactionPin(pin))) return { error: "The secure PIN cookie is not configured. Ask support to configure it." };
   revalidatePath("/account", "layout");
   return { notice: "Transaction PIN saved and unlocked on this device." };
+}
+
+export async function sendTransactionPinCode(): Promise<FormState> {
+  const result = await customerApi<{ sent_to: string }>("POST", "/v1/store/account/transaction-pin/code", {});
+  return result.ok ? { notice: `We emailed a six-digit code to ${result.data.sent_to}. It expires in 30 minutes.` } : failed(result);
 }
 
 /** Unlocks an existing transaction PIN without changing it or signing out other devices. */

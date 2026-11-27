@@ -4,7 +4,10 @@ import { PasswordsService } from '../auth/passwords.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Customer } from '../generated/prisma/client.js';
+import { EmailService } from '../notifications/email.service.js';
+import { transactionPinCodeEmail } from '../notifications/templates.js';
 import type { CustomerCaller } from './customer-session.js';
+import { CustomersService, type CustomerWithStore } from './customers.service.js';
 
 export const transactionPinHeader = 'bitocard-transaction-pin';
 const pinPattern = /^\d{6}$/;
@@ -21,6 +24,8 @@ export class TransactionPinService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordsService,
+    private readonly customers: CustomersService,
+    private readonly email: EmailService,
   ) {}
 
   status(customer: Pick<Customer, 'transactionPinHash' | 'transactionPinLockedUntil' | 'transactionPinUpdatedAt'>) {
@@ -32,15 +37,30 @@ export class TransactionPinService {
     };
   }
 
-  /** Set or replace the PIN only after proving the account password; other signed-in devices are revoked. */
-  async set(customer: Customer, sessionId: string, currentPassword: string, pin: string) {
+  /** Emails a single-use code before the customer creates or changes their PIN. */
+  async sendCode(customer: CustomerWithStore) {
+    const code = await this.customers.issueCode(customer, 'transaction_pin', customer.email);
+    try {
+      await this.email.send(transactionPinCodeEmail(customer.email, { store: customer.store.name, code, changing: Boolean(customer.transactionPinHash) }), {
+        resellerId: customer.store.resellerId,
+        name: customer.store.name,
+      });
+    } catch (error) {
+      await this.customers.cancelCode(customer.id, 'transaction_pin');
+      throw error;
+    }
+    const [name, domain] = customer.email.split('@');
+    return { object: 'transaction_pin_code' as const, sent: true, sent_to: `${name.slice(0, 1)}•••@${domain}` };
+  }
+
+  /** Set or replace the PIN only after consuming the emailed OTP; other signed-in devices are revoked. */
+  async set(customer: Customer, sessionId: string, code: string, pin: string) {
     if (!pinPattern.test(pin)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'transaction_pin_invalid', 'Choose a six-digit transaction PIN.', 'pin');
     if (/^(\d)\1{5}$/.test(pin) || ['012345', '123456', '234567', '345678', '456789', '987654', '876543', '765432', '654321'].includes(pin)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'transaction_pin_weak', 'Choose a PIN that is not repeated or consecutive.', 'pin');
     }
-    if (!customer.passwordHash || !(await this.passwords.verify(customer.passwordHash, currentPassword))) {
-      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'password_incorrect', 'Your current password is wrong.', 'current_password');
-    }
+    if (!/^\d{6}$/.test(code)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'Enter the six-digit code sent to your email.', 'code');
+    await this.customers.consumeCode(customer, 'transaction_pin', code);
     const now = new Date();
     const updated = await this.prisma.$transaction(async tx => {
       const row = await tx.customer.update({

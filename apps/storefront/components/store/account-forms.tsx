@@ -11,6 +11,7 @@ import {
   resetPassword,
   setCountry,
   setTransactionPin,
+  sendTransactionPinCode,
   signIn,
   signUp,
   startVerification,
@@ -332,14 +333,33 @@ export function PasswordForm() {
 }
 
 export function TransactionPinForm({ configured }: { configured: boolean }) {
-  const [state, action, pending] = useActionState(configured ? unlockTransactionPin : setTransactionPin, empty);
+  const [state, action, pending] = useActionState(setTransactionPin, empty);
+  const [sent, send, sending] = useActionState(sendTransactionPinCode, empty);
+  const [unlocked, unlock, unlocking] = useActionState(unlockTransactionPin, empty);
   return (
-    <form action={action} className="space-y-3">
-      <FormMessage state={state} />
-      {!configured ? <TextField label="Current account password" name="current_password" type="password" autoComplete="current-password" required state={state} /> : null}
-      <TextField label={configured ? "Transaction PIN" : "New transaction PIN"} name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Six digits. Five wrong attempts lock transactions for 15 minutes." />
-      <Submit pending={pending}>{configured ? "Unlock transactions" : "Set transaction PIN"}</Submit>
-    </form>
+    <div className="space-y-6">
+      {configured ? (
+        <form action={unlock} className="space-y-3 rounded-xl border border-slate-200 p-4">
+          <h3 className="font-semibold">Unlock transactions on this device</h3>
+          <FormMessage state={unlocked} />
+          <TextField label="Current transaction PIN" name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={unlocked} />
+          <Submit pending={unlocking}>Unlock transactions</Submit>
+        </form>
+      ) : null}
+      <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+        <h3 className="font-semibold">{configured ? "Change transaction PIN" : "Create transaction PIN"}</h3>
+        <form action={send}>
+          <FormMessage state={sent} />
+          <Submit pending={sending}>{sent.notice ? "Send a new email code" : "Email me a code"}</Submit>
+        </form>
+        <form action={action} className="space-y-3">
+          <FormMessage state={state} />
+          <TextField label="Email code" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" minLength={6} maxLength={6} required state={state} />
+          <TextField label="New transaction PIN" name="pin" type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Six digits. Five wrong attempts lock transactions for 15 minutes." />
+          <Submit pending={pending}>{configured ? "Change transaction PIN" : "Create transaction PIN"}</Submit>
+        </form>
+      </div>
+    </div>
   );
 }
 
