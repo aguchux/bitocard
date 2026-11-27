@@ -5,7 +5,7 @@ import type { ChargeResult, CheckoutInput, CheckoutProvider, PaymentRef, RefundR
 
 type PaystackResponse<T> = { status: boolean; message?: string; data: T };
 type PaystackTransaction = {
-  id: number; reference: string; status: string; amount: number; currency: string; fees?: number | null; gateway_response?: string | null;
+  id: number; reference: string; status: string; amount: number; requested_amount?: number | null; currency: string; fees?: number | null; gateway_response?: string | null;
   domain?: string; channel?: string; customer?: { customer_code?: string }; authorization?: { channel?: string; receiver_bank_account_number?: string };
 };
 type PaystackRefund = { id: number; status: string; transaction?: number | { id?: number } };
@@ -169,13 +169,23 @@ export class PaystackProvider implements CheckoutProvider {
   private charge(tx: PaystackTransaction): ChargeResult {
     const status = String(tx.status ?? '').toLowerCase();
     const failed = notPaid.has(status);
+    const gross = BigInt(Math.round(Number(tx.amount ?? 0)));
+    const reportedFee = BigInt(Math.round(Number(tx.fees ?? 0)));
+    // When "Pass fees to customers" is enabled, Paystack returns the checkout total in `amount` and the amount we
+    // initialized in `requested_amount`. Only the latter belongs in the wallet/order. The part of Paystack's fee added
+    // above it was paid by the customer, so only any remaining fee is BitoCard's processing expense.
+    const requested = Number.isSafeInteger(tx.requested_amount) && Number(tx.requested_amount) > 0 && Number(tx.requested_amount) <= Number(tx.amount)
+      ? BigInt(tx.requested_amount!)
+      : gross;
+    const customerPaidFee = gross > requested ? gross - requested : 0n;
+    const merchantFee = reportedFee > customerPaidFee ? reportedFee - customerPaidFee : 0n;
     return {
       status: status === 'success' ? 'succeeded' : failed ? 'failed' : 'pending',
       providerTransactionId: String(tx.id),
       reference: fromPaystackReference(tx.reference),
-      amount: BigInt(Math.round(Number(tx.amount ?? 0))),
+      amount: requested,
       currency: tx.currency,
-      fee: BigInt(Math.round(Number(tx.fees ?? 0))),
+      fee: merchantFee,
       failureReason: failed ? (tx.gateway_response ?? `Payment ${status}`) : undefined,
     };
   }

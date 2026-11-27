@@ -60,6 +60,32 @@ describe('Paystack payment pages', () => {
     assert.deepEqual([reversed.status, reversed.failureReason], ['failed', 'Reversed by bank']);
   });
 
+  test('credits the requested amount when Paystack adds customer-paid fees to checkout', async () => {
+    await provider.createCheckout({ ...input('bc_top_customer_fee'), amount: 15_000n });
+    Object.assign(paystack.state.transactions['bc.top.customer.fee'], {
+      status: 'success',
+      amount: 15_229,
+      requested_amount: 15_000,
+      fees: 229,
+    });
+
+    const paid = await provider.verify(ref('bc_top_customer_fee', 15_000n));
+    assert.deepEqual([paid.status, paid.amount, paid.fee], ['succeeded', 15_000n, 0n]);
+  });
+
+  test('books only the part of Paystack fees not passed to the customer', async () => {
+    await provider.createCheckout({ ...input('bc_top_split_fee'), amount: 15_000n });
+    Object.assign(paystack.state.transactions['bc.top.split.fee'], {
+      status: 'success',
+      amount: 15_200,
+      requested_amount: 15_000,
+      fees: 250,
+    });
+
+    const paid = await provider.verify(ref('bc_top_split_fee', 15_000n));
+    assert.deepEqual([paid.amount, paid.fee], [15_000n, 50n]);
+  });
+
   test('no transaction yet is null; a refused key is an error, never "not paid"', async () => {
     assert.equal(await provider.verify(ref('bc_top_never')), null);
     await assert.rejects(new PaystackProvider('not-a-key', paystack.url).verify(ref('bc_top_never')), error => error instanceof ProviderError && error.status === 401);
