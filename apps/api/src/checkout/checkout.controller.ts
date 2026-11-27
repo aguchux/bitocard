@@ -99,8 +99,8 @@ class ChangePasswordDto {
 }
 
 class TransactionPinDto {
-  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code' })
-  code: string;
+  @IsOptional() @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code' })
+  code?: string;
 
   @Matches(/^\d{6}$/, { message: 'pin must be six digits' })
   pin: string;
@@ -325,7 +325,14 @@ export class CustomerAccountController {
   @Post('transaction-pin/code')
   @HttpCode(HttpStatus.OK)
   transactionPinCode(@CurrentCustomer() caller: CustomerCaller) {
-    return this.transactionPins.sendCode(caller.customer);
+    return this.transactionPins.sendCode(caller.customer, caller.sessionId);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('transaction-pin/code/verify')
+  @HttpCode(HttpStatus.OK)
+  verifyTransactionPinCode(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
+    return this.transactionPins.verifyCode(caller.customer, caller.sessionId, body.code);
   }
 
   @UseGuards(CustomerGuard)

@@ -19,6 +19,7 @@ import {
   updateName,
   unlockTransactionPin,
   verifyEmail,
+  verifyTransactionPinCode,
 } from "@/lib/account-actions";
 import type { Market } from "@/lib/countries";
 import { PhoneInput } from "@bitocard/ui/phone-input";
@@ -335,11 +336,70 @@ export function PasswordForm() {
 
 const pinDialogClass = "fixed inset-0 z-[70] m-auto max-h-[92vh] w-[min(92vw,34rem)] overflow-y-auto rounded-3xl bg-white p-0 text-navy-900 shadow-2xl backdrop:bg-navy-950/80";
 
+function OtpInput({ value, onChange, invalid = false }: { value: string; onChange: (value: string) => void; invalid?: boolean }) {
+  const inputs = useRef<Array<HTMLInputElement | null>>([]);
+  const digits = Array.from({ length: 6 }, (_, index) => value[index] ?? "");
+  const replaceDigit = (index: number, raw: string) => {
+    const nextDigit = raw.replace(/\D/g, "").slice(-1);
+    const next = [...digits];
+    next[index] = nextDigit;
+    onChange(next.join(""));
+    if (nextDigit && index < 5) inputs.current[index + 1]?.focus();
+  };
+  const paste = (raw: string) => {
+    const next = raw.replace(/\D/g, "").slice(0, 6);
+    if (!next) return;
+    onChange(next);
+    inputs.current[Math.min(next.length, 6) - 1]?.focus();
+  };
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-semibold">Email OTP</span>
+      <div role="group" aria-label="Six-digit email OTP" className="grid grid-cols-6 gap-2 sm:gap-3">
+        {digits.map((digit, index) => (
+          <input
+            key={index}
+            ref={element => { inputs.current[index] = element; }}
+            value={digit}
+            inputMode="numeric"
+            autoComplete={index === 0 ? "one-time-code" : "off"}
+            pattern="[0-9]*"
+            maxLength={1}
+            required
+            aria-label={`OTP digit ${index + 1}`}
+            aria-invalid={invalid || undefined}
+            className="aspect-square min-w-0 rounded-xl border border-slate-200 bg-white text-center text-xl font-bold text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400"
+            onFocus={event => event.currentTarget.select()}
+            onChange={event => replaceDigit(index, event.target.value)}
+            onPaste={event => {
+              event.preventDefault();
+              paste(event.clipboardData.getData("text"));
+            }}
+            onKeyDown={event => {
+              if (event.key === "Backspace" && !digit && index > 0) {
+                const next = [...digits];
+                next[index - 1] = "";
+                onChange(next.join(""));
+                inputs.current[index - 1]?.focus();
+              } else if (event.key === "ArrowLeft" && index > 0) inputs.current[index - 1]?.focus();
+              else if (event.key === "ArrowRight" && index < 5) inputs.current[index + 1]?.focus();
+            }}
+          />
+        ))}
+      </div>
+      <input type="hidden" name="code" value={value} />
+    </div>
+  );
+}
+
 export function TransactionPinDialog({ configured, required = false, id }: { configured: boolean; required?: boolean; id: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const router = useRouter();
   const [state, action, pending] = useActionState(setTransactionPin, empty);
   const [sent, send, sending] = useActionState(sendTransactionPinCode, empty);
+  const [verified, verifyCode, verifying] = useActionState(verifyTransactionPinCode, empty);
+  const [step, setStep] = useState<"otp" | "pin">("otp");
+  const [code, setCode] = useState("");
   const [pin, setPin] = useState("");
   const [again, setAgain] = useState("");
   const mismatch = again.length > 0 && again !== pin;
@@ -347,22 +407,36 @@ export function TransactionPinDialog({ configured, required = false, id }: { con
     if (required && !dialog.current?.open) dialog.current?.showModal();
   }, [required]);
   useEffect(() => {
+    if (!verified.notice) return;
+    const advance = window.setTimeout(() => setStep("pin"), 0);
+    return () => window.clearTimeout(advance);
+  }, [verified]);
+  useEffect(() => {
     if (!state.notice) return;
     dialog.current?.close();
     router.refresh();
     const clear = window.setTimeout(() => {
       setPin("");
       setAgain("");
+      setCode("");
+      setStep("otp");
     }, 0);
     return () => window.clearTimeout(clear);
   }, [router, state.notice]);
   const close = () => {
     if (!required) dialog.current?.close();
   };
+  const open = () => {
+    setCode("");
+    setPin("");
+    setAgain("");
+    setStep("otp");
+    dialog.current?.showModal();
+  };
   return (
     <>
       {!required ? (
-        <button type="button" aria-haspopup="dialog" aria-controls={id} onClick={() => dialog.current?.showModal()} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
+        <button type="button" aria-haspopup="dialog" aria-controls={id} onClick={open} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
           <KeyRound className="size-5" aria-hidden="true" /> {configured ? "Change PIN" : "Create PIN"}
         </button>
       ) : null}
@@ -384,19 +458,33 @@ export function TransactionPinDialog({ configured, required = false, id }: { con
             {!required ? <button type="button" onClick={close} className="grid size-11 place-items-center rounded-full bg-slate-100 hover:bg-slate-200" aria-label="Close"><X className="size-5" aria-hidden="true" /></button> : null}
           </div>
           <h2 id={`${id}-title`} className="mt-5 text-2xl font-extrabold">{configured ? "Change transaction PIN" : "Create transaction PIN"}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{configured ? "We will email a one-time code before your PIN can be changed." : "Create a six-digit PIN to protect payments, wallet movements and other transactions."}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{step === "otp" ? "First, verify the six-digit code sent to your email." : "Now choose and confirm your new six-digit transaction PIN."}</p>
+          <div className="mt-5 flex items-center gap-2" aria-label={`Step ${step === "otp" ? 1 : 2} of 2`}>
+            <span className={`h-2 flex-1 rounded-full ${step === "otp" ? "bg-brand-500" : "bg-emerald-500"}`} />
+            <span className={`h-2 flex-1 rounded-full ${step === "pin" ? "bg-brand-500" : "bg-slate-200"}`} />
+            <span className="ml-2 text-xs font-semibold text-slate-500">Step {step === "otp" ? 1 : 2} of 2</span>
+          </div>
           <div className="mt-6 space-y-4">
-            <form action={send} className="space-y-3">
-              <FormMessage state={sent} />
-              <Submit pending={sending}>{sent.notice ? "Send a new email code" : "Email me a code"}</Submit>
-            </form>
-            <form action={action} className="space-y-4">
-              <FormMessage state={state} />
-              <TextField label="Email OTP" name="code" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" minLength={6} maxLength={6} required state={state} />
-              <TextField label="New transaction PIN" name="pin" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Choose six digits that are not repeated or consecutive." />
-              <TextField label="Confirm transaction PIN" name="pin_confirmation" value={again} onChange={event => setAgain(event.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required aria-invalid={mismatch || undefined} hint={mismatch ? "The two PINs are not the same." : undefined} />
-              <Submit pending={pending} disabled={pin.length !== 6 || again !== pin}>{configured ? "Change transaction PIN" : "Create transaction PIN"}</Submit>
-            </form>
+            {step === "otp" ? (
+              <>
+                <form action={send} className="space-y-3">
+                  <FormMessage state={sent} />
+                  <Submit pending={sending}>{sent.notice ? "Send a new email code" : "Email me a code"}</Submit>
+                </form>
+                <form action={verifyCode} className="space-y-4">
+                  <FormMessage state={verified} />
+                  <OtpInput value={code} onChange={setCode} invalid={verified.field === "code" && Boolean(verified.error)} />
+                  <Submit pending={verifying} disabled={code.length !== 6}>Verify code and continue</Submit>
+                </form>
+              </>
+            ) : (
+              <form action={action} className="space-y-4">
+                <FormMessage state={state} />
+                <TextField label="New transaction PIN" name="pin" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required state={state} hint="Choose six digits that are not repeated or consecutive." />
+                <TextField label="Confirm transaction PIN" name="pin_confirmation" value={again} onChange={event => setAgain(event.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" autoComplete="off" pattern="\d{6}" minLength={6} maxLength={6} required aria-invalid={mismatch || undefined} hint={mismatch ? "The two PINs are not the same." : undefined} />
+                <Submit pending={pending} disabled={pin.length !== 6 || again !== pin}>{configured ? "Change transaction PIN" : "Create transaction PIN"}</Submit>
+              </form>
+            )}
           </div>
         </div>
       </dialog>

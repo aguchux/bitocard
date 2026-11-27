@@ -150,13 +150,19 @@ export async function setTransactionPin(_state: FormState, form: FormData): Prom
   const pin = text(form, "pin");
   if (pin !== text(form, "pin_confirmation")) return { error: "The two PINs are not the same.", field: "pin_confirmation" };
   const result = await customerApi<{ object: "transaction_pin" }>("POST", "/v1/store/account/transaction-pin", {
-    code: text(form, "code"),
     pin,
   });
   if (!result.ok) return failed(result);
   if (!(await keepTransactionPin(pin))) return { error: "The secure PIN cookie is not configured. Ask support to configure it." };
   revalidatePath("/account", "layout");
   return { notice: "Transaction PIN saved and unlocked on this device." };
+}
+
+export async function verifyTransactionPinCode(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<{ object: "transaction_pin_code_verified" }>("POST", "/v1/store/account/transaction-pin/code/verify", {
+    code: text(form, "code"),
+  });
+  return result.ok ? { notice: "Email code verified." } : failed(result);
 }
 
 export async function sendTransactionPinCode(): Promise<FormState> {

@@ -13,11 +13,13 @@ export const transactionPinHeader = 'bitocard-transaction-pin';
 const pinPattern = /^\d{6}$/;
 const maxFailures = 5;
 const lockMs = 15 * 60_000;
+const codeVerificationMs = 10 * 60_000;
 
 const missing = () => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'transaction_pin_required', 'Enter your transaction PIN to continue.', 'transaction_pin');
 const notSet = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'transaction_pin_setup_required', 'Set a transaction PIN in Security before making a transaction.');
 const wrong = () => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'transaction_pin_incorrect', 'That transaction PIN is incorrect.', 'transaction_pin');
 const locked = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'transaction_pin_locked', 'Too many incorrect PIN attempts. Try again in 15 minutes.');
+const codeRequired = () => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'transaction_pin_code_required', 'Verify the email code before choosing your new PIN.', 'code');
 
 @Injectable()
 export class TransactionPinService {
@@ -38,7 +40,11 @@ export class TransactionPinService {
   }
 
   /** Emails a single-use code before the customer creates or changes their PIN. */
-  async sendCode(customer: CustomerWithStore) {
+  async sendCode(customer: CustomerWithStore, sessionId: string) {
+    await this.prisma.customerSession.updateMany({
+      where: { id: sessionId, customerId: customer.id, revokedAt: null },
+      data: { transactionPinVerifiedAt: null },
+    });
     const code = await this.customers.issueCode(customer, 'transaction_pin', customer.email);
     try {
       await this.email.send(transactionPinCodeEmail(customer.email, { store: customer.store.name, code, changing: Boolean(customer.transactionPinHash) }), {
@@ -53,14 +59,43 @@ export class TransactionPinService {
     return { object: 'transaction_pin_code' as const, sent: true, sent_to: `${name.slice(0, 1)}•••@${domain}` };
   }
 
-  /** Set or replace the PIN only after consuming the emailed OTP; other signed-in devices are revoked. */
-  async set(customer: Customer, sessionId: string, code: string, pin: string) {
+  /** Consume the emailed OTP and briefly authorize the PIN step on this signed-in session. */
+  async verifyCode(customer: Customer, sessionId: string, code: string) {
+    await this.customers.consumeCode(customer, 'transaction_pin', code);
+    const verifiedAt = new Date();
+    const updated = await this.prisma.customerSession.updateMany({
+      where: { id: sessionId, customerId: customer.id, revokedAt: null },
+      data: { transactionPinVerifiedAt: verifiedAt },
+    });
+    if (!updated.count) throw codeRequired();
+    return {
+      object: 'transaction_pin_code_verified' as const,
+      verified: true,
+      expires_at: new Date(verifiedAt.getTime() + codeVerificationMs).toISOString(),
+    };
+  }
+
+  /** Set or replace the PIN after the wizard OTP step. `code` remains accepted for older mobile clients. */
+  async set(customer: Customer, sessionId: string, code: string | undefined, pin: string) {
     if (!pinPattern.test(pin)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'transaction_pin_invalid', 'Choose a six-digit transaction PIN.', 'pin');
     if (/^(\d)\1{5}$/.test(pin) || ['012345', '123456', '234567', '345678', '456789', '987654', '876543', '765432', '654321'].includes(pin)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'transaction_pin_weak', 'Choose a PIN that is not repeated or consecutive.', 'pin');
     }
-    if (!/^\d{6}$/.test(code)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'Enter the six-digit code sent to your email.', 'code');
-    await this.customers.consumeCode(customer, 'transaction_pin', code);
+    if (code !== undefined) {
+      if (!/^\d{6}$/.test(code)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'Enter the six-digit code sent to your email.', 'code');
+      await this.customers.consumeCode(customer, 'transaction_pin', code);
+    } else {
+      const consumed = await this.prisma.customerSession.updateMany({
+        where: {
+          id: sessionId,
+          customerId: customer.id,
+          revokedAt: null,
+          transactionPinVerifiedAt: { gte: new Date(Date.now() - codeVerificationMs) },
+        },
+        data: { transactionPinVerifiedAt: null },
+      });
+      if (!consumed.count) throw codeRequired();
+    }
     const now = new Date();
     const updated = await this.prisma.$transaction(async tx => {
       const row = await tx.customer.update({
@@ -68,6 +103,7 @@ export class TransactionPinService {
         data: { transactionPinHash: await this.passwords.hash(pin), transactionPinFailures: 0, transactionPinLockedUntil: null, transactionPinUpdatedAt: now },
       });
       await tx.customerSession.updateMany({ where: { customerId: customer.id, id: { not: sessionId }, revokedAt: null }, data: { revokedAt: now } });
+      await tx.customerSession.updateMany({ where: { id: sessionId, customerId: customer.id }, data: { transactionPinVerifiedAt: null } });
       return row;
     });
     return this.status(updated);

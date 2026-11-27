@@ -2671,6 +2671,8 @@ model CustomerSession {
   mfaVerifiedAt    DateTime? @map("mfa_verified_at")
   /// The trader proved their current method on this session, but admins no longer allow it: they choose another next.
   mfaReconfirmedAt DateTime? @map("mfa_reconfirmed_at")
+  /// A recently verified email OTP that may be used once to create or replace the transaction PIN.
+  transactionPinVerifiedAt DateTime? @map("transaction_pin_verified_at")
   customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
