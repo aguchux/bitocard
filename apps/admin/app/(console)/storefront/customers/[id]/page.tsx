@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { Landmark, Wallet } from "lucide-react";
 import { Card, CardHeader, errorMessage, PageHeader, QueryView, Skeleton, StoreCustomerView } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
@@ -38,7 +39,16 @@ export default function StorefrontCustomerPage() {
       current="/storefront/customers"
       crumbs={[{ label: "Storefront", href: "/storefront" }, { label: "Customers", href: "/storefront/customers" }, { label: customer.data?.name ?? "Customer" }]}
     >
-      <PageHeader title={customer.data?.name ?? "Customer"} description="A bitocard.com customer." />
+      <PageHeader
+        title={customer.data?.name ?? "Customer"}
+        description="A bitocard.com customer."
+        actions={(
+          <>
+            <AppLink href={`/orders/fundings?customer_id=${id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-white hover:text-ink"><Wallet className="size-4" aria-hidden />Fundings</AppLink>
+            <AppLink href={`/orders/reserved-accounts?customer_id=${id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-white hover:text-ink"><Landmark className="size-4" aria-hidden />Static accounts</AppLink>
+          </>
+        )}
+      />
       <QueryView query={customer} message={error => errorMessage(error)} loading={<Skeleton className="h-96 w-full" />}>
         {data => (
           <div className="space-y-6">

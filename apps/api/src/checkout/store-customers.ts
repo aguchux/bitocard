@@ -284,7 +284,7 @@ export class StoreCustomersController {
 /** Admin app (Storefront > Customers and Settings): bitocard.com's own customers and store settings. Resellers' are theirs. */
 @ApiExcludeController()
 @RealmOnly('admin')
-@AdminRoles('operations', 'support')
+@AdminRoles('operations', 'support', 'finance')
 @Controller('admin/storefront')
 export class AdminStoreCustomersController {
   constructor(private readonly customers: StoreCustomersService) {}

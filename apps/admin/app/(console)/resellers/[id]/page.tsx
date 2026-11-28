@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { Ban, CheckCircle2, ReceiptText, RotateCcw, ShieldCheck } from "lucide-react";
+import { Ban, CheckCircle2, Landmark, ReceiptText, RotateCcw, ShieldCheck, Wallet } from "lucide-react";
 import {
   ActionDialog,
   Button,
@@ -76,13 +76,16 @@ export default function ResellerPage() {
           <PageHeader
             title={reseller.name}
             description={`${reseller.country ?? "No country yet"} · joined ${formatDate(reseller.created_at)}`}
-            actions={
-              operator ? (
-                <>
-                  <AppLink href={`/orders?reseller=${reseller.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-white hover:text-ink">
+            actions={(
+              <>
+                <AppLink href={`/orders/fundings?reseller_id=${reseller.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-white hover:text-ink"><Wallet className="size-4" aria-hidden />Fundings</AppLink>
+                <AppLink href={`/orders/reserved-accounts?reseller_id=${reseller.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-white hover:text-ink"><Landmark className="size-4" aria-hidden />Static accounts</AppLink>
+                {operator ? (
+                  <>
+                    <AppLink href={`/orders?reseller=${reseller.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-white hover:text-ink">
                     <ReceiptText className="size-4" aria-hidden />
                     Orders
-                  </AppLink>
+                    </AppLink>
                   {reseller.status === "suspended" ? (
                     <Button icon={<RotateCcw className="size-4" aria-hidden />} onClick={() => setLifting(true)}>
                       Unsuspend
@@ -97,9 +100,10 @@ export default function ResellerPage() {
                       Suspend
                     </Button>
                   ) : null}
-                </>
-              ) : null
-            }
+                  </>
+                ) : null}
+              </>
+            )}
           />
           <TestAccount reseller={reseller} operator={operator} latestCheck={latestCheck?.status} />
 

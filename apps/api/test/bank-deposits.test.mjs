@@ -27,6 +27,7 @@ function storeServer() {
       headers: {
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(token ? { 'bitocard-customer-session': token } : {}),
+        ...(token ? { 'bitocard-transaction-pin': '246802' } : {}),
         ...(method === 'POST' ? { 'idempotency-key': `store-${Date.now()}-${Math.random()}` } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -46,6 +47,8 @@ async function customer() {
   const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada Obi', email, password: 'correct horse battery', country: 'NG' });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+  assert.equal((await shopper.post('/v1/store/account/transaction-pin/code')).status, 200);
+  assert.equal((await shopper.post('/v1/store/account/transaction-pin', { code: await lastEmailCode(server.app, email), pin: '246802' })).status, 200);
   shopper.id = signup.json.customer.id;
   return shopper;
 }
@@ -125,6 +128,8 @@ describe('bank deposits', () => {
     const again = await admin.post(`/v1/admin/bank-deposits/${deposit.id}/credit`, {});
     assert.deepEqual([again.status, again.json.error.code], [409, 'deposit_closed']);
     assert.equal(await naira(shopper), 450_000, 'credited once');
+    const funding = (await admin.get(`/v1/admin/fundings?customer_id=${shopper.id}&source=bank_deposit`)).json.data.find(item => item.record_id === deposit.id);
+    assert.deepEqual([funding.source, funding.status, funding.amount, funding.credited_amount, funding.external_reference], ['bank_deposit', 'succeeded', 500_000, 450_000, 'ZEN-77812']);
     await ledgerOk();
     const inbox = await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.wallet.credited' } });
     assert.match(inbox.body, /4,500/);

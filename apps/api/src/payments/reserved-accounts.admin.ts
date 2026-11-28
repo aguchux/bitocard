@@ -19,6 +19,12 @@ class ReservedAccountsFilterDto {
   @IsOptional() @IsIn(['reseller', 'customer'])
   owner?: 'reseller' | 'customer';
 
+  @IsOptional() @IsUUID()
+  reseller_id?: string;
+
+  @IsOptional() @IsUUID()
+  customer_id?: string;
+
   /** An account number, our reference, or the owner's name or email. */
   @IsOptional() @IsString() @Length(1, 100)
   q?: string;
@@ -48,6 +54,8 @@ export class ReservedAccountsAdminService {
       ...(filter.mode ? { mode: filter.mode } : {}),
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.owner === 'customer' ? { customerId: { not: null } } : filter.owner === 'reseller' ? { customerId: null } : {}),
+      ...(filter.reseller_id ? { resellerId: filter.reseller_id, customerId: null } : {}),
+      ...(filter.customer_id ? { customerId: filter.customer_id } : {}),
       ...(q
         ? {
             OR: [

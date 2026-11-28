@@ -84,6 +84,8 @@ describe('reseller top-ups', () => {
     assert.ok(history.some(item => item.action === 'wallet.manual_top_up' && item.after.external_reference === 'GTB-778812'));
     assert.ok(await prisma.notification.findFirst({ where: { resellerId, type: 'top_up.credited' } }), 'the reseller is told');
     assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.wallet.manual_top_up', link: `/resellers/${resellerId}` } }), 'finance admins are told');
+    const funding = (await finance.get(`/v1/admin/fundings?reseller_id=${resellerId}`)).json.data.find(item => item.record_id === asked.json.id);
+    assert.deepEqual([funding.source, funding.status, funding.owner.type, funding.amount, funding.external_reference], ['manual', 'succeeded', 'reseller', 250000, 'GTB-778812']);
     await ledgerOk();
   });
 

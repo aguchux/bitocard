@@ -12,11 +12,12 @@ import { AdminPawapayCoverageController, PawapayCoverageService } from './pawapa
 import { PaymentsService } from './payments.service.js';
 import { AdminReservedAccountsController, ReservedAccountsAdminService } from './reserved-accounts.admin.js';
 import { ProviderWebhooksController } from './webhooks.controller.js';
+import { AdminFundingsController, AdminFundingsService } from './fundings.admin.js';
 
 @Module({
   imports: [PayoutsModule, IdentityModule, SettingsModule, FxModule],
-  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController, AdminPawapayCoverageController, AdminReservedAccountsController],
-  providers: [PaymentsService, PaymentMethodsService, ChargebacksService, PawapayCoverageService, ReservedAccountsAdminService],
+  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController, AdminPawapayCoverageController, AdminReservedAccountsController, AdminFundingsController],
+  providers: [PaymentsService, PaymentMethodsService, ChargebacksService, PawapayCoverageService, ReservedAccountsAdminService, AdminFundingsService],
   exports: [PaymentsService, PaymentMethodsService, ChargebacksService],
 })
 export class PaymentsModule {}

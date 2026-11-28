@@ -160,6 +160,27 @@ describe('session', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull());
   });
 
+  test('staff navigation omits pages outside their roles instead of linking to forbidden screens', async () => {
+    vi.stubGlobal('fetch', async () => Response.json({ object: 'admin_session', admin: { object: 'admin', id: 'a1', name: 'Sam Support', email: 'sam@bitocard.com', roles: ['support'] } }));
+    render(
+      <AdminProviders>
+        <AdminGate>
+          <AdminShell section="orders" current="/orders" crumbs={[{ label: 'Orders' }]}>
+            <Name />
+          </AdminShell>
+        </AdminGate>
+      </AdminProviders>,
+    );
+    await screen.findByText('Signed in as Sam Support');
+    const main = screen.getByRole('navigation', { name: 'Main' });
+    expect(within(main).getByText('Orders')).toBeTruthy();
+    expect(within(main).getByText('Support')).toBeTruthy();
+    expect(within(main).queryByText('Catalog')).toBeNull();
+    expect(within(main).queryByText('Settings')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Orders' }).textContent).toContain('Fundings');
+    expect(screen.getByRole('navigation', { name: 'Orders' }).textContent).not.toContain('Chargebacks');
+  });
+
   test('the main menu scrolls under the logo, with arrows only where there is more', async () => {
     vi.stubGlobal('fetch', async () => Response.json({ object: 'admin_session', admin: { object: 'admin', id: 'a1', name: 'Alex Admin', email: 'alex@bitocard.com', roles: ['operations'] } }));
     render(

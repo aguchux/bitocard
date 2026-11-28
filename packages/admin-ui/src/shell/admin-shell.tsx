@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { FlaskConical, UserRound } from 'lucide-react';
 import { useAdminSignOutMutation } from '@bitocard/api-client/admin';
 import { cn, humanise } from '../format';
@@ -11,11 +11,6 @@ import { StepUpPrompt } from './step-up';
 import { AppLink, can, useAdmin, useMode } from './session';
 
 export type { Crumb };
-
-const staffMenus = {
-  ...menus,
-  settings: { ...menus.settings, items: menus.settings.items.filter(item => item.href !== '/settings/team') },
-};
 
 function AdminAccountMenu() {
   const admin = useAdmin();
@@ -65,8 +60,18 @@ export function ModeSwitch() {
 /** The layout of every admin page (see ConsoleShell). */
 export function AdminShell({ section, current, crumbs, actions, children }: { section: SectionKey; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   const admin = useAdmin();
+  const allowed = (roles: import('@bitocard/api-client/admin').AdminRole[] | undefined) => roles === undefined || can(admin, ...roles);
+  const visibleMenus = Object.fromEntries(Object.entries(menus).map(([key, menu]) => [key, { ...menu, items: menu.items.filter(item => allowed(item.roles)) }])) as typeof menus;
+  const visibleSections = sections
+    .filter(item => visibleMenus[item.key].items.length > 0)
+    .map(item => ({ ...item, href: visibleMenus[item.key].items[0]?.href ?? item.href }));
+  const currentAllowed = current === '/account' || visibleMenus[section].items.some(item => current === item.href || (item.href !== '/' && current.startsWith(`${item.href}/`)));
+  useEffect(() => {
+    if (!currentAllowed) window.location.assign('/');
+  }, [currentAllowed]);
+  if (!currentAllowed) return null;
   return (
-    <ConsoleShell brand="Bitocard" sections={sections} menus={can(admin) ? menus : staffMenus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
+    <ConsoleShell brand="Bitocard" sections={visibleSections} menus={visibleMenus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
       {children}
       <StepUpPrompt />
     </ConsoleShell>

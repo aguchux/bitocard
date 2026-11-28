@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { RefreshCw, Search } from "lucide-react";
 import { Button, Card, DataTable, errorMessage, formatDateTime, formatRelative, Input, Notice, PageHeader, Select, StatusBadge, Tabs } from "@bitocard/admin-ui";
-import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type Mode, type ReservedAccountRequestStatus, useReservedAccountsQuery, useSweepReservedDepositsMutation } from "@bitocard/api-client/admin";
 
 const filters = [
@@ -24,19 +25,23 @@ const statusLabels: Record<ReservedAccountRequestStatus, string> = { pending: "W
  */
 export default function ReservedAccountsPage() {
   const admin = useAdmin();
-  const [filter, setFilter] = useState<Filter>("pending");
+  const params = useSearchParams();
+  const resellerId = params.get("reseller_id") || undefined;
+  const customerId = params.get("customer_id") || undefined;
+  const [filter, setFilter] = useState<Filter>("all");
+  const [owner, setOwner] = useState<"" | "reseller" | "customer">(customerId ? "customer" : resellerId ? "reseller" : "");
   const [mode, setMode] = useState<Mode>("live");
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
-  const accounts = useReservedAccountsQuery({ mode, status: filter === "all" ? undefined : filter, q: q || undefined });
+  const accounts = useReservedAccountsQuery({ mode, status: filter === "all" ? undefined : filter, owner: owner || undefined, reseller_id: resellerId, customer_id: customerId, q: q || undefined });
   const [sweep, sweepState] = useSweepReservedDepositsMutation();
   const swept = sweepState.data;
 
   return (
-    <AdminShell section="orders" current="/orders/reserved-accounts" crumbs={[{ label: "Orders", href: "/orders" }, { label: "Bank transfer accounts" }]}>
+    <AdminShell section="orders" current="/orders/reserved-accounts" crumbs={[{ label: "Orders", href: "/orders" }, { label: "Static accounts" }]}>
       <PageHeader
-        title="Bank transfer accounts"
-        description="Static bank account numbers that top up wallets by transfer. Transfers are credited by their reference, even into an account whose number never reached BitoCard."
+        title="Static accounts"
+        description="Every reseller and customer static bank account, plus requests still waiting for a provider. Transfers are tied to the owning wallet by reference."
         actions={
           can(admin, "finance", "operations") ? (
             <Button variant="secondary" icon={<RefreshCw className="size-4" aria-hidden />} loading={sweepState.isLoading} onClick={() => sweep()}>
@@ -72,6 +77,11 @@ export default function ReservedAccountsPage() {
           <Button type="submit" variant="secondary" icon={<Search className="size-4" aria-hidden />}>
             Search
           </Button>
+          <Select value={owner} disabled={Boolean(resellerId || customerId)} onChange={event => setOwner(event.target.value as typeof owner)} className="w-auto" aria-label="Owner type">
+            <option value="">All owners</option>
+            <option value="reseller">Resellers</option>
+            <option value="customer">Customers</option>
+          </Select>
           <Select value={mode} onChange={event => setMode(event.target.value as Mode)} className="w-auto" aria-label="Mode">
             <option value="live">Live</option>
             <option value="test">Sandbox</option>
@@ -81,7 +91,7 @@ export default function ReservedAccountsPage() {
 
       <Card>
         <DataTable
-          caption="Bank transfer accounts"
+          caption="Static accounts"
           rows={accounts.data?.data}
           loading={accounts.isLoading}
           error={accounts.error ? errorMessage(accounts.error) : null}
@@ -94,7 +104,7 @@ export default function ReservedAccountsPage() {
               header: "Wallet",
               cell: row => (
                 <div className="space-y-0.5">
-                  <span className="font-medium text-ink">{row.owner.name ?? "Unknown"}</span>
+                  <AppLink href={row.owner.type === "customer" ? `/orders/reserved-accounts?customer_id=${row.owner.id}` : `/resellers/${row.owner.id}`} className="font-medium text-brand-600 hover:underline">{row.owner.name ?? "Unknown"}</AppLink>
                   <p className="text-xs text-muted">{row.owner.type === "customer" ? `Customer${row.owner.email ? ` · ${row.owner.email}` : ""}${row.owner.seller ? ` · ${row.owner.seller}` : ""}` : "Reseller"}</p>
                 </div>
               ),

@@ -281,6 +281,8 @@ describe('dedicated account provider priority', () => {
     assert.equal((await notify(ref)).data.credited, true);
     assert.equal((await notify(ref)).data.reason, 'duplicate');
     assert.equal((await browser.get('/v1/wallet')).json.available, transfer.amount);
+    const funding = (await finance.get(`/v1/admin/fundings?reseller_id=${resellerId}&source=static_account`)).json.data.find(item => item.reference === ref);
+    assert.deepEqual([funding.source, funding.status, funding.static_account.account_number, funding.amount], ['static_account', 'succeeded', account.accountNumber, transfer.amount]);
   });
 
   test('falls back on a definite refusal, and uses the new order the next time', async () => {

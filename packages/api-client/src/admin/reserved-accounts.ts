@@ -24,7 +24,7 @@ export type AdminReservedAccountRequest = {
 
 export type ReservedDepositSweep = { object: 'reserved_deposit_sweep'; pages?: number; checked?: number; credited?: number; failed?: number; skipped?: string; error?: string };
 
-export type ReservedAccountsFilter = { mode?: Mode; status?: ReservedAccountRequestStatus; owner?: 'reseller' | 'customer'; q?: string };
+export type ReservedAccountsFilter = { mode?: Mode; status?: ReservedAccountRequestStatus; owner?: 'reseller' | 'customer'; reseller_id?: string; customer_id?: string; q?: string };
 
 /** Reserved bank accounts across every wallet (operations, finance, support), and the deposit sweep (finance, operations). */
 export const adminReservedAccountsApi = bitocardApi.injectEndpoints({
