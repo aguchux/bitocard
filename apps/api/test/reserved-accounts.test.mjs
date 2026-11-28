@@ -260,6 +260,7 @@ describe('dedicated account provider priority', () => {
     const request = await prisma.reservedAccountRequest.findFirstOrThrow({ where: { resellerId, provider: 'paystack' } });
     assert.match(request.providerCustomerId, /^CUS_/);
     assert.equal(saves().at(-1).body.phone, '+2348031234567');
+    assert.equal(saves().at(-1).body.preferred_bank, 'wema-bank', 'live Nigerian accounts explicitly prefer Wema Bank');
     assert.equal(saves().at(-1).body.bvn, undefined);
     const calls = saves().length;
     const again = await reserve(browser);

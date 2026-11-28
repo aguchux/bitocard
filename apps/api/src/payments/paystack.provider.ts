@@ -107,7 +107,9 @@ export class PaystackProvider implements CheckoutProvider {
     const account = await this.call<PaystackDva>('/dedicated_account', {
       method: 'POST',
       body: { customer: customer.customer_code, first_name: details.first_name, last_name: details.last_name, phone: details.phone,
-        ...(this.secretKey.startsWith('sk_test_') ? { preferred_bank: 'test-bank' } : {}) },
+        ...(this.secretKey.startsWith('sk_test_')
+          ? { preferred_bank: 'test-bank' }
+          : input.currency === 'NGN' ? { preferred_bank: 'wema-bank' } : {}) },
     }).catch((error: unknown) => {
       if (error instanceof ProviderError && error.status === 409) throw new ProviderError(this.name, 'Paystack has not confirmed the dedicated account assignment', false, 409);
       throw error;
