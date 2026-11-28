@@ -493,7 +493,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
     id: 'africas_talking',
     name: 'Africa’s Talking',
     description:
-      'Mobile airtime and data bundles paid from BitoCard’s Africa’s Talking wallet. Published Kenya and Nigeria data packages are built in; account-specific plans below replace them. Without the username and API key it serves only the sandbox, never live orders.',
+      'Mobile airtime and data bundles paid from BitoCard’s Africa’s Talking wallet. Its published airtime discounts and Kenya, Nigeria and Uganda data packages are filled in below; change them to your account’s own schedule. Without the username and API key it serves only the sandbox, never live orders.',
     webhookPath: '/v1/webhooks/africas-talking?token=<callback token>',
     fields: [
       field('AFRICAS_TALKING_USERNAME', 'Username', { required: true, help: 'Your app’s username (Africa’s Talking dashboard > your team > the app). Its sandbox app’s username is always sandbox.' }),
@@ -501,17 +501,17 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady' | 
       field('AFRICAS_TALKING_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Africa’s Talking’s sandbox (api.sandbox.africastalking.com, username sandbox), for Test connection only; it is not synced or used for live orders. Off: live.' }),
       field('AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT', 'Airtime discounts (%)', {
         required: true,
-        help: 'The airtime discounts on your Africa’s Talking pricing schedule, one per line or separated by semicolons: a network in a country (NG mtn 1.8; NG airtel 2; NG glo 3; NG t2 3), a whole country (KE 4) or one number for everything else (3). The most specific wins and a network with none is not synced. The schedule raises the rates with monthly volume: set the tier your account is on and change them when it moves up. BitoCard’s cost is the amount less the discount; the discount each send reports is kept for reconciliation, so a different one is flagged. Syncing airtime refuses until one is set.',
+        help: 'The airtime discounts on your Africa’s Talking pricing schedule, one per line or separated by semicolons: a network in a country (NG mtn 1.8; NG airtel 2; NG glo 3; NG t2 3), a whole country (KE 4) or one number for everything else (3). Filled in with Africa’s Talking’s published lowest tier (South Africa has none there, so it is not synced until you add yours). The most specific wins and a network with none is not synced. The schedule raises the rates with monthly volume: set the tier your account is on and change them when it moves up. BitoCard’s cost is the amount less the discount; the discount each send reports is kept for reconciliation, so a different one is flagged. Syncing airtime refuses until one is set.',
       }),
       field('AFRICAS_TALKING_AIRTIME_COUNTRIES', 'Airtime countries', {
         required: false,
-        help: 'Leave empty for the countries Africa’s Talking lists airtime as live in (KE, UG, TZ, NG, GH, ZA; every one is stocked whichever market is synced, each country’s only for its own resellers and customers, never cross-border). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
+        help: 'Leave empty for the countries Africa’s Talking lists airtime as live in (KE, UG, TZ, NG, GH, ZA, ZM, RW, MW, ET; every one is stocked whichever market is synced, each country’s only for its own resellers and customers, never cross-border). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
       }),
-      field('AFRICAS_TALKING_DATA_PRODUCT', 'Mobile Data product', { required: false, help: 'The product name created in the dashboard (Mobile Data > Products). Data bundles are synced only once it is set, and Test connection then also checks the Mobile Data wallet.' }),
+      field('AFRICAS_TALKING_DATA_PRODUCT', 'Mobile Data product', { required: false, help: 'The product name created in the dashboard (Mobile Data > Products). Data bundles are listed without it, but data orders are refused until it is set; Test connection then also checks the Mobile Data wallet.' }),
       field('AFRICAS_TALKING_DATA_PLANS', 'Data plans', {
         kind: 'data_plans',
         required: false,
-        help: 'Leave empty to use Africa’s Talking’s published Kenya and Nigeria packages. To replace them with your account’s own schedule, enter one per line or separated by semicolons: country, network, size, validity (Day, Week, BiWeek, Month or Quarterly), retail face price, then BitoCard’s cost, for example KE safaricom 1GB Month 299 250.',
+        help: 'Filled in with Africa’s Talking’s published Kenya, Nigeria and Uganda packages; edit them to your account’s own schedule. As text, one per line or separated by semicolons: country, network, size, validity (Day, Week, BiWeek, Month or Quarterly), retail face price, then BitoCard’s cost, for example KE safaricom 1GB Month 299 250.',
       }),
       field('AFRICAS_TALKING_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
       field('AFRICAS_TALKING_DATA_URL', 'Mobile Data address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),

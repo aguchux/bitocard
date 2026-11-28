@@ -15,15 +15,19 @@ export const validities = [
 /** Where Africa's Talking sells mobile data, with the networks it reaches (its airtime countries). */
 export const planCountries = [
   { code: "KE", name: "Kenya", currency: "KES", networks: ["safaricom", "airtel", "telkom"] },
-  { code: "UG", name: "Uganda", currency: "UGX", networks: ["mtn", "airtel"] },
+  { code: "UG", name: "Uganda", currency: "UGX", networks: ["mtn", "airtel", "lyca"] },
   { code: "TZ", name: "Tanzania", currency: "TZS", networks: ["vodacom", "airtel", "tigo", "halotel"] },
   { code: "NG", name: "Nigeria", currency: "NGN", networks: ["mtn", "airtel", "glo", "9mobile"] },
   { code: "GH", name: "Ghana", currency: "GHS", networks: ["mtn", "telecel", "airteltigo"] },
   { code: "ZA", name: "South Africa", currency: "ZAR", networks: ["vodacom", "mtn", "cell-c", "telkom"] },
+  { code: "ZM", name: "Zambia", currency: "ZMW", networks: ["airtel", "zamtel", "mtn"] },
+  { code: "RW", name: "Rwanda", currency: "RWF", networks: ["mtn"] },
+  { code: "MW", name: "Malawi", currency: "MWK", networks: ["airtel", "tnm"] },
+  { code: "ET", name: "Ethiopia", currency: "ETB", networks: ["safaricom"] },
 ] as const;
 
 export const networkLabel = (network: string) =>
-  ({ safaricom: "Safaricom", airtel: "Airtel", telkom: "Telkom", mtn: "MTN", vodacom: "Vodacom", tigo: "Tigo", halotel: "Halotel", glo: "Glo", "9mobile": "9mobile", telecel: "Telecel", airteltigo: "AirtelTigo", "cell-c": "Cell C" })[network] ??
+  ({ safaricom: "Safaricom", airtel: "Airtel", telkom: "Telkom", mtn: "MTN", vodacom: "Vodacom", tigo: "Tigo", halotel: "Halotel", glo: "Glo", "9mobile": "9mobile", telecel: "Telecel", airteltigo: "AirtelTigo", "cell-c": "Cell C", lyca: "Lyca Mobile", zamtel: "Zamtel", tnm: "TNM" })[network] ??
   network;
 
 export type PlanRow = { id: string; country: string; network: string; size: string; unit: "MB" | "GB"; validity: string; price: string; cost: string };

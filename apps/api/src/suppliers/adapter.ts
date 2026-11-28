@@ -113,6 +113,8 @@ export interface SupplierAdapter {
    * in their own currency), whatever the reseller's plan allows abroad.
    */
   readonly domesticOnly?: boolean;
+  /** Products this supplier's sync creates are listed on bitocard.com straight away (admins can still unlist them). */
+  readonly listsNewProducts?: boolean;
   catalogue(scope: CatalogueScope): Promise<CatalogueItem[]>;
   /** Optional: what the last catalogue fetch found, so a sync that brings back nothing can say why. */
   syncReport?(): string | null;

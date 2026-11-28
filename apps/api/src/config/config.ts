@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { publishedAirtimeDiscountsText, publishedDataPlansText } from '../suppliers/africas-talking-data-plans.js';
 
 const list = z
   .string()
@@ -255,13 +256,13 @@ export const configSchema = z.object({
   /** Leave at the defaults to follow AFRICAS_TALKING_SANDBOX; any other value overrides them. */
   AFRICAS_TALKING_API_URL: z.string().url().default('https://api.africastalking.com'),
   AFRICAS_TALKING_DATA_URL: z.string().url().default('https://bundles.africastalking.com'),
-  /** The airtime discount agreed with Africa's Talking, in percent: BitoCard's cost is the amount less this. */
-  AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT: z.string().optional(),
+  /** The airtime discounts agreed with Africa's Talking, in percent: BitoCard's cost is the amount less them. Default: its published lowest tier. */
+  AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT: z.string().default(publishedAirtimeDiscountsText),
   /** Airtime countries (`KE KES 10-10000 safaricom,airtel,telkom; ...`); empty: the published defaults. */
   AFRICAS_TALKING_AIRTIME_COUNTRIES: z.string().optional(),
   /** The Mobile Data product made in its dashboard, and the plans sold (`KE safaricom 1GB Month 299 250; ...`). */
   AFRICAS_TALKING_DATA_PRODUCT: z.string().optional(),
-  AFRICAS_TALKING_DATA_PLANS: z.string().optional(),
+  AFRICAS_TALKING_DATA_PLANS: z.string().default(publishedDataPlansText),
   /** In the status callback addresses set in its dashboard: /v1/webhooks/africas-talking?token=<this>. */
   AFRICAS_TALKING_CALLBACK_TOKEN: z.string().optional(),
   /** Remita Vending Bills (RemitaConnect): the account's secret key, sent as the secretKey header. */

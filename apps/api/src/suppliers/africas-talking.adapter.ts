@@ -3,7 +3,7 @@ import { Prisma, type ProductCategory } from '../generated/prisma/client.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
 import type { CatalogueItem, CatalogueScope, FulfilmentRequest, FulfilmentResult, SupplierAdapter } from './adapter.js';
 import { slug } from './adapter.js';
-import { dataValidities as validities, publishedAfricasTalkingDataPlans, type AfricasTalkingDataPlan as DataPlan, type DataValidity as Validity } from './africas-talking-data-plans.js';
+import { dataValidities as validities, publishedAfricasTalkingDataPlans, publishedAirtimeDiscountsText, type AfricasTalkingDataPlan as DataPlan, type DataValidity as Validity } from './africas-talking-data-plans.js';
 
 const Decimal = Prisma.Decimal;
 
@@ -12,18 +12,22 @@ export type AirtimeMarket = { country: string; currency: string; min: number; ma
 
 /**
  * Africa's Talking's airtime markets: the countries its help centre lists airtime as live in, with the per-number limits
- * it publishes (Kenya, Uganda, Tanzania and Nigeria; Ghana's and South Africa's are not published, so theirs are kept
- * narrow until confirmed on BitoCard's account). Settings > Integrations > Africa's Talking > Airtime countries
+ * it publishes (Kenya, Uganda, Tanzania and Nigeria; Ghana's, South Africa's, Zambia's, Rwanda's, Malawi's and Ethiopia's
+ * are not published, so theirs are kept narrow until confirmed on BitoCard's account). Settings > Integrations > Africa's Talking > Airtime countries
  * overrides them. Network slugs match the other suppliers' brands (Reloadly's "MTN Nigeria" is `mtn`), so Africa's
  * Talking's offers share their products and are routed by net margin.
  */
 export const defaultAirtimeMarkets: AirtimeMarket[] = [
   { country: 'KE', currency: 'KES', min: 10, max: 10_000, networks: ['safaricom', 'airtel', 'telkom'] },
-  { country: 'UG', currency: 'UGX', min: 50, max: 200_000, networks: ['mtn', 'airtel'] },
+  { country: 'UG', currency: 'UGX', min: 50, max: 200_000, networks: ['mtn', 'airtel', 'lyca'] },
   { country: 'TZ', currency: 'TZS', min: 1_000, max: 200_000, networks: ['vodacom', 'airtel', 'tigo', 'halotel'] },
   { country: 'NG', currency: 'NGN', min: 50, max: 5_000, networks: ['mtn', 'airtel', 'glo', '9mobile'] },
   { country: 'GH', currency: 'GHS', min: 1, max: 1_000, networks: ['mtn', 'telecel', 'airteltigo'] },
   { country: 'ZA', currency: 'ZAR', min: 5, max: 1_000, networks: ['vodacom', 'mtn', 'cell-c', 'telkom'] },
+  { country: 'ZM', currency: 'ZMW', min: 1, max: 1_000, networks: ['airtel', 'zamtel', 'mtn'] },
+  { country: 'RW', currency: 'RWF', min: 100, max: 100_000, networks: ['mtn'] },
+  { country: 'MW', currency: 'MWK', min: 100, max: 100_000, networks: ['airtel', 'tnm'] },
+  { country: 'ET', currency: 'ETB', min: 5, max: 1_000, networks: ['safaricom'] },
 ];
 
 const networkNames: Record<string, string> = {
@@ -40,6 +44,7 @@ const networkNames: Record<string, string> = {
   airteltigo: 'AirtelTigo',
   tnm: 'TNM',
   zamtel: 'Zamtel',
+  lyca: 'Lyca Mobile',
   'cell-c': 'Cell C',
 };
 const networkName = (network: string) => networkNames[network] ?? network.replace(/(^|-)([a-z])/g, (_, dash: string, letter: string) => `${dash ? ' ' : ''}${letter.toUpperCase()}`);
@@ -71,7 +76,7 @@ export function parseAirtimeMarkets(value: string | undefined): { markets: Airti
 }
 
 /** Networks Africa's Talking (or a price list) names differently from the shared product brands. */
-const networkAliases: Record<string, string> = { t2: '9mobile', etisalat: '9mobile', 'airtel-tigo': 'airteltigo', vodafone: 'telecel' };
+const networkAliases: Record<string, string> = { 'lyca-mobile': 'lyca', lycamobile: 'lyca', t2: '9mobile', etisalat: '9mobile', 'airtel-tigo': 'airteltigo', vodafone: 'telecel' };
 const networkSlug = (value: string) => {
   const name = slug(value);
   return networkAliases[name] ?? name;
@@ -81,12 +86,13 @@ const networkSlug = (value: string) => {
  * The airtime discounts agreed with Africa's Talking, in percent, one per line or separated by semicolons or commas:
  * a bare number for every country and network (`3`), a country's (`NG 2`), or a network's in a country (`NG mtn 1.8`;
  * T2 is 9mobile's new name). The most specific wins; a network with none is not synced. Africa's Talking's schedule
- * raises the rates with monthly volume, so set the tier the account is on.
+ * raises the rates with monthly volume, so set the tier the account is on. Empty: its published lowest tier.
  */
 export function parseAirtimeDiscounts(value: string | undefined) {
   const discounts = new Map<string, Prisma.Decimal>();
   const problems: string[] = [];
-  for (const entry of (value ?? '').split(/[\n;,]+/).map(item => item.trim()).filter(Boolean)) {
+  const text = (value ?? '').trim() ? value! : publishedAirtimeDiscountsText;
+  for (const entry of text.split(/[\n;,]+/).map(item => item.trim()).filter(Boolean)) {
     const match = /^(?:([A-Za-z]{2})\s+(?:([a-z0-9][a-z0-9-]*)\s+)?)?(\d{1,2}(?:\.\d{1,4})?)\s*%?$/i.exec(entry);
     const percent = match ? new Decimal(match[3]) : null;
     if (!match || !percent || percent.gte(20)) {
@@ -179,6 +185,8 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
    * serves only that country: its resellers and their customers buy in their own currency, never cross-border.
    */
   readonly domesticOnly = true;
+  /** Its airtime and data are listed on bitocard.com as soon as they are synced. */
+  readonly listsNewProducts = true;
   private report: string[] = [];
 
   constructor(private readonly config: AfricasTalkingConfig) {}
@@ -265,10 +273,8 @@ export class AfricasTalkingAdapter implements SupplierAdapter {
     const plans = lines(this.config.dataPlans).length ? configured.plans : [...publishedAfricasTalkingDataPlans];
     const problems = configured.problems;
     if (problems.length) this.report.push(`Data plans not understood: ${problems.join(', ')}.`);
-    if (!this.config.dataProduct?.trim()) {
-      if (plans.length) this.report.push('Set the Mobile Data product name before data plans can be synced.');
-      return [];
-    }
+    // Listed even before the Mobile Data product name is set (orders are refused until it is), so admins see the plans.
+    if (!this.config.dataProduct?.trim() && plans.length) this.report.push('Set the Mobile Data product name (Settings > Integrations > Africa’s Talking): data orders are refused until it is.');
     const currencies = new Map(parseAirtimeMarkets(this.config.airtimeCountries).markets.map(item => [item.country, item.currency]));
     const items: CatalogueItem[] = [];
     for (const plan of plans.filter(item => item.country === country)) {

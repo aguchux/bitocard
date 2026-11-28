@@ -7,6 +7,7 @@ import { adminClient, adminCode, client, resellerClient, startApp } from './help
 import { fakeAfricasTalking } from './fakes.mjs';
 
 const { AfricasTalkingAdapter, parseAirtimeMarkets, parseAirtimeDiscounts, parseDataPlans, africasTalkingNotice, atAmount } = await import('../dist/suppliers/africas-talking.adapter.js');
+const { publishedDataPlansText } = await import('../dist/suppliers/africas-talking-data-plans.js');
 
 let server;
 let at;
@@ -88,7 +89,7 @@ describe('Africa’s Talking catalogue', () => {
     for (const offer of offers) (byCountry[offer.product.country] ??= []).push(offer.product.brand);
     assert.deepEqual(
       Object.fromEntries(Object.entries(byCountry).map(([country, brands]) => [country, brands.sort()]).sort()),
-      { GH: ['airteltigo', 'mtn', 'telecel'], KE: ['airtel', 'safaricom', 'telkom'], NG: ['9mobile', 'airtel', 'glo', 'mtn'], TZ: ['airtel', 'halotel', 'tigo', 'vodacom'], UG: ['airtel', 'mtn'], ZA: ['cell-c', 'mtn', 'telkom', 'vodacom'] },
+      { GH: ['airteltigo', 'mtn', 'telecel'], KE: ['airtel', 'safaricom', 'telkom'], NG: ['9mobile', 'airtel', 'glo', 'mtn'], TZ: ['airtel', 'halotel', 'tigo', 'vodacom'], UG: ['airtel', 'lyca', 'mtn'], ZA: ['cell-c', 'mtn', 'telkom', 'vodacom'], ET: ['safaricom'], MW: ['airtel', 'tnm'], RW: ['mtn'], ZM: ['airtel', 'mtn', 'zamtel'] },
       'only Kenya’s market is switched on, yet every country is stocked',
     );
     const uganda = await prisma.product.findUniqueOrThrow({ where: { key: 'airtime:UG:mtn:topup' } });
@@ -97,16 +98,36 @@ describe('Africa’s Talking catalogue', () => {
     assert.equal(southAfrica.name, 'Cell C airtime');
   });
 
-  test('airtime refuses to sync until the discount is set; settings are read line by line', async () => {
+  test('with nothing set, the published discounts and packages are used; settings are read line by line', async () => {
     const adapter = new AfricasTalkingAdapter({ username: 'bitocard', apiKey: 'at-key', apiUrl: at.url, dataUrl: at.url });
-    await assert.rejects(() => adapter.catalogue({ category: 'airtime', country: 'KE' }), /airtime discount/);
-    assert.equal((await adapter.catalogue({ category: 'data', country: 'KE' })).length, 0, 'no data without the Mobile Data product');
+    const airtime = await adapter.catalogue({ category: 'airtime', country: 'KE' });
+    assert.deepEqual(
+      Object.fromEntries(airtime.filter(item => ['KE', 'UG', 'ZM', 'ET'].includes(item.country)).map(item => [item.productKey, item.costRatio])),
+      {
+        'airtime:KE:safaricom:topup': '0.96',
+        'airtime:KE:airtel:topup': '0.96',
+        'airtime:KE:telkom:topup': '0.96',
+        'airtime:UG:mtn:topup': '0.97',
+        'airtime:UG:airtel:topup': '0.97',
+        'airtime:UG:lyca:topup': '0.97',
+        'airtime:ZM:airtel:topup': '0.995',
+        'airtime:ZM:zamtel:topup': '0.99',
+        'airtime:ZM:mtn:topup': '0.98',
+        'airtime:ET:safaricom:topup': '0.98',
+      },
+      'Africa’s Talking’s lowest published tier',
+    );
+    assert.ok(!airtime.some(item => item.country === 'ZA'), 'South Africa publishes no discount at that tier');
+    assert.match(adapter.syncReport(), /No airtime discount set for ZA vodacom/);
+    const data = await adapter.catalogue({ category: 'data', country: 'KE' });
+    assert.equal(data.length, 5, 'data plans are listed before the Mobile Data product is set');
+    assert.match(adapter.syncReport(), /Mobile Data product name/);
     const markets = parseAirtimeMarkets('KE KES 5-5000 safaricom, airtel; UG UGX 500 to 9');
     assert.deepEqual(markets.markets, [{ country: 'KE', currency: 'KES', min: 5, max: 5000, networks: ['safaricom', 'airtel'] }]);
     assert.deepEqual(markets.problems, ['"UG UGX 500 to 9"']);
     assert.deepEqual(
       parseAirtimeMarkets('').markets.map(market => market.country),
-      ['KE', 'UG', 'TZ', 'NG', 'GH', 'ZA'],
+      ['KE', 'UG', 'TZ', 'NG', 'GH', 'ZA', 'ZM', 'RW', 'MW', 'ET'],
       'empty: the countries Africa’s Talking lists airtime as live in',
     );
     assert.deepEqual(parseDataPlans('ng mtn 2gb biweek 600 540').plans, [{ country: 'NG', network: 'mtn', quantity: 2, unit: 'GB', validity: 'BiWeek', price: '600', cost: '540' }]);
@@ -114,11 +135,14 @@ describe('Africa’s Talking catalogue', () => {
     assert.deepEqual(atAmount('KES 100.5000'), { currency: 'KES', minor: 10050n });
   });
 
-  test('the published package list supplies Nigeria and Kenya when no account-specific plans are set', async () => {
+  test('the published package list supplies Nigeria, Kenya and Uganda when no account-specific plans are set', async () => {
     const adapter = new AfricasTalkingAdapter({ username: 'bitocard', apiKey: 'at-key', apiUrl: at.url, dataUrl: at.url, dataProduct: 'BitoCard Data' });
     const nigeria = await adapter.catalogue({ category: 'data', country: 'NG' });
     const kenya = await adapter.catalogue({ category: 'data', country: 'KE' });
-    assert.deepEqual([nigeria.length, kenya.length], [88, 5]);
+    const uganda = await adapter.catalogue({ category: 'data', country: 'UG' });
+    assert.deepEqual([nigeria.length, kenya.length, uganda.length], [88, 5, 27]);
+    assert.ok(uganda.some(item => item.productKey === 'data:UG:mtn:1gb-1-day' && item.fixedValues[0] === 200_000n && item.costRatio === '0.97'));
+    assert.deepEqual(parseDataPlans(publishedDataPlansText).plans.length, 120, 'the setting’s default is every published plan, as rows the admin app can edit');
     assert.ok(nigeria.some(item => item.productKey === 'data:NG:mtn:1gb-1-day' && item.fixedValues[0] === 50_000n && item.costRatio === '0.98'));
     assert.ok(nigeria.some(item => item.productKey === 'data:NG:9mobile:2gb-30-days' && item.fixedValues[0] === 100_000n && item.costRatio === '0.965'));
     assert.ok(kenya.some(item => item.productKey === 'data:KE:safaricom:1gb-7-days' && item.fixedValues[0] === 20_500n));
@@ -132,7 +156,7 @@ describe('Africa’s Talking catalogue', () => {
       'T2 is 9mobile; a country’s rate, then the general one, cover the rest',
     );
     assert.deepEqual(parsed.problems, ['"NG mtn 25"', '"mtn 2"'], 'a discount of 20% or more, or a network without its country, is not guessed');
-    assert.equal(parseAirtimeDiscounts('').discounts.size, 0);
+    assert.equal(parseAirtimeDiscounts('').of('NG', 'mtn')?.toString(), '1.8', 'empty: the published lowest tier');
 
     // Nigeria's schedule (Basic tier) and nothing else: only Nigeria's networks are synced, each at its own rate.
     const adapter = new AfricasTalkingAdapter({ username: 'bitocard', apiKey: 'at-key', apiUrl: at.url, dataUrl: at.url, airtimeDiscountPercent: 'NG airtel 2; NG glo 3; NG mtn 1.8; NG t2 3' });

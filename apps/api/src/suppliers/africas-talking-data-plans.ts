@@ -1,9 +1,13 @@
 /**
  * Africa's Talking's published Mobile Data price list.
  *
- * Source checked 26 November 2026: https://africastalking.co.tz/pricing?lang=en
- * Only packages supported by the Mobile Data API's quantity/unit/validity contract are included. Admin-configured
- * plans override this list, so an account-specific schedule can replace it without a deployment.
+ * Source checked 26 November 2026 (Uganda and the airtime discounts added 28 November 2026):
+ * https://africastalking.co.tz/pricing?lang=en
+ * Only data-only packages the Mobile Data API's quantity/unit/validity contract can send are included (no bundles with
+ * minutes, no 3-day or no-expiry bundles: Ghana's are all no-expiry, so Ghana has none). South Africa's bundles are
+ * listed at their retail price with no discount, so they could never be sold at a profit and are left out.
+ * These are the integration settings' defaults (`AFRICAS_TALKING_DATA_PLANS`, `AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT`),
+ * so the admin app shows every plan and discount and an account-specific schedule replaces them without a deployment.
  */
 
 export const dataValidities = { Day: '1 day', Week: '7 days', BiWeek: '14 days', Month: '30 days', Quarterly: '90 days' } as const;
@@ -121,4 +125,66 @@ export const publishedAfricasTalkingDataPlans: readonly AfricasTalkingDataPlan[]
   plan('NG', '9mobile', 6.2, 'GB', 'Month', 3000, 2895),
   plan('NG', '9mobile', 8.4, 'GB', 'Month', 4000, 3860),
   plan('NG', '9mobile', 11.4, 'GB', 'Month', 5000, 4825),
-];
+]
+  .concat(uganda());
+
+/** Uganda: the listed price, less Africa's Talking's 3% discount on every bundle. */
+function uganda(): AfricasTalkingDataPlan[] {
+  const rows: Array<[string, number, 'MB' | 'GB', DataValidity, number]> = [
+    ['lyca', 50, 'MB', 'Day', 250],
+    ['mtn', 40, 'MB', 'Day', 250],
+    ['mtn', 80, 'MB', 'Day', 500],
+    ['mtn', 300, 'MB', 'Day', 1000],
+    ['mtn', 1, 'GB', 'Day', 2000],
+    ['mtn', 1.5, 'GB', 'Day', 3000],
+    ['mtn', 1.5, 'GB', 'Month', 5000],
+    ['mtn', 2, 'GB', 'Month', 6500],
+    ['mtn', 4, 'GB', 'Month', 10000],
+    ['mtn', 7.5, 'GB', 'Month', 20000],
+    ['mtn', 20, 'GB', 'Month', 26000],
+    ['mtn', 45, 'GB', 'Month', 50000],
+    ['mtn', 100, 'GB', 'Month', 100000],
+    ['mtn', 200, 'GB', 'Month', 170000],
+    ['airtel', 70, 'MB', 'Day', 500],
+    ['airtel', 170, 'MB', 'Day', 1000],
+    ['airtel', 500, 'MB', 'Day', 2000],
+    ['airtel', 1.5, 'GB', 'Day', 3000],
+    ['airtel', 5, 'GB', 'Week', 6000],
+    ['airtel', 7, 'GB', 'Week', 8000],
+    ['airtel', 10, 'GB', 'Week', 10000],
+    ['airtel', 2, 'GB', 'Month', 6500],
+    ['airtel', 4, 'GB', 'Month', 10000],
+    ['airtel', 25, 'GB', 'Month', 30000],
+    ['airtel', 45, 'GB', 'Month', 50000],
+    ['airtel', 100, 'GB', 'Month', 100000],
+    ['airtel', 150, 'GB', 'Month', 150000],
+  ];
+  return rows.map(([network, quantity, unit, validity, price]) => plan('UG', network, quantity, unit, validity, price, Math.round(price * 0.97 * 100) / 100));
+}
+
+/** The plans as the setting's text, one a line: `KE safaricom 1GB Month 299 250`. */
+export const formatDataPlans = (plans: readonly AfricasTalkingDataPlan[]) =>
+  plans.map(item => `${item.country} ${item.network} ${item.quantity}${item.unit} ${item.validity} ${item.price} ${item.cost}`).join('\n');
+
+export const publishedDataPlansText = formatDataPlans(publishedAfricasTalkingDataPlans);
+
+/**
+ * Africa's Talking's published airtime discounts at its lowest volume tier (Basic), in the setting's format. South
+ * Africa publishes none at that tier, so it is not synced until the account's tier is entered.
+ */
+export const publishedAirtimeDiscountsText = [
+  'KE 4',
+  'UG 3',
+  'NG mtn 1.8',
+  'NG airtel 2',
+  'NG glo 3',
+  'NG 9mobile 3',
+  'TZ 1.5',
+  'GH 0.5',
+  'ZM airtel 0.5',
+  'ZM zamtel 1',
+  'ZM mtn 2',
+  'RW mtn 0.5',
+  'MW 0.5',
+  'ET safaricom 2',
+].join('\n');

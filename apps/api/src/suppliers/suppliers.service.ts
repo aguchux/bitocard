@@ -291,7 +291,11 @@ export class SuppliersService {
           items.push(item);
         }
       }
-      ({ created, updated } = await this.saveOffers(code, items));
+      let createdKeys: Set<string>;
+      ({ created, updated, createdKeys } = await this.saveOffers(code, items));
+      if (adapter.listsNewProducts && createdKeys.size) {
+        await this.prisma.product.updateMany({ where: { key: { in: [...createdKeys] }, listed: false }, data: { listed: true, listedAt: new Date() } });
+      }
     } catch (error) {
       const message = (error as Error).message.slice(0, 500);
       await this.prisma.supplier.update({ where: { code }, data: { lastSyncError: message } });
@@ -344,7 +348,7 @@ export class SuppliersService {
       await inGroups(changed);
       if (unchanged.length) await this.prisma.supplierProduct.updateMany({ where: { id: { in: unchanged } }, data: { available: true, syncedAt: now } });
     }
-    return { created: created.size, updated: items.length - created.size };
+    return { created: created.size, updated: items.length - created.size, createdKeys: created };
   }
 
   /**
